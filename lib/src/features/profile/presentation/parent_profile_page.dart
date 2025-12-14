@@ -1,0 +1,735 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
+import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+
+class ParentProfilePage extends StatefulWidget {
+  const ParentProfilePage({super.key});
+
+  @override
+  State<ParentProfilePage> createState() => _ParentProfilePageState();
+}
+
+class _ParentProfilePageState extends State<ParentProfilePage> {
+  final ImagePicker _picker = ImagePicker();
+  File? _avatarFile;
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _emailController;
+  bool _initializedFromLocale = false;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+    _emailController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedFromLocale) return;
+
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    _nameController.text = isArabic ? "عبدالله الأحمد" : "Abdullah Al-Ahmad";
+    _phoneController.text = "0501234567";
+    _emailController.text = "abdullah@example.com";
+    _initializedFromLocale = true;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final file = await _picker.pickImage(
+      source: source,
+      maxWidth: 1400,
+      imageQuality: 85,
+    );
+    if (file == null) return;
+
+    setState(() => _avatarFile = File(file.path));
+  }
+
+  void _toggleEditing() {
+    if (_isEditing) FocusScope.of(context).unfocus();
+    setState(() => _isEditing = !_isEditing);
+  }
+
+  void _showPhotoOptions() {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: Text(isArabic ? "التقاط صورة" : "Take a photo"),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text(
+                isArabic ? "اختيار من المعرض" : "Choose from gallery",
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ImageProvider avatarImage = _avatarFile != null
+        ? FileImage(_avatarFile!)
+        : const NetworkImage(
+            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
+          );
+
+    return CustomScrollView(
+      slivers: [
+        // Navigation Bar
+        CupertinoSliverNavigationBar(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: null,
+          largeTitle: Text(
+            isArabic ? "الملف الشخصي" : "Profile",
+            style: TextStyle(
+              color: isDark ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          leading: Material(
+            color: Colors.transparent,
+            child: IconButton(
+              icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+          trailing: Material(
+            color: Colors.transparent,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _isEditing ? Icons.check_rounded : Icons.edit_rounded,
+                    color: AppColors.primary,
+                  ),
+                  onPressed: _toggleEditing,
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: AppColors.primary,
+                  ),
+                  onPressed: _showPhotoOptions,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Content
+        SliverPadding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Profile Header
+              _ProfileHeader(
+                nameController: _nameController,
+                isEditing: _isEditing,
+                isArabic: isArabic,
+                isDark: isDark,
+                avatar: avatarImage,
+                onChangePhoto: _showPhotoOptions,
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+
+              // Personal Information Section
+              _SectionTitle(
+                title: isArabic ? "المعلومات الشخصية" : "Personal Information",
+                icon: Icons.person_outline,
+                isDark: isDark,
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              _InfoCard(
+                icon: Icons.phone_outlined,
+                label: isArabic ? "رقم الهاتف" : "Phone Number",
+                value: _phoneController.text,
+                isEditing: _isEditing,
+                isDark: isDark,
+                controller: _phoneController,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              _InfoCard(
+                icon: Icons.email_outlined,
+                label: isArabic ? "البريد الإلكتروني" : "Email",
+                value: _emailController.text,
+                isEditing: _isEditing,
+                isDark: isDark,
+                controller: _emailController,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              _InfoCard(
+                icon: Icons.badge_outlined,
+                label: isArabic ? "رقم ولي الأمر" : "Parent ID",
+                value: "123456",
+                isEditing: _isEditing,
+                isDark: isDark,
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+
+              // Children Section
+              _SectionTitle(
+                title: isArabic ? "الأبناء" : "Children",
+                icon: Icons.family_restroom_rounded,
+                isDark: isDark,
+                action: TextButton.icon(
+                  onPressed: () {
+                    // Navigate to children screen
+                    final controller = AppScope.of(context);
+                    controller.setNavIndex(1);
+                    Navigator.of(context).pop(); // Close drawer if open
+                  },
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                  label: Text(isArabic ? "عرض الكل" : "View All"),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              _ChildQuickCard(
+                name: isArabic ? "سارة أحمد" : "Sarah Ahmed",
+                grade: isArabic ? "الصف الرابع" : "Grade 4",
+                avatar:
+                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
+                isDark: isDark,
+                isArabic: isArabic,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              _ChildQuickCard(
+                name: isArabic ? "عبدالله محمد" : "Abdullah Mohammed",
+                grade: isArabic ? "الصف الأول" : "Grade 1",
+                avatar:
+                    "https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d?w=200",
+                isDark: isDark,
+                isArabic: isArabic,
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+
+              // Quick Actions Section
+              _SectionTitle(
+                title: isArabic ? "إجراءات سريعة" : "Quick Actions",
+                icon: Icons.bolt_rounded,
+                isDark: isDark,
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.notifications_outlined,
+                      label: isArabic ? "الإشعارات" : "Notifications",
+                      color: AppColors.accent,
+                      isDark: isDark,
+                      onTap: () {
+                        final controller = AppScope.of(context);
+                        controller.setNavIndex(3);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.chat_bubble_outline,
+                      label: isArabic ? "الرسائل" : "Messages",
+                      color: AppColors.primary,
+                      isDark: isDark,
+                      onTap: () {
+                        final controller = AppScope.of(context);
+                        controller.setNavIndex(4);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+
+              // Logout Button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    // Show logout confirmation
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(isArabic ? "تسجيل الخروج" : "Logout"),
+                        content: Text(
+                          isArabic
+                              ? "هل أنت متأكد من تسجيل الخروج؟"
+                              : "Are you sure you want to logout?",
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text(isArabic ? "إلغاء" : "Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              // Perform logout
+                              Navigator.pop(context);
+                            },
+                            child: Text(
+                              isArabic ? "تسجيل الخروج" : "Logout",
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.error.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.logout_rounded,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          isArabic ? "تسجيل الخروج" : "Logout",
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(
+                height: MediaQuery.of(context).padding.bottom + AppSpacing.xl,
+              ),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.nameController,
+    required this.isEditing,
+    required this.isArabic,
+    required this.isDark,
+    required this.avatar,
+    required this.onChangePhoto,
+  });
+
+  final TextEditingController nameController;
+  final bool isEditing;
+  final bool isArabic;
+  final bool isDark;
+  final ImageProvider avatar;
+  final VoidCallback onChangePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: AppColors.brandGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 3,
+                  ),
+                ),
+                child: CircleAvatar(radius: 50, backgroundImage: avatar),
+              ),
+              if (isEditing)
+                Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: onChangePhoto,
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (isEditing)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                controller: nameController,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            )
+          else
+            Text(
+              nameController.text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          const SizedBox(height: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              isArabic ? "ولي الأمر" : "Parent",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.title,
+    required this.icon,
+    required this.isDark,
+    this.action,
+  });
+
+  final String title;
+  final IconData icon;
+  final bool isDark;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 22),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          title,
+          style: TextStyle(
+            color: isDark ? Colors.white : AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (action != null) ...[const Spacer(), action!],
+      ],
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.isEditing,
+    required this.isDark,
+    this.controller,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isEditing;
+  final bool isDark;
+  final TextEditingController? controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (isEditing && controller != null)
+                  TextField(
+                    controller: controller,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
+                  )
+                else
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChildQuickCard extends StatelessWidget {
+  const _ChildQuickCard({
+    required this.name,
+    required this.grade,
+    required this.avatar,
+    required this.isDark,
+    required this.isArabic,
+  });
+
+  final String name;
+  final String grade;
+  final String avatar;
+  final bool isDark;
+  final bool isArabic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(radius: 24, backgroundImage: NetworkImage(avatar)),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  grade,
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 16,
+            color: isDark ? Colors.white60 : AppColors.textSecondary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
