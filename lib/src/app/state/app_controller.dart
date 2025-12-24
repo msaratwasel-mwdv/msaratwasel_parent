@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:developer' as developer;
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
@@ -10,7 +12,9 @@ class AppController extends ChangeNotifier {
       _notifications = SampleData.notifications(),
       _messages = SampleData.messages,
       _attendance = List.of(SampleData.attendance),
-      _trips = List.of(SampleData.trips);
+      _trips = List.of(SampleData.trips) {
+    developer.log('🏗️ AppController: Instance created', name: 'STATE');
+  }
 
   Locale _locale = const Locale('ar');
   ThemeMode _themeMode = ThemeMode.system;
@@ -50,9 +54,17 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
+    developer.log('🎬 AppController: Starting bootstrap...', name: 'BOOT');
     // Simulate loading configuration, cached session, etc.
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(seconds: 1));
+
     _bootCompleted = true;
+    developer.log('🏁 AppController: Bootstrap completed', name: 'BOOT');
+
+    // Remove native splash screen if it exists
+    FlutterNativeSplash.remove();
+    developer.log('✨ AppController: Native splash removed', name: 'BOOT');
+
     notifyListeners();
   }
 

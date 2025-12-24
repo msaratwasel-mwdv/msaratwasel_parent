@@ -1,9 +1,6 @@
-import 'dart:ui'; // Added for ImageFilter
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
@@ -64,9 +61,6 @@ class SplashScreen extends StatelessWidget {
 
                 const SizedBox(height: 32),
 
-                // Text Animation
-                const SizedBox(height: 48),
-
                 // Loading Indicator
                 SizedBox(
                   width: 200,
@@ -81,9 +75,11 @@ class SplashScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         context.t('loading'),
-                        style: GoogleFonts.cairo(
-                          color: Colors.white70,
-                          fontSize: 14,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
                         ),
                       ),
                     ],
@@ -137,16 +133,16 @@ class _AnimatedBackground extends StatelessWidget {
 
           // Gradient Orb 2
           Positioned(
-                bottom: -50,
-                left: -50,
+                bottom: -150,
+                left: -150,
                 child: Container(
-                  width: 300,
-                  height: 300,
+                  width: 500,
+                  height: 500,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        Colors.blue.withOpacity(0.3),
+                        const Color(0xFF005BC4).withOpacity(0.4),
                         Colors.transparent,
                       ],
                     ),
@@ -154,16 +150,19 @@ class _AnimatedBackground extends StatelessWidget {
                 ),
               )
               .animate(onPlay: (c) => c.repeat(reverse: true))
-              .move(
-                begin: const Offset(0, 0),
-                end: const Offset(20, -20),
-                duration: 5.seconds,
+              .scale(
+                begin: const Offset(1.2, 1.2),
+                end: const Offset(1, 1),
+                duration: 6.seconds,
+                curve: Curves.easeInOut,
               ),
 
-          // Glass overlay
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-            child: Container(color: Colors.black.withOpacity(0.2)),
+          // Optional: Subtle Glassmorphism overlay
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: Container(color: Colors.transparent),
+            ),
           ),
         ],
       ),

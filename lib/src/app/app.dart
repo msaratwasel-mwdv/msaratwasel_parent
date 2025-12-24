@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:developer' as developer;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -20,6 +21,7 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
   @override
   void initState() {
     super.initState();
+    developer.log('⚡ MsaratWaselApp: initState', name: 'UI');
     _controller = AppController();
     _controller.bootstrap();
   }
@@ -32,6 +34,7 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
 
   @override
   Widget build(BuildContext context) {
+    developer.log('🎨 MsaratWaselApp: building root widget tree', name: 'UI');
     return AppScope(
       controller: _controller,
       child: AnimatedBuilder(

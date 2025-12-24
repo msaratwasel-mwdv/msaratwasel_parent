@@ -18,12 +18,13 @@ class ChildrenScreen extends StatelessWidget {
     final trips = controller.trips;
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return CustomScrollView(
       slivers: [
         // Navigation Bar
         CupertinoSliverNavigationBar(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          backgroundColor: scaffoldBackgroundColor,
           border: null,
           largeTitle: Text(
             'الأبناء (${students.length})',

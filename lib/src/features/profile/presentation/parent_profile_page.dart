@@ -18,18 +18,14 @@ class ParentProfilePage extends StatefulWidget {
 class _ParentProfilePageState extends State<ParentProfilePage> {
   final ImagePicker _picker = ImagePicker();
   File? _avatarFile;
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-  late final TextEditingController _emailController;
+  String _name = '';
+  String _phone = '';
+  String _email = '';
   bool _initializedFromLocale = false;
-  bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _phoneController = TextEditingController();
-    _emailController = TextEditingController();
   }
 
   @override
@@ -38,17 +34,14 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     if (_initializedFromLocale) return;
 
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    _nameController.text = isArabic ? "عبدالله الأحمد" : "Abdullah Al-Ahmad";
-    _phoneController.text = "0501234567";
-    _emailController.text = "abdullah@example.com";
+    _name = isArabic ? "عبدالله الأحمد" : "Abdullah Al-Ahmad";
+    _phone = "0501234567";
+    _email = "abdullah@example.com";
     _initializedFromLocale = true;
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -61,11 +54,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     if (file == null) return;
 
     setState(() => _avatarFile = File(file.path));
-  }
-
-  void _toggleEditing() {
-    if (_isEditing) FocusScope.of(context).unfocus();
-    setState(() => _isEditing = !_isEditing);
   }
 
   void _showPhotoOptions() {
@@ -108,6 +96,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   Widget build(BuildContext context) {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
     final ImageProvider avatarImage = _avatarFile != null
         ? FileImage(_avatarFile!)
         : const NetworkImage(
@@ -118,7 +107,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
       slivers: [
         // Navigation Bar
         CupertinoSliverNavigationBar(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          backgroundColor: scaffoldBackgroundColor,
           border: null,
           largeTitle: Text(
             isArabic ? "الملف الشخصي" : "Profile",
@@ -140,13 +129,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: Icon(
-                    _isEditing ? Icons.check_rounded : Icons.edit_rounded,
-                    color: AppColors.primary,
-                  ),
-                  onPressed: _toggleEditing,
-                ),
-                IconButton(
                   icon: const Icon(
                     Icons.camera_alt_rounded,
                     color: AppColors.primary,
@@ -165,8 +147,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             delegate: SliverChildListDelegate([
               // Profile Header
               _ProfileHeader(
-                nameController: _nameController,
-                isEditing: _isEditing,
+                name: _name,
                 isArabic: isArabic,
                 isDark: isDark,
                 avatar: avatarImage,
@@ -184,30 +165,25 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               const SizedBox(height: AppSpacing.md),
 
               _InfoCard(
+                icon: Icons.badge_outlined,
+                label: isArabic ? "الرقم المدني" : "Civil ID",
+                value: "123456",
+                isDark: isDark,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              _InfoCard(
                 icon: Icons.phone_outlined,
                 label: isArabic ? "رقم الهاتف" : "Phone Number",
-                value: _phoneController.text,
-                isEditing: _isEditing,
+                value: _phone,
                 isDark: isDark,
-                controller: _phoneController,
               ),
               const SizedBox(height: AppSpacing.sm),
 
               _InfoCard(
                 icon: Icons.email_outlined,
                 label: isArabic ? "البريد الإلكتروني" : "Email",
-                value: _emailController.text,
-                isEditing: _isEditing,
-                isDark: isDark,
-                controller: _emailController,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              _InfoCard(
-                icon: Icons.badge_outlined,
-                label: isArabic ? "رقم ولي الأمر" : "Parent ID",
-                value: "123456",
-                isEditing: _isEditing,
+                value: _email,
                 isDark: isDark,
               ),
 
@@ -378,16 +354,14 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
-    required this.nameController,
-    required this.isEditing,
+    required this.name,
     required this.isArabic,
     required this.isDark,
     required this.avatar,
     required this.onChangePhoto,
   });
 
-  final TextEditingController nameController;
-  final bool isEditing;
+  final String name;
   final bool isArabic;
   final bool isDark;
   final ImageProvider avatar;
@@ -424,60 +398,37 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 child: CircleAvatar(radius: 50, backgroundImage: avatar),
               ),
-              if (isEditing)
-                Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    onTap: onChangePhoto,
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.camera_alt_rounded,
-                        size: 20,
-                        color: AppColors.primary,
-                      ),
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: onChangePhoto,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      size: 20,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          if (isEditing)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: nameController,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            )
-          else
-            Text(
-              nameController.text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
             ),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -538,17 +489,13 @@ class _InfoCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    required this.isEditing,
     required this.isDark,
-    this.controller,
   });
 
   final IconData icon;
   final String label;
   final String value;
-  final bool isEditing;
   final bool isDark;
-  final TextEditingController? controller;
 
   @override
   Widget build(BuildContext context) {
@@ -587,29 +534,14 @@ class _InfoCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (isEditing && controller != null)
-                  TextField(
-                    controller: controller,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      isDense: true,
-                    ),
-                  )
-                else
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
               ],
             ),
           ),

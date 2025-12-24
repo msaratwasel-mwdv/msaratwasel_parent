@@ -81,7 +81,7 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   device_info_plus: ^12.3.0
   url_launcher: ^6.3.2
-  syncfusion_flutter_pdf: ^31.2.16
+  syncfusion_flutter_pdf: ^32.1.19
   printing: ^5.14.2
   web_socket_channel: ^3.0.3
   socket_io_client: ^3.1.3

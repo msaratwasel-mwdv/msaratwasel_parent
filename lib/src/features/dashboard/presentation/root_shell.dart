@@ -22,21 +22,14 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  late final List<Widget> _pages;
+  late final List<Widget?> _pages;
 
   @override
   void initState() {
     super.initState();
-    _pages = const [
-      HomeScreen(), // index 0 – الرئيسية
-      ChildrenScreen(), // index 1 – الأبناء
-      TrackingPage(), // index 2 – تتبع الحافلة
-      NotificationsPage(), // index 3 – الإشعارات
-      MessagesPage(), // index 4 – الدردشة
-      AbsenceRequestPage(), // index 5 – إدارة الحضور
-      ParentProfilePage(), // index 6 – ملف ولي الأمر
-      MorePage(), // index 7 – الإعدادات
-    ];
+    _pages = List<Widget?>.filled(8, null, growable: false);
+    // Preload the first tab only to avoid initializing heavy widgets (e.g., Google Maps) prematurely.
+    _pages[0] = const HomeScreen();
   }
 
   @override
@@ -48,6 +41,7 @@ class _RootShellState extends State<RootShell> {
       builder: (context, _) {
         final isArabic = controller.locale.languageCode == 'ar';
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
+        final page = _buildPage(currentIndex);
 
         return Scaffold(
           key: _scaffoldKey,
@@ -68,10 +62,30 @@ class _RootShellState extends State<RootShell> {
           // AppBar removed to allow pages to have their own CupertinoSliverNavigationBar
           appBar: null,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: IndexedStack(index: currentIndex, children: _pages),
+          // Keep SafeArea for scrollable pages (unified status/app bar color),
+          // but allow TrackingPage (Google Maps) to be truly fullscreen.
+          body: currentIndex == 2
+              ? page
+              : SafeArea(top: true, bottom: false, child: page),
         );
       },
     );
+  }
+
+  Widget _buildPage(int index) {
+    // Lazily instantiate pages to avoid initializing platform views (e.g., Google Maps) when not visible.
+    _pages[index] ??= switch (index) {
+      0 => const HomeScreen(),
+      1 => const ChildrenScreen(),
+      2 => const TrackingPage(),
+      3 => const NotificationsPage(),
+      4 => const MessagesPage(),
+      5 => const AbsenceRequestPage(),
+      6 => const ParentProfilePage(),
+      7 => const MorePage(),
+      _ => const HomeScreen(),
+    };
+    return _pages[index]!;
   }
 }
 

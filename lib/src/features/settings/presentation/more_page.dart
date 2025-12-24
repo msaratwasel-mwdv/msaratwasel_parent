@@ -26,198 +26,193 @@ class _MorePageState extends State<MorePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            CupertinoSliverNavigationBar(
-              largeTitle: Text(
-                context.t('settings'),
-                style: TextStyle(
-                  fontFamily: GoogleFonts.cairo().fontFamily,
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                ),
-              ),
-              backgroundColor: theme.scaffoldBackgroundColor.withOpacity(0.9),
-              border: null, // Remove the border for a cleaner look
-              stretch: true,
-              leading: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  icon: Icon(Icons.menu_rounded, color: AppColors.primary),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          CupertinoSliverNavigationBar(
+            largeTitle: Text(
+              context.t('settings'),
+              style: TextStyle(
+                fontFamily: GoogleFonts.cairo().fontFamily,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isArabic
-                          ? 'إعدادات التطبيق والحساب'
-                          : 'App and account settings',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: isDark
-                            ? Colors.white70
-                            : AppColors.textSecondary,
+            backgroundColor: theme.scaffoldBackgroundColor.withOpacity(0.9),
+            border: null, // Remove the border for a cleaner look
+            stretch: true,
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isArabic
+                        ? 'إعدادات التطبيق والحساب'
+                        : 'App and account settings',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDark ? Colors.white70 : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // Account Section
+                  _SectionHeader(title: isArabic ? 'الحساب' : 'Account'),
+                  const SizedBox(height: AppSpacing.md),
+                  _SettingsCard(
+                    children: [
+                      _SettingsTile(
+                        icon: PhosphorIcons.userCircle(
+                          PhosphorIconsStyle.duotone,
+                        ),
+                        title: isArabic ? 'الملف الشخصي' : 'Profile',
+                        subtitle: isArabic
+                            ? 'تعديل البيانات الشخصية'
+                            : 'Edit personal info',
+                        onTap: () =>
+                            controller.setNavIndex(6), // Parent Profile
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.users(PhosphorIconsStyle.duotone),
+                        title: isArabic ? 'أبنائي' : 'My Kids',
+                        subtitle: isArabic
+                            ? 'إدارة الطلاب المسجلين'
+                            : 'Manage registered students',
+                        onTap: () => controller.setNavIndex(0), // Kids list
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
 
-                    // Account Section
-                    _SectionHeader(title: isArabic ? 'الحساب' : 'Account'),
-                    const SizedBox(height: AppSpacing.md),
-                    _SettingsCard(
-                      children: [
-                        _SettingsTile(
-                          icon: PhosphorIcons.userCircle(
-                            PhosphorIconsStyle.duotone,
-                          ),
-                          title: isArabic ? 'الملف الشخصي' : 'Profile',
-                          subtitle: isArabic
-                              ? 'تعديل البيانات الشخصية'
-                              : 'Edit personal info',
-                          onTap: () =>
-                              controller.setNavIndex(6), // Parent Profile
+                  // App Settings Section
+                  _SectionHeader(title: isArabic ? 'التطبيق' : 'Application'),
+                  const SizedBox(height: AppSpacing.md),
+                  _SettingsCard(
+                    children: [
+                      _SettingsTile(
+                        icon: isDark
+                            ? PhosphorIcons.moonStars(
+                                PhosphorIconsStyle.duotone,
+                              )
+                            : PhosphorIcons.sun(PhosphorIconsStyle.duotone),
+                        title: isArabic ? 'المظهر' : 'Appearance',
+                        subtitle: isDark
+                            ? (isArabic ? 'داكن' : 'Dark')
+                            : (isArabic ? 'فاتح' : 'Light'),
+                        trailing: Switch.adaptive(
+                          value: isDark,
+                          activeColor: AppColors.primary,
+                          onChanged: (v) => controller.toggleTheme(isDark),
                         ),
-                        _Divider(),
-                        _SettingsTile(
-                          icon: PhosphorIcons.users(PhosphorIconsStyle.duotone),
-                          title: isArabic ? 'أبنائي' : 'My Kids',
-                          subtitle: isArabic
-                              ? 'إدارة الطلاب المسجلين'
-                              : 'Manage registered students',
-                          onTap: () => controller.setNavIndex(0), // Kids list
+                        onTap: () => controller.toggleTheme(isDark),
+                      ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.translate(
+                          PhosphorIconsStyle.duotone,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
+                        title: isArabic ? 'الخ لغة' : 'Language',
+                        subtitle: isArabic ? 'العربية' : 'English',
+                        trailing: Switch.adaptive(
+                          value: isArabic,
+                          activeColor: AppColors.primary,
+                          onChanged: (v) => controller.toggleLanguage(),
+                        ),
+                        onTap: controller.toggleLanguage,
+                      ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.bellSimple(
+                          PhosphorIconsStyle.duotone,
+                        ),
+                        title: isArabic ? 'الإشعارات' : 'Notifications',
+                        subtitle: isArabic
+                            ? 'تنبيهات الرحلات والحضور'
+                            : 'Trip and attendance alerts',
+                        trailing: Switch.adaptive(
+                          value: notificationsEnabled,
+                          activeColor: AppColors.primary,
+                          onChanged: (v) =>
+                              setState(() => notificationsEnabled = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
 
-                    // App Settings Section
-                    _SectionHeader(title: isArabic ? 'التطبيق' : 'Application'),
-                    const SizedBox(height: AppSpacing.md),
-                    _SettingsCard(
-                      children: [
-                        _SettingsTile(
-                          icon: isDark
-                              ? PhosphorIcons.moonStars(
-                                  PhosphorIconsStyle.duotone,
-                                )
-                              : PhosphorIcons.sun(PhosphorIconsStyle.duotone),
-                          title: isArabic ? 'المظهر' : 'Appearance',
-                          subtitle: isDark
-                              ? (isArabic ? 'داكن' : 'Dark')
-                              : (isArabic ? 'فاتح' : 'Light'),
-                          trailing: Switch.adaptive(
-                            value: isDark,
-                            activeColor: AppColors.primary,
-                            onChanged: (v) => controller.toggleTheme(isDark),
-                          ),
-                          onTap: () => controller.toggleTheme(isDark),
+                  // Support Section
+                  _SectionHeader(title: isArabic ? 'الدعم' : 'Support'),
+                  const SizedBox(height: AppSpacing.md),
+                  _SettingsCard(
+                    children: [
+                      _SettingsTile(
+                        icon: PhosphorIcons.question(
+                          PhosphorIconsStyle.duotone,
                         ),
-                        _Divider(),
-                        _SettingsTile(
-                          icon: PhosphorIcons.translate(
-                            PhosphorIconsStyle.duotone,
-                          ),
-                          title: isArabic ? 'الخ لغة' : 'Language',
-                          subtitle: isArabic ? 'العربية' : 'English',
-                          trailing: Switch.adaptive(
-                            value: isArabic,
-                            activeColor: AppColors.primary,
-                            onChanged: (v) => controller.toggleLanguage(),
-                          ),
-                          onTap: controller.toggleLanguage,
+                        title: isArabic ? 'مركز المساعدة' : 'Help Center',
+                        onTap: () {},
+                      ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.phoneCall(
+                          PhosphorIconsStyle.duotone,
                         ),
-                        _Divider(),
-                        _SettingsTile(
-                          icon: PhosphorIcons.bellSimple(
-                            PhosphorIconsStyle.duotone,
-                          ),
-                          title: isArabic ? 'الإشعارات' : 'Notifications',
-                          subtitle: isArabic
-                              ? 'تنبيهات الرحلات والحضور'
-                              : 'Trip and attendance alerts',
-                          trailing: Switch.adaptive(
-                            value: notificationsEnabled,
-                            activeColor: AppColors.primary,
-                            onChanged: (v) =>
-                                setState(() => notificationsEnabled = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
+                        title: isArabic ? 'تواصل معنا' : 'Contact Us',
+                        onTap: () {},
+                      ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.info(PhosphorIconsStyle.duotone),
+                        title: isArabic ? 'عن التطبيق' : 'About App',
+                        subtitle: 'v1.0.0',
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
 
-                    // Support Section
-                    _SectionHeader(title: isArabic ? 'الدعم' : 'Support'),
-                    const SizedBox(height: AppSpacing.md),
-                    _SettingsCard(
-                      children: [
-                        _SettingsTile(
-                          icon: PhosphorIcons.question(
-                            PhosphorIconsStyle.duotone,
-                          ),
-                          title: isArabic ? 'مركز المساعدة' : 'Help Center',
-                          onTap: () {},
+                  // Logout Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: controller.logout,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.error.withOpacity(0.1),
+                        foregroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        _Divider(),
-                        _SettingsTile(
-                          icon: PhosphorIcons.phoneCall(
-                            PhosphorIconsStyle.duotone,
-                          ),
-                          title: isArabic ? 'تواصل معنا' : 'Contact Us',
-                          onTap: () {},
-                        ),
-                        _Divider(),
-                        _SettingsTile(
-                          icon: PhosphorIcons.info(PhosphorIconsStyle.duotone),
-                          title: isArabic ? 'عن التطبيق' : 'About App',
-                          subtitle: 'v1.0.0',
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // Logout Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: controller.logout,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.error.withOpacity(0.1),
-                          foregroundColor: AppColors.error,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.logout_rounded),
-                        label: Text(
-                          isArabic ? 'تسجيل الخروج' : 'Logout',
-                          style: GoogleFonts.cairo(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.logout_rounded),
+                      label: Text(
+                        isArabic ? 'تسجيل الخروج' : 'Logout',
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
                     ),
-                    const SizedBox(
-                      height: AppSpacing.xxl,
-                    ), // Extra space for bottom nav
-                    const SizedBox(height: AppSpacing.xxl),
-                  ],
-                ),
+                  ),
+                  const SizedBox(
+                    height: AppSpacing.xxl,
+                  ), // Extra space for bottom nav
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
