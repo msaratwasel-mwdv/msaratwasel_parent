@@ -95,7 +95,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             border: Border(
               bottom: BorderSide(
-                color: Theme.of(context).dividerColor.withOpacity(0.5),
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
                 width: 0.0,
               ),
             ),

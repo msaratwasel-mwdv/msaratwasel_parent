@@ -27,15 +27,15 @@ class SplashScreen extends StatelessWidget {
                 Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),
@@ -56,7 +56,7 @@ class SplashScreen extends StatelessWidget {
                     .then()
                     .shimmer(
                       duration: 1500.ms,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
 
                 const SizedBox(height: 32),
@@ -68,7 +68,7 @@ class SplashScreen extends StatelessWidget {
                     children: [
                       LinearProgressIndicator(
                         minHeight: 4,
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
                         color: AppColors.accent,
                         borderRadius: BorderRadius.circular(2),
                       ),
@@ -116,7 +116,7 @@ class _AnimatedBackground extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        AppColors.accent.withOpacity(0.4),
+                        AppColors.accent.withValues(alpha: 0.4),
                         Colors.transparent,
                       ],
                     ),
@@ -142,7 +142,7 @@ class _AnimatedBackground extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        const Color(0xFF005BC4).withOpacity(0.4),
+                        const Color(0xFF005BC4).withValues(alpha: 0.4),
                         Colors.transparent,
                       ],
                     ),

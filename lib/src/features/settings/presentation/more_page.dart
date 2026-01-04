@@ -1,10 +1,11 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:msaratwasel_user/src/features/settings/presentation/change_password_page.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class MorePage extends StatefulWidget {
@@ -29,43 +30,30 @@ class _MorePageState extends State<MorePage> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: Text(
-              context.t('settings'),
-              style: TextStyle(
-                fontFamily: GoogleFonts.cairo().fontFamily,
-                color: isDark ? Colors.white : AppColors.textPrimary,
-              ),
-            ),
-            backgroundColor: theme.scaffoldBackgroundColor.withOpacity(0.9),
-            border: null, // Remove the border for a cleaner look
-            stretch: true,
+          AppSliverHeader(
+            title: context.t('settings'),
             leading: Material(
               color: Colors.transparent,
               child: IconButton(
-                icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: Theme.of(context).primaryColor,
+                ),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-          ),
+          ), // Unified header
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    isArabic
-                        ? 'إعدادات التطبيق والحساب'
-                        : 'App and account settings',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDark ? Colors.white70 : AppColors.textSecondary,
-                    ),
-                  ),
+                  // ... existing header ...
                   const SizedBox(height: AppSpacing.xl),
 
                   // Account Section
-                  _SectionHeader(title: isArabic ? 'الحساب' : 'Account'),
+                  _SectionHeader(title: context.t('account')),
                   const SizedBox(height: AppSpacing.md),
                   _SettingsCard(
                     children: [
@@ -73,20 +61,28 @@ class _MorePageState extends State<MorePage> {
                         icon: PhosphorIcons.userCircle(
                           PhosphorIconsStyle.duotone,
                         ),
-                        title: isArabic ? 'الملف الشخصي' : 'Profile',
-                        subtitle: isArabic
-                            ? 'تعديل البيانات الشخصية'
-                            : 'Edit personal info',
+                        title: context.t('profile'),
+                        subtitle: context.t('editProfile'),
                         onTap: () =>
                             controller.setNavIndex(6), // Parent Profile
                       ),
                       _Divider(),
                       _SettingsTile(
+                        icon: PhosphorIcons.lockKey(PhosphorIconsStyle.duotone),
+                        title: context.t('changePassword'),
+                        subtitle: '********',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePasswordPage(),
+                          ),
+                        ),
+                      ),
+                      _Divider(),
+                      _SettingsTile(
                         icon: PhosphorIcons.users(PhosphorIconsStyle.duotone),
-                        title: isArabic ? 'أبنائي' : 'My Kids',
-                        subtitle: isArabic
-                            ? 'إدارة الطلاب المسجلين'
-                            : 'Manage registered students',
+                        title: context.t('myKids'),
+                        subtitle: context.t('manageKids'),
                         onTap: () => controller.setNavIndex(0), // Kids list
                       ),
                     ],
@@ -94,7 +90,7 @@ class _MorePageState extends State<MorePage> {
                   const SizedBox(height: AppSpacing.xl),
 
                   // App Settings Section
-                  _SectionHeader(title: isArabic ? 'التطبيق' : 'Application'),
+                  _SectionHeader(title: context.t('application')),
                   const SizedBox(height: AppSpacing.md),
                   _SettingsCard(
                     children: [
@@ -104,13 +100,13 @@ class _MorePageState extends State<MorePage> {
                                 PhosphorIconsStyle.duotone,
                               )
                             : PhosphorIcons.sun(PhosphorIconsStyle.duotone),
-                        title: isArabic ? 'المظهر' : 'Appearance',
+                        title: context.t('appearance'),
                         subtitle: isDark
-                            ? (isArabic ? 'داكن' : 'Dark')
-                            : (isArabic ? 'فاتح' : 'Light'),
+                            ? context.t('dark')
+                            : context.t('light'),
                         trailing: Switch.adaptive(
                           value: isDark,
-                          activeColor: AppColors.primary,
+                          activeTrackColor: AppColors.primary,
                           onChanged: (v) => controller.toggleTheme(isDark),
                         ),
                         onTap: () => controller.toggleTheme(isDark),
@@ -120,11 +116,11 @@ class _MorePageState extends State<MorePage> {
                         icon: PhosphorIcons.translate(
                           PhosphorIconsStyle.duotone,
                         ),
-                        title: isArabic ? 'الخ لغة' : 'Language',
+                        title: context.t('language'),
                         subtitle: isArabic ? 'العربية' : 'English',
                         trailing: Switch.adaptive(
                           value: isArabic,
-                          activeColor: AppColors.primary,
+                          activeTrackColor: AppColors.primary,
                           onChanged: (v) => controller.toggleLanguage(),
                         ),
                         onTap: controller.toggleLanguage,
@@ -134,13 +130,11 @@ class _MorePageState extends State<MorePage> {
                         icon: PhosphorIcons.bellSimple(
                           PhosphorIconsStyle.duotone,
                         ),
-                        title: isArabic ? 'الإشعارات' : 'Notifications',
-                        subtitle: isArabic
-                            ? 'تنبيهات الرحلات والحضور'
-                            : 'Trip and attendance alerts',
+                        title: context.t('notifications'),
+                        subtitle: context.t('activitiesSubtitle'),
                         trailing: Switch.adaptive(
                           value: notificationsEnabled,
-                          activeColor: AppColors.primary,
+                          activeTrackColor: AppColors.primary,
                           onChanged: (v) =>
                               setState(() => notificationsEnabled = v),
                         ),
@@ -150,7 +144,7 @@ class _MorePageState extends State<MorePage> {
                   const SizedBox(height: AppSpacing.xl),
 
                   // Support Section
-                  _SectionHeader(title: isArabic ? 'الدعم' : 'Support'),
+                  _SectionHeader(title: context.t('support')),
                   const SizedBox(height: AppSpacing.md),
                   _SettingsCard(
                     children: [
@@ -158,7 +152,7 @@ class _MorePageState extends State<MorePage> {
                         icon: PhosphorIcons.question(
                           PhosphorIconsStyle.duotone,
                         ),
-                        title: isArabic ? 'مركز المساعدة' : 'Help Center',
+                        title: context.t('helpCenter'),
                         onTap: () {},
                       ),
                       _Divider(),
@@ -166,13 +160,13 @@ class _MorePageState extends State<MorePage> {
                         icon: PhosphorIcons.phoneCall(
                           PhosphorIconsStyle.duotone,
                         ),
-                        title: isArabic ? 'تواصل معنا' : 'Contact Us',
+                        title: context.t('contactUs'),
                         onTap: () {},
                       ),
                       _Divider(),
                       _SettingsTile(
                         icon: PhosphorIcons.info(PhosphorIconsStyle.duotone),
-                        title: isArabic ? 'عن التطبيق' : 'About App',
+                        title: context.t('aboutApp'),
                         subtitle: 'v1.0.0',
                         onTap: () {},
                       ),
@@ -186,7 +180,7 @@ class _MorePageState extends State<MorePage> {
                     child: FilledButton.icon(
                       onPressed: controller.logout,
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.error.withOpacity(0.1),
+                        backgroundColor: AppColors.error.withValues(alpha: 0.1),
                         foregroundColor: AppColors.error,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -196,7 +190,7 @@ class _MorePageState extends State<MorePage> {
                       ),
                       icon: const Icon(Icons.logout_rounded),
                       label: Text(
-                        isArabic ? 'تسجيل الخروج' : 'Logout',
+                        context.t('logout'),
                         style: GoogleFonts.cairo(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -249,16 +243,18 @@ class _SettingsCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : AppColors.border,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : AppColors.border,
         ),
         boxShadow: isDark
             ? []
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -300,8 +296,8 @@ class _SettingsTile extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? AppColors.primary.withOpacity(0.2)
-                      : AppColors.primary.withOpacity(0.08),
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 22),
@@ -362,8 +358,8 @@ class _Divider extends StatelessWidget {
       indent: 64,
       endIndent: 0,
       color: isDark
-          ? Colors.white.withOpacity(0.05)
-          : AppColors.border.withOpacity(0.5),
+          ? Colors.white.withValues(alpha: 0.05)
+          : AppColors.border.withValues(alpha: 0.5),
     );
   }
 }

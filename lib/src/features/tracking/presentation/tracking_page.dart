@@ -216,12 +216,12 @@ class _BottomDetailsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.2),
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.2),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -245,7 +245,7 @@ class _BottomDetailsCard extends StatelessWidget {
                 height: 5,
                 decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.white.withOpacity(0.3)
+                      ? Colors.white.withValues(alpha: 0.3)
                       : AppColors.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
@@ -374,7 +374,9 @@ class _TrackingStat extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : AppColors.border,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : AppColors.border,
           ),
         ),
         child: Padding(

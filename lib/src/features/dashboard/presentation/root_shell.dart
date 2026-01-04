@@ -146,7 +146,7 @@ class CustomDrawer extends StatelessWidget {
                   bottomEnd: Radius.circular(30),
                 ),
                 // Optional: Subtle separation if needed, or completely flat
-                // border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : Colors.grey.withOpacity(0.1))),
+                // border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.1))),
               ),
               child: SafeArea(
                 bottom: false,
@@ -165,7 +165,7 @@ class CustomDrawer extends StatelessWidget {
                               border: Border.all(
                                 color: isDark
                                     ? Colors.white24
-                                    : AppColors.primary.withOpacity(0.2),
+                                    : AppColors.primary.withValues(alpha: 0.2),
                                 width: 2,
                               ),
                             ),
@@ -216,8 +216,8 @@ class CustomDrawer extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.grey.withOpacity(0.1),
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.grey.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -310,7 +310,7 @@ class CustomDrawer extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(
-                        color: AppColors.error.withOpacity(0.2),
+                        color: AppColors.error.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -357,8 +357,8 @@ class _DrawerItem extends StatelessWidget {
 
     final Color backgroundColor = isSelected
         ? (isDark
-              ? Colors.white.withOpacity(0.1)
-              : AppColors.primary.withOpacity(0.08))
+              ? Colors.white.withValues(alpha: 0.1)
+              : AppColors.primary.withValues(alpha: 0.08))
         : Colors.transparent;
 
     final Color foregroundColor = isSelected

@@ -54,18 +54,31 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
-    developer.log('🎬 AppController: Starting bootstrap...', name: 'BOOT');
-    // Simulate loading configuration, cached session, etc.
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      // Simulate loading configuration, cached session, etc.
+      await Future.delayed(const Duration(seconds: 1));
 
-    _bootCompleted = true;
-    developer.log('🏁 AppController: Bootstrap completed', name: 'BOOT');
-
-    // Remove native splash screen if it exists
-    FlutterNativeSplash.remove();
-    developer.log('✨ AppController: Native splash removed', name: 'BOOT');
-
-    notifyListeners();
+      _bootCompleted = true;
+      developer.log('🏁 AppController: Bootstrap completed', name: 'BOOT');
+    } catch (e, st) {
+      developer.log(
+        '❌ AppController: Bootstrap failed',
+        name: 'BOOT',
+        error: e,
+        stackTrace: st,
+      );
+      // Fallback to allow app entry (or handle error state appropriately)
+      _bootCompleted = true;
+    } finally {
+      // Remove native splash screen if it exists
+      try {
+        FlutterNativeSplash.remove();
+      } catch (e) {
+        developer.log('⚠️ Failed to remove splash', error: e);
+      }
+      developer.log('✨ AppController: Native splash removed', name: 'BOOT');
+      notifyListeners();
+    }
   }
 
   Future<bool> login({

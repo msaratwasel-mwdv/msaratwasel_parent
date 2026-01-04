@@ -50,7 +50,9 @@ class _MessagesPageState extends State<MessagesPage> {
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   bottom: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.5),
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.5),
                     width: 0.0,
                   ),
                 ),
@@ -329,7 +331,7 @@ class _MessageBubble extends StatelessWidget {
         ? const Color(0xFF1E508E)
         : (Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF334155)
-              : Colors.white.withOpacity(0.85));
+              : Colors.white.withValues(alpha: 0.85));
     final textColor = isParent
         ? Colors.white
         : (Theme.of(context).brightness == Brightness.dark
@@ -375,7 +377,7 @@ class _MessageBubble extends StatelessWidget {
                   borderRadius: radius,
                   border: isParent
                       ? null
-                      : Border.all(color: Colors.white.withOpacity(0.8)),
+                      : Border.all(color: Colors.white.withValues(alpha: 0.8)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withAlpha(13),
@@ -452,7 +454,7 @@ class _TypingIndicator extends StatelessWidget {
             vertical: AppSpacing.sm,
           ),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.85),
+            color: Colors.white.withValues(alpha: 0.85),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(4),
               topRight: Radius.circular(18),

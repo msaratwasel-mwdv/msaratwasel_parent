@@ -7,7 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:msaratwasel_user/src/shared/widgets/custom_text_field.dart';
+import 'package:msaratwasel_user/src/shared/widgets/frosted_card.dart';
+import 'package:msaratwasel_user/src/shared/widgets/primary_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.controller});
@@ -72,11 +74,12 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.controller.isDark;
-    final theme = isDark ? AppColors.dark : AppColors.light;
+    final theme = Theme.of(context);
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Material(
-        color: theme.scaffold,
+        color: theme.scaffoldBackgroundColor,
         child: Stack(
           children: [
             // 1. Animated Background
@@ -94,37 +97,30 @@ class _LoginScreenState extends State<LoginScreen>
                       children: [
                         const _LoginHeader(),
                         const SizedBox(height: 40),
-                        _GlassCard(
-                          dark: isDark,
+                        FrostedCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _title(theme),
+                              _title(context, isDark),
                               const SizedBox(height: 24),
-                              _PremiumTextField(
+                              CustomTextField(
                                 controller: _civilIdController,
                                 label: context.t('civilId'),
-                                icon: PhosphorIcons.identificationCard(
-                                  PhosphorIconsStyle.regular,
-                                ),
+                                icon: Icons.credit_card_rounded,
                                 keyboardType: TextInputType.number,
                                 validator: (v) => v?.isNotEmpty == true
                                     ? null
                                     : context.t('civilIdError'),
-                                dark: isDark,
                               ).animate().fadeIn(delay: 150.ms).scale(),
                               const SizedBox(height: 16),
-                              _PremiumTextField(
+                              CustomTextField(
                                 controller: _phoneController,
                                 label: context.t('phoneNumber'),
-                                icon: PhosphorIcons.phone(
-                                  PhosphorIconsStyle.regular,
-                                ),
+                                icon: Icons.phone_rounded,
                                 keyboardType: TextInputType.phone,
                                 validator: (v) => v?.isNotEmpty == true
                                     ? null
                                     : context.t('phoneError'),
-                                dark: isDark,
                               ).animate().fadeIn(delay: 250.ms).scale(),
                               const SizedBox(height: 8),
                               Align(
@@ -132,9 +128,11 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: TextButton(
                                   onPressed: () => _resetByPhone(context),
                                   child: Text(
-                                    context.t('forgot'),
+                                    context.t('forgotData'),
                                     style: GoogleFonts.cairo(
-                                      color: theme.accent,
+                                      color: isDark
+                                          ? AppColors.dark.accent
+                                          : AppColors.accent,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -145,26 +143,37 @@ class _LoginScreenState extends State<LoginScreen>
                                   margin: const EdgeInsets.only(top: 8),
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: theme.error.withOpacity(.15),
-                                    borderRadius: BorderRadius.circular(12),
+                                    color:
+                                        (isDark
+                                                ? AppColors.error
+                                                : AppColors.error)
+                                            .withValues(alpha: .15),
+                                    borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: theme.error.withOpacity(.3),
+                                      color:
+                                          (isDark
+                                                  ? AppColors.error
+                                                  : AppColors.error)
+                                              .withValues(alpha: .3),
                                     ),
                                   ),
                                   child: Text(
                                     _errorMessage!,
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.cairo(
-                                      color: theme.error,
+                                      color: isDark
+                                          ? AppColors.error
+                                          : AppColors.error,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ).animate(controller: _animC).shake().fadeIn(),
                               const SizedBox(height: 24),
-                              _LoginButton(
-                                loading: _isLoading,
+                              PrimaryButton(
+                                isLoading: _isLoading,
                                 onTap: _handleLogin,
-                                dark: isDark,
+                                text: context.t('login'),
+                                icon: Icons.arrow_forward_rounded,
                               ),
                               const SizedBox(height: 16),
                               if (Localizations.localeOf(
@@ -213,25 +222,31 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _title(AppThemeColors theme) => Column(
-    children: [
-      Text(
-        context.t('welcomeBack'),
-        textAlign: TextAlign.center,
-        style: GoogleFonts.cairo(
-          fontSize: 26,
-          fontWeight: FontWeight.bold,
-          color: theme.text,
+  Widget _title(BuildContext context, bool isDark) {
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    return Column(
+      children: [
+        Text(
+          context.t('welcomeBack'),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
         ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        context.t('signInToContinue'),
-        textAlign: TextAlign.center,
-        style: GoogleFonts.cairo(fontSize: 14, color: theme.text70),
-      ),
-    ],
-  ).animate().fadeIn().moveY(begin: 10, end: 0);
+        const SizedBox(height: 6),
+        Text(
+          context.t('signInToContinue'),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(
+            fontSize: 14,
+            color: isDark ? Colors.white70 : AppColors.textSecondary,
+          ),
+        ),
+      ],
+    ).animate().fadeIn().moveY(begin: 10, end: 0);
+  }
 
   void _resetByPhone(BuildContext ctx) {
     // TODO: navigate to reset screen
@@ -280,7 +295,9 @@ class _AnimatedBackground extends StatelessWidget {
           // Glass blur
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-            child: Container(color: Colors.black.withOpacity(dark ? .25 : .1)),
+            child: Container(
+              color: Colors.black.withValues(alpha: dark ? .25 : .1),
+            ),
           ),
         ],
       ),
@@ -293,7 +310,7 @@ class _AnimatedBackground extends StatelessWidget {
     decoration: BoxDecoration(
       shape: BoxShape.circle,
       gradient: RadialGradient(
-        colors: [color.withOpacity(.4), Colors.transparent],
+        colors: [color.withValues(alpha: .4), Colors.transparent],
       ),
     ),
   );
@@ -311,9 +328,9 @@ class _LoginHeader extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.15),
+              color: Colors.white.withValues(alpha: .15),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: .2)),
             ),
             child: Image.asset('assets/icons/msarticon/icon.png', height: 90),
           ),
@@ -333,166 +350,6 @@ class _LoginHeader extends StatelessWidget {
   }
 }
 
-class _GlassCard extends StatelessWidget {
-  const _GlassCard({required this.child, required this.dark});
-  final Widget child;
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Container(
-          decoration: BoxDecoration(
-            color: dark
-                ? Colors.white.withOpacity(.08)
-                : Colors.black.withOpacity(.06),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: Colors.white.withOpacity(dark ? .2 : .15),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(.1),
-                blurRadius: 30,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumTextField extends StatelessWidget {
-  const _PremiumTextField({
-    required this.controller,
-    required this.label,
-    required this.icon,
-    required this.keyboardType,
-    this.validator,
-    required this.dark,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final IconData icon;
-  final TextInputType keyboardType;
-  final String? Function(String?)? validator;
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      validator: validator,
-      style: GoogleFonts.cairo(
-        fontWeight: FontWeight.w600,
-        color: dark ? Colors.white : Colors.black87,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.cairo(
-          color: dark ? Colors.white70 : Colors.black54,
-        ),
-        floatingLabelStyle: GoogleFonts.cairo(
-          color: dark ? Colors.white : Colors.black,
-          fontWeight: FontWeight.bold,
-        ),
-        prefixIcon: Icon(icon, color: dark ? Colors.white70 : Colors.black54),
-        filled: true,
-        fillColor: (dark ? Colors.white : Colors.black).withOpacity(.08),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 16,
-          horizontal: 20,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: dark ? Colors.white : Colors.black,
-            width: 1.2,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: (dark ? Colors.white : Colors.black).withOpacity(.15),
-          ),
-        ),
-        errorStyle: GoogleFonts.cairo(color: const Color(0xFFFF8A80)),
-      ),
-    );
-  }
-}
-
-class _LoginButton extends StatelessWidget {
-  const _LoginButton({
-    required this.loading,
-    required this.onTap,
-    required this.dark,
-  });
-
-  final bool loading;
-  final VoidCallback onTap;
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 56,
-      child: Animate(
-        effects: const [ScaleEffect(curve: Curves.elasticOut)],
-        child: ElevatedButton(
-          onPressed: loading ? null : onTap,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 8,
-            shadowColor: AppColors.primary.withOpacity(.4),
-          ),
-          child: loading
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      context.t('login'),
-                      style: GoogleFonts.cairo(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded, size: 20),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BioButton extends StatelessWidget {
   const _BioButton({required this.dark});
   final bool dark;
@@ -509,14 +366,14 @@ class _BioButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: (dark ? Colors.white : Colors.black).withOpacity(.2),
+            color: (dark ? Colors.white : Colors.black).withValues(alpha: .2),
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.fingerprint,
+              Icons.fingerprint_rounded,
               color: dark ? Colors.white70 : Colors.black54,
               size: 20,
             ),
@@ -543,7 +400,7 @@ class _CircleIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(.15),
+      color: Colors.white.withValues(alpha: .15),
       shape: const CircleBorder(side: BorderSide(color: Colors.white24)),
       child: InkWell(
         onTap: onTap,

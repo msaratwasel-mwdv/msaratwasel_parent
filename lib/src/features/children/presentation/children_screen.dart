@@ -139,12 +139,12 @@ class _ChildCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.2),
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.grey.withValues(alpha: 0.2),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -209,7 +209,9 @@ class _ChildCard extends StatelessWidget {
 
               const SizedBox(height: AppSpacing.md),
               Divider(
-                color: isDark ? Colors.white12 : Colors.grey.withOpacity(0.2),
+                color: isDark
+                    ? Colors.white12
+                    : Colors.grey.withValues(alpha: 0.2),
               ),
               const SizedBox(height: AppSpacing.md),
 
@@ -217,7 +219,7 @@ class _ChildCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -256,7 +258,9 @@ class _ChildCard extends StatelessWidget {
 
               const SizedBox(height: AppSpacing.md),
               Divider(
-                color: isDark ? Colors.white12 : Colors.grey.withOpacity(0.2),
+                color: isDark
+                    ? Colors.white12
+                    : Colors.grey.withValues(alpha: 0.2),
               ),
               const SizedBox(height: AppSpacing.md),
 
@@ -379,7 +383,7 @@ class _StatItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -439,9 +443,9 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -494,7 +498,7 @@ class _ChildDetailsSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
+              color: Colors.grey.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -561,7 +565,7 @@ class _ChildDetailsSheet extends StatelessWidget {
           ),
 
           Divider(
-            color: isDark ? Colors.white12 : Colors.grey.withOpacity(0.2),
+            color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.2),
           ),
 
           // Content
@@ -674,7 +678,7 @@ class _DetailSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark
                 ? const Color(0xFF1E293B)
-                : Colors.grey.withOpacity(0.05),
+                : Colors.grey.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: child,
@@ -737,12 +741,12 @@ class _AttendanceItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.2),
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -782,8 +786,8 @@ class _AttendanceItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: entry.status.contains('حضرت')
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.orange.withOpacity(0.1),
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -817,12 +821,12 @@ class _TripItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.2),
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -852,7 +856,7 @@ class _TripItem extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

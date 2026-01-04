@@ -75,7 +75,9 @@ class DashboardPage extends StatelessWidget {
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   bottom: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.5),
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.5),
                     width: 0.0, // hide standard border usually
                   ),
                 ),
@@ -495,7 +497,7 @@ class _QuickServiceItem extends StatelessWidget {
           color: Theme.of(context).cardColor,
           border: Border.all(
             color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withOpacity(0.1)
+                ? Colors.white.withValues(alpha: 0.1)
                 : AppColors.border,
           ),
           borderRadius: BorderRadius.circular(16),
@@ -564,7 +566,7 @@ class _StudentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
           color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withOpacity(0.1)
+              ? Colors.white.withValues(alpha: 0.1)
               : AppColors.border,
         ),
       ),
@@ -655,7 +657,7 @@ class _StudentCard extends StatelessWidget {
               border: Border(
                 top: BorderSide(
                   color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white.withOpacity(0.1)
+                      ? Colors.white.withValues(alpha: 0.1)
                       : AppColors.border,
                 ),
               ),
@@ -777,7 +779,7 @@ class _BusInfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
           color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withOpacity(0.1)
+              ? Colors.white.withValues(alpha: 0.1)
               : AppColors.border,
         ),
       ),
