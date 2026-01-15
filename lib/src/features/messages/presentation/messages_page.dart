@@ -5,6 +5,8 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
 
@@ -31,6 +33,7 @@ class _MessagesPageState extends State<MessagesPage> {
     final app = AppScope.of(context);
     final isArabic = app.locale.languageCode == 'ar';
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedBuilder(
       animation: app,
@@ -46,7 +49,28 @@ class _MessagesPageState extends State<MessagesPage> {
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               CupertinoSliverNavigationBar(
-                largeTitle: Text(name),
+                largeTitle: Platform.isAndroid
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            height: 1.2,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        name,
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                        ),
+                      ),
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   bottom: BorderSide(
@@ -59,29 +83,14 @@ class _MessagesPageState extends State<MessagesPage> {
                 leading: Material(
                   color: Colors.transparent,
                   child: IconButton(
-                    icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+                    icon: Icon(
+                      Icons.menu_rounded,
+                      color: isDark ? Colors.white : AppColors.primary,
+                    ),
                     onPressed: () => Scaffold.of(context).openDrawer(),
                   ),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.call_rounded,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.videocam_rounded,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
+                // trailing: removed call and video icons
               ),
             ];
           },
@@ -201,12 +210,7 @@ class _MessagesPageState extends State<MessagesPage> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.attach_file_rounded),
-                        color: AppColors.textSecondary,
-                      ),
-                      IconButton(
-                        onPressed: () {},
+                        onPressed: () => _pickImage(context),
                         icon: const Icon(Icons.photo_camera_outlined),
                         color: AppColors.textSecondary,
                       ),
@@ -262,6 +266,47 @@ class _MessagesPageState extends State<MessagesPage> {
         );
       },
     );
+  }
+
+  Future<void> _pickImage(BuildContext context) async {
+    final picker = ImagePicker();
+    final app = AppScope.of(context);
+    final isArabic = app.locale.languageCode == 'ar';
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: Text(isArabic ? 'الكاميرا' : 'Camera'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: Text(isArabic ? 'معرض الصور' : 'Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source != null) {
+      final XFile? image = await picker.pickImage(source: source);
+      if (image != null) {
+        app.addMessage('', mediaUrl: image.path);
+      }
+    }
   }
 }
 
@@ -400,12 +445,37 @@ class _MessageBubble extends StatelessWidget {
                             ),
                       ),
                     if (!isParent) const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      message.text,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: textColor),
-                    ),
+                    if (message.mediaUrl != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: File(message.mediaUrl!).existsSync()
+                              ? Image.file(
+                                  File(message.mediaUrl!),
+                                  height: 150,
+                                  width: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.broken_image_rounded,
+                                    size: 50,
+                                    color: Colors.white70,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.image_not_supported_rounded,
+                                  size: 50,
+                                  color: Colors.white70,
+                                ),
+                        ),
+                      ),
+                    if (message.text.isNotEmpty)
+                      Text(
+                        message.text,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: textColor),
+                      ),
                     const SizedBox(height: AppSpacing.xs),
                     Row(
                       mainAxisSize: MainAxisSize.min,

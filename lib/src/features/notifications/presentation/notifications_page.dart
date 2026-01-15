@@ -26,6 +26,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final isArabic = controller.locale.languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = controller.notifications.where((n) {
       switch (_filter) {
         case _Filter.all:
@@ -102,7 +103,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             leading: Material(
               color: Colors.transparent,
               child: IconButton(
-                icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
@@ -171,10 +175,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               : AppColors.primary.withAlpha(12),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withAlpha(30),
+                              backgroundColor: isDark
+                                  ? Colors.white.withAlpha(20)
+                                  : AppColors.primary.withAlpha(30),
                               child: Icon(
                                 _notificationIcon(item.type),
-                                color: AppColors.primary,
+                                color: isDark
+                                    ? AppColors.dark.accent
+                                    : AppColors.primary,
                               ),
                             ),
                             title: Text(label),
@@ -220,12 +228,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Widget _buildFilterChip(BuildContext context, _Filter filter, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FilterChip(
       label: Text(label),
       selected: _filter == filter,
       onSelected: (_) => setState(() => _filter = filter),
-      selectedColor: AppColors.primary.withAlpha(30),
-      checkmarkColor: AppColors.primary,
+      selectedColor: isDark
+          ? AppColors.dark.accent.withAlpha(40)
+          : AppColors.primary.withAlpha(30),
+      checkmarkColor: isDark ? Colors.white : AppColors.primary,
     );
   }
 }

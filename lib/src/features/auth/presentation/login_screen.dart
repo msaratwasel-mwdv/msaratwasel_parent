@@ -1,15 +1,15 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/features/auth/presentation/forgot_password_screen.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/widgets/custom_text_field.dart';
 import 'package:msaratwasel_user/src/shared/widgets/frosted_card.dart';
 import 'package:msaratwasel_user/src/shared/widgets/primary_button.dart';
+import 'package:msaratwasel_user/src/features/auth/presentation/widgets/auth_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.controller});
@@ -83,7 +83,8 @@ class _LoginScreenState extends State<LoginScreen>
         child: Stack(
           children: [
             // 1. Animated Background
-            _AnimatedBackground(dark: isDark),
+            // 1. Animated Background
+            AuthBackground(isDark: isDark),
             // 2. Glass Form
             SafeArea(
               child: Center(
@@ -132,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     style: GoogleFonts.cairo(
                                       color: isDark
                                           ? AppColors.dark.accent
-                                          : AppColors.accent,
+                                          : AppColors.primary,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -176,11 +177,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 icon: Icons.arrow_forward_rounded,
                               ),
                               const SizedBox(height: 16),
-                              if (Localizations.localeOf(
-                                    context,
-                                  ).languageCode ==
-                                  'ar')
-                                _BioButton(dark: isDark),
+                              const SizedBox(height: 16),
                             ],
                           ),
                         ),
@@ -249,72 +246,16 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _resetByPhone(BuildContext ctx) {
-    // TODO: navigate to reset screen
-    ScaffoldMessenger.of(
+    Navigator.push(
       ctx,
-    ).showSnackBar(SnackBar(content: Text(context.t('resetSoon'))));
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(controller: widget.controller),
+      ),
+    );
   }
 }
 
 /* ==================== Widgets ==================== */
-
-class _AnimatedBackground extends StatelessWidget {
-  const _AnimatedBackground({required this.dark});
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
-              : [const Color(0xFFE0F2FE), const Color(0xFFBAE6FD)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Orb 1
-          Positioned(
-                top: -100,
-                right: -100,
-                child: _orb(400, dark ? AppColors.accent : AppColors.primary),
-              )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .scale(begin: const Offset(1, 1), end: const Offset(1.15, 1.15)),
-          // Orb 2
-          Positioned(
-                bottom: -60,
-                left: -60,
-                child: _orb(320, dark ? Colors.blueAccent : Colors.cyanAccent),
-              )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .move(begin: Offset.zero, end: const Offset(30, -30)),
-          // Glass blur
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-            child: Container(
-              color: Colors.black.withValues(alpha: dark ? .25 : .1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _orb(double size, Color color) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: RadialGradient(
-        colors: [color.withValues(alpha: .4), Colors.transparent],
-      ),
-    ),
-  );
-}
 
 class _LoginHeader extends StatelessWidget {
   const _LoginHeader();
@@ -347,48 +288,6 @@ class _LoginHeader extends StatelessWidget {
         ),
       ],
     ).animate().fadeIn().scale();
-  }
-}
-
-class _BioButton extends StatelessWidget {
-  const _BioButton({required this.dark});
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.t('bioSoon')))),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: (dark ? Colors.white : Colors.black).withValues(alpha: .2),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fingerprint_rounded,
-              color: dark ? Colors.white70 : Colors.black54,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              context.t('useBiometric'),
-              style: GoogleFonts.cairo(
-                fontSize: 13,
-                color: dark ? Colors.white70 : Colors.black54,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

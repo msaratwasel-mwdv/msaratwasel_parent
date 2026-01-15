@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:developer' as developer;
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
@@ -16,7 +17,17 @@ class AppController extends ChangeNotifier {
     developer.log('🏗️ AppController: Instance created', name: 'STATE');
   }
 
-  Locale _locale = const Locale('ar');
+  Locale _locale = () {
+    try {
+      final platformDispatcher = WidgetsBinding.instance.platformDispatcher;
+      final systemLocale = platformDispatcher.locale;
+      if (systemLocale.languageCode == 'en') return const Locale('en');
+      // Default to Arabic for 'ar' or any other language
+      return const Locale('ar');
+    } catch (_) {
+      return const Locale('ar');
+    }
+  }();
   ThemeMode _themeMode = ThemeMode.system;
   int _navIndex = 0;
   int _selectedStudentIndex = 0;
@@ -133,8 +144,8 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addMessage(String text) {
-    if (text.trim().isEmpty) return;
+  void addMessage(String text, {String? mediaUrl}) {
+    if (text.trim().isEmpty && mediaUrl == null) return;
     _messages.add(
       MessageItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -142,6 +153,7 @@ class AppController extends ChangeNotifier {
         text: text.trim(),
         time: DateTime.now(),
         incoming: false,
+        mediaUrl: mediaUrl,
       ),
     );
     notifyListeners();
@@ -161,6 +173,29 @@ class AppController extends ChangeNotifier {
       ),
     );
     notifyListeners();
+  }
+
+  void updateStudentLocation(
+    String studentId,
+    LatLng location, {
+    String? note,
+  }) {
+    final index = _students.indexWhere((s) => s.id == studentId);
+    if (index != -1) {
+      final student = _students[index];
+      _students[index] = Student(
+        id: student.id,
+        name: student.name,
+        grade: student.grade,
+        schoolId: student.schoolId,
+        bus: student.bus,
+        status: student.status,
+        avatarUrl: student.avatarUrl,
+        homeLocation: location,
+        locationNote: note ?? student.locationNote,
+      );
+      notifyListeners();
+    }
   }
 }
 

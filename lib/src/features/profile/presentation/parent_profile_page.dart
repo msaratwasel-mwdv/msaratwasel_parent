@@ -109,17 +109,32 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
         CupertinoSliverNavigationBar(
           backgroundColor: scaffoldBackgroundColor,
           border: null,
-          largeTitle: Text(
-            isArabic ? "الملف الشخصي" : "Profile",
-            style: TextStyle(
-              color: isDark ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          largeTitle: Platform.isAndroid
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    isArabic ? "الملف الشخصي" : "Profile",
+                    style: TextStyle(
+                      height: 1.2,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                )
+              : Text(
+                  isArabic ? "الملف الشخصي" : "Profile",
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
           leading: Material(
             color: Colors.transparent,
             child: IconButton(
-              icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: isDark ? Colors.white : AppColors.primary,
+              ),
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
@@ -204,7 +219,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   icon: const Icon(Icons.arrow_forward_rounded, size: 18),
                   label: Text(isArabic ? "عرض الكل" : "View All"),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: isDark
+                        ? Colors.blue.shade200
+                        : AppColors.primary,
                   ),
                 ),
               ),
@@ -231,114 +248,41 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
               const SizedBox(height: AppSpacing.xl),
 
-              // Quick Actions Section
-              _SectionTitle(
-                title: isArabic ? "إجراءات سريعة" : "Quick Actions",
-                icon: Icons.bolt_rounded,
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.notifications_outlined,
-                      label: isArabic ? "الإشعارات" : "Notifications",
-                      color: AppColors.accent,
-                      isDark: isDark,
-                      onTap: () {
-                        final controller = AppScope.of(context);
-                        controller.setNavIndex(3);
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.chat_bubble_outline,
-                      label: isArabic ? "الرسائل" : "Messages",
-                      color: AppColors.primary,
-                      isDark: isDark,
-                      onTap: () {
-                        final controller = AppScope.of(context);
-                        controller.setNavIndex(4);
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSpacing.xl),
-
               // Logout Button
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    // Show logout confirmation
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(isArabic ? "تسجيل الخروج" : "Logout"),
-                        content: Text(
-                          isArabic
-                              ? "هل أنت متأكد من تسجيل الخروج؟"
-                              : "Are you sure you want to logout?",
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text(isArabic ? "إلغاء" : "Cancel"),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // Perform logout
-                              Navigator.pop(context);
-                            },
-                            child: Text(
-                              isArabic ? "تسجيل الخروج" : "Logout",
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        ],
+              _ProfileActionButton(
+                icon: Icons.logout_rounded,
+                label: isArabic ? "تسجيل الخروج" : "Logout",
+                color: AppColors.error,
+                isDark: isDark,
+                isHorizontal: true,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(isArabic ? "تسجيل الخروج" : "Logout"),
+                      content: Text(
+                        isArabic
+                            ? "هل أنت متأكد من تسجيل الخروج؟"
+                            : "Are you sure you want to logout?",
                       ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.md,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.error.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.logout_rounded,
-                          color: AppColors.error,
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(isArabic ? "إلغاء" : "Cancel"),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          isArabic ? "تسجيل الخروج" : "Logout",
-                          style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text(
+                            isArabic ? "تسجيل الخروج" : "Logout",
+                            style: const TextStyle(color: Colors.red),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
 
               SizedBox(
@@ -468,7 +412,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 22),
+        Icon(icon, color: isDark ? Colors.white : AppColors.primary, size: 22),
         const SizedBox(width: AppSpacing.sm),
         Text(
           title,
@@ -515,10 +459,16 @@ class _InfoCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
+            child: Icon(
+              icon,
+              color: isDark ? Colors.white : AppColors.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -617,13 +567,14 @@ class _ChildQuickCard extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
+class _ProfileActionButton extends StatelessWidget {
+  const _ProfileActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.isDark,
     required this.onTap,
+    this.isHorizontal = false,
   });
 
   final IconData icon;
@@ -631,6 +582,7 @@ class _ActionButton extends StatelessWidget {
   final Color color;
   final bool isDark;
   final VoidCallback onTap;
+  final bool isHorizontal;
 
   @override
   Widget build(BuildContext context) {
@@ -638,28 +590,81 @@ class _ActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.grey.withValues(alpha: 0.2),
+            ),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.grey.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
           ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+          child: isHorizontal
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isDark
+                            ? Colors.white
+                            : color, // Ensure Logout/Action icons are visible
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isDark ? Colors.white : color,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

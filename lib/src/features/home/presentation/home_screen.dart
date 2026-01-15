@@ -1,11 +1,12 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -17,25 +18,20 @@ class HomeScreen extends StatelessWidget {
     final notifications = controller.notifications;
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return CustomScrollView(
       slivers: [
         // Navigation Bar
-        CupertinoSliverNavigationBar(
-          backgroundColor: scaffoldBackgroundColor,
-          border: null,
-          largeTitle: Text(
-            'الرئيسية',
-            style: TextStyle(
-              color: isDark ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        // Navigation Bar
+        AppSliverHeader(
+          title: context.t('home'),
           leading: Material(
             color: Colors.transparent,
             child: IconButton(
-              icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: isDark ? Colors.white : AppColors.primary,
+              ),
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
@@ -59,7 +55,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
 
               // Children Quick View
-              _SectionTitle(title: 'الأبناء', isDark: isDark),
+              _SectionTitle(title: context.t('myKids'), isDark: isDark),
               const SizedBox(height: AppSpacing.md),
               ...students.map(
                 (student) => _ChildQuickCard(
@@ -73,7 +69,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
 
               // Recent Notifications
-              _SectionTitle(title: 'آخر التنبيهات', isDark: isDark),
+              _SectionTitle(title: context.t('notifications'), isDark: isDark),
               const SizedBox(height: AppSpacing.md),
               _RecentNotifications(
                 notifications: notifications.take(3).toList(),
@@ -85,7 +81,10 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
 
               // Quick Actions
-              _SectionTitle(title: 'إجراءات سريعة', isDark: isDark),
+              _SectionTitle(
+                title: context.t('quickActionsTitle'),
+                isDark: isDark,
+              ),
               const SizedBox(height: AppSpacing.md),
               _QuickActions(controller: controller, isDark: isDark),
 
@@ -104,6 +103,16 @@ class _WelcomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hour = DateTime.now().hour;
+    String greeting;
+    if (hour < 12) {
+      greeting = context.t('greetingMorning');
+    } else if (hour < 17) {
+      greeting = context.t('greetingAfternoon');
+    } else {
+      greeting = context.t('greetingEvening');
+    }
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -140,18 +149,18 @@ class _WelcomeHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'مرحباً،',
-                  style: TextStyle(
+                Text(
+                  greeting,
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'عبدالله الأحمد',
-                  style: TextStyle(
+                Text(
+                  '${context.t('welcomeUser')} عبدالله الأحمد', // TODO: Localize Name if needed
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -167,9 +176,9 @@ class _WelcomeHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    'ولي الأمر',
-                    style: TextStyle(
+                  child: Text(
+                    context.t('guardianRole'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -209,8 +218,10 @@ class _SummaryStats extends StatelessWidget {
           child: _StatCard(
             icon: Icons.family_restroom_rounded,
             value: students.length.toString(),
-            label: 'أبناء',
-            color: AppColors.primary,
+            label: context.t(
+              'myKids',
+            ), // Reusing key 'myKids' or specifically 'Kids'
+            color: isDark ? AppColors.dark.accent : AppColors.primary,
             isDark: isDark,
           ),
         ),
@@ -219,7 +230,9 @@ class _SummaryStats extends StatelessWidget {
           child: _StatCard(
             icon: Icons.directions_bus_rounded,
             value: onBusCount.toString(),
-            label: 'في الحافلة',
+            label: context.t(
+              'busTracking',
+            ), // Or a shorter 'On Bus' key if available, falling back to existing
             color: AppColors.accent,
             isDark: isDark,
           ),
@@ -229,7 +242,7 @@ class _SummaryStats extends StatelessWidget {
           child: _StatCard(
             icon: Icons.notifications_active_rounded,
             value: unreadCount.toString(),
-            label: 'تنبيهات',
+            label: context.t('notifications'),
             color: AppColors.error,
             isDark: isDark,
           ),
@@ -295,12 +308,15 @@ class _StatCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            label,
+            label, // Already localized
             style: TextStyle(
               color: isDark ? Colors.white70 : AppColors.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -325,7 +341,7 @@ class _ChildQuickCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusText = Labels.studentStatus(student.status, arabic: isArabic);
     final statusIcon = _statusIcon(student.status);
-    final statusColor = _getStatusColor(student.status);
+    final statusColor = _getStatusColor(student.status, isDark);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -353,7 +369,7 @@ class _ChildQuickCard extends StatelessWidget {
                   child: Text(
                     student.name[0],
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: isDark ? Colors.white : AppColors.primary,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
@@ -374,7 +390,7 @@ class _ChildQuickCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        student.grade,
+                        '${context.t('studentGrade')}: ${student.grade}',
                         style: TextStyle(
                           color: isDark
                               ? Colors.white70
@@ -434,7 +450,10 @@ class _ChildQuickCard extends StatelessWidget {
     }
   }
 
-  Color _getStatusColor(StudentStatus status) {
+  Color _getStatusColor(StudentStatus status, bool isDark) {
+    if (isDark && status == StudentStatus.atSchool) {
+      return Colors.white;
+    }
     switch (status) {
       case StudentStatus.onBus:
         return AppColors.accent;
@@ -489,9 +508,9 @@ class _RecentNotifications extends StatelessWidget {
           TextButton(
             onPressed: onViewAll,
             child: Text(
-              isArabic ? 'عرض الكل' : 'View all',
+              context.t('viewAll'),
               style: TextStyle(
-                color: AppColors.primary,
+                color: isDark ? AppColors.dark.accent : AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -515,7 +534,7 @@ class _NotificationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeAgo = _getTimeAgo(notification.time);
+    final timeAgo = _getTimeAgo(notification.time, isArabic);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -560,7 +579,7 @@ class _NotificationItem extends StatelessWidget {
     );
   }
 
-  String _getTimeAgo(DateTime time) {
+  String _getTimeAgo(DateTime time, bool isArabic) {
     final diff = DateTime.now().difference(time);
     if (diff.inMinutes < 60) {
       final minutes = diff.inMinutes;
@@ -588,7 +607,7 @@ class _QuickActions extends StatelessWidget {
         Expanded(
           child: _QuickActionButton(
             icon: Icons.directions_bus_rounded,
-            label: 'تتبع',
+            label: context.t('track'),
             color: AppColors.accent,
             isDark: isDark,
             onTap: () => controller.setNavIndex(2),
@@ -598,8 +617,8 @@ class _QuickActions extends StatelessWidget {
         Expanded(
           child: _QuickActionButton(
             icon: Icons.chat_bubble_rounded,
-            label: 'رسائل',
-            color: AppColors.primary,
+            label: context.t('chat'), // Was 'رسائل' which matches 'chat' key
+            color: isDark ? AppColors.dark.accent : AppColors.primary,
             isDark: isDark,
             onTap: () => controller.setNavIndex(4),
           ),
@@ -608,7 +627,7 @@ class _QuickActions extends StatelessWidget {
         Expanded(
           child: _QuickActionButton(
             icon: Icons.calendar_month_rounded,
-            label: 'حضور',
+            label: context.t('attendance'), // Was 'حضور'
             color: Colors.orange,
             isDark: isDark,
             onTap: () => controller.setNavIndex(5),
@@ -618,7 +637,7 @@ class _QuickActions extends StatelessWidget {
         Expanded(
           child: _QuickActionButton(
             icon: Icons.settings_rounded,
-            label: 'إعدادات',
+            label: context.t('settings'),
             color: Colors.grey,
             isDark: isDark,
             onTap: () => controller.setNavIndex(7),
@@ -673,6 +692,8 @@ class _QuickActionButton extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

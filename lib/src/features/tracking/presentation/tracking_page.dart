@@ -9,6 +9,8 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/features/tracking/presentation/widgets/student_marker_widget.dart';
+import 'package:widget_to_marker/widget_to_marker.dart';
 
 class TrackingPage extends StatefulWidget {
   const TrackingPage({super.key});
@@ -29,17 +31,20 @@ class _TrackingPageState extends State<TrackingPage> {
       builder: (context, _) {
         final tracking = controller.currentTracking;
         final isArabic = controller.locale.languageCode == 'ar';
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         return Scaffold(
           body: Stack(
             children: [
-              Positioned.fill(child: _TrackingMap(tracking: tracking)),
+              Positioned.fill(
+                child: _TrackingMap(students: controller.students),
+              ),
               // Menu button at top-right (RTL)
               Positioned(
                 top: MediaQuery.of(context).padding.top + AppSpacing.sm,
                 right: AppSpacing.md,
                 child: Material(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   shape: const CircleBorder(),
                   elevation: 4,
                   child: InkWell(
@@ -49,7 +54,7 @@ class _TrackingPageState extends State<TrackingPage> {
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       child: Icon(
                         Icons.menu_rounded,
-                        color: AppColors.primary,
+                        color: isDark ? Colors.white : AppColors.primary,
                         size: 24,
                       ),
                     ),
@@ -70,12 +75,6 @@ class _TrackingPageState extends State<TrackingPage> {
                         arabic: isArabic,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    _Pill(
-                      icon: Icons.timer_rounded,
-                      label:
-                          '${tracking.etaMinutes} ${context.t('minutesSuffix')}',
-                    ),
                     const Spacer(),
                     _Pill(
                       icon: Icons.my_location_rounded,
@@ -85,39 +84,22 @@ class _TrackingPageState extends State<TrackingPage> {
                   ],
                 ),
               ),
-              Positioned(
-                bottom: AppSpacing.xl + 12,
-                right: AppSpacing.xl,
-                child: _ToggleDetailsButton(
-                  isOpen: detailsVisible,
-                  onTap: () => setState(() => detailsVisible = !detailsVisible),
-                ),
-              ),
+              // Card aligns to bottom - no external sliding, internal animation used
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.xl,
-                    AppSpacing.md,
+                    0,
                     AppSpacing.xl,
                     AppSpacing.xl,
                   ),
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOut,
-                    offset: detailsVisible
-                        ? Offset.zero
-                        : const Offset(0, 1.05),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: detailsVisible ? 1 : 0,
-                      child: _BottomDetailsCard(
-                        tracking: tracking,
-                        isArabic: isArabic,
-                        onToggle: () =>
-                            setState(() => detailsVisible = !detailsVisible),
-                      ),
-                    ),
+                  child: _BottomDetailsCard(
+                    tracking: tracking,
+                    isArabic: isArabic,
+                    isOpen: detailsVisible,
+                    onToggle: () =>
+                        setState(() => detailsVisible = !detailsVisible),
                   ),
                 ),
               ),
@@ -129,54 +111,127 @@ class _TrackingPageState extends State<TrackingPage> {
   }
 }
 
-class _ToggleDetailsButton extends StatelessWidget {
-  const _ToggleDetailsButton({required this.isOpen, required this.onTap});
+class _TrackingMap extends StatefulWidget {
+  const _TrackingMap({required this.students});
 
-  final bool isOpen;
-  final VoidCallback onTap;
+  final List<Student> students;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 6,
-      shadowColor: Colors.black.withAlpha(31),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Icon(
-            isOpen ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-            color: AppColors.primary,
-          ),
-        ),
-      ),
-    );
-  }
+  State<_TrackingMap> createState() => _TrackingMapState();
 }
 
-class _TrackingMap extends StatelessWidget {
-  const _TrackingMap({required this.tracking});
+class _TrackingMapState extends State<_TrackingMap> {
+  final Map<String, BitmapDescriptor> _markers = {};
 
-  final TrackingSnapshot tracking;
+  @override
+  void initState() {
+    super.initState();
+    _loadMarkers();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TrackingMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.students != widget.students) {
+      _loadMarkers();
+    }
+  }
+
+  Future<void> _loadMarkers() async {
+    final newMarkers = <String, BitmapDescriptor>{};
+    for (final student in widget.students) {
+      try {
+        final marker =
+            await StudentMarkerWidget(
+              name: student.name,
+              imageUrl: student.avatarUrl,
+            ).toBitmapDescriptor(
+              logicalSize: const Size(100, 100),
+              imageSize: const Size(200, 200),
+            );
+        newMarkers[student.id] = marker;
+      } catch (e) {
+        debugPrint('Error generating marker for ${student.name}: $e');
+        // Fallback to default
+        newMarkers[student.id] = BitmapDescriptor.defaultMarkerWithHue(
+          BitmapDescriptor.hueAzure,
+        );
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _markers.clear();
+        _markers.addAll(newMarkers);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final busPosition = LatLng(tracking.lat, tracking.lng);
+    final controller = AppScope.of(context);
+    final markers = <Marker>{};
 
-    final markers = <Marker>{
-      Marker(
-        markerId: const MarkerId('bus'),
-        position: busPosition,
-        infoWindow: InfoWindow(title: context.t('bus')),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      ),
-    };
+    // Calculate bounding box to include all buses
+    LatLngBounds? bounds;
+
+    for (var i = 0; i < widget.students.length; i++) {
+      final student = widget.students[i];
+      final tracking = controller.trackingForStudent(student.id);
+
+      // Offset logic:
+      // If multiple students are on the same bus (same lat/lng), apply a small offset.
+      // We can use a simple deterministic offset based on index.
+      // 0.00005 degrees is roughly 5 meters.
+      final double offset = (i % 2 == 0 ? 1 : -1) * (i * 0.00005);
+      final position = LatLng(tracking.lat + offset, tracking.lng + offset);
+
+      markers.add(
+        Marker(
+          markerId: MarkerId('student_${student.id}'),
+          position: position,
+          infoWindow: InfoWindow(
+            title: student.name,
+            snippet: tracking.busState == BusState.enRoute
+                ? 'Lat: ${tracking.lat}, Lng: ${tracking.lng}'
+                : null,
+          ),
+          icon:
+              _markers[student.id] ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        ),
+      );
+
+      // Update bounds
+      if (bounds == null) {
+        bounds = LatLngBounds(southwest: position, northeast: position);
+      } else {
+        bounds = LatLngBounds(
+          southwest: LatLng(
+            position.latitude < bounds.southwest.latitude
+                ? position.latitude
+                : bounds.southwest.latitude,
+            position.longitude < bounds.southwest.longitude
+                ? position.longitude
+                : bounds.southwest.longitude,
+          ),
+          northeast: LatLng(
+            position.latitude > bounds.northeast.latitude
+                ? position.latitude
+                : bounds.northeast.latitude,
+            position.longitude > bounds.northeast.longitude
+                ? position.longitude
+                : bounds.northeast.longitude,
+          ),
+        );
+      }
+    }
+
+    final primaryTracking = controller.currentTracking;
+    final primaryPos = LatLng(primaryTracking.lat, primaryTracking.lng);
 
     return GoogleMap(
-      initialCameraPosition: CameraPosition(target: busPosition, zoom: 14),
+      initialCameraPosition: CameraPosition(target: primaryPos, zoom: 14),
       markers: markers,
       myLocationEnabled: true,
       zoomControlsEnabled: false,
@@ -190,11 +245,13 @@ class _BottomDetailsCard extends StatelessWidget {
   const _BottomDetailsCard({
     required this.tracking,
     required this.isArabic,
+    required this.isOpen,
     required this.onToggle,
   });
 
   final TrackingSnapshot tracking;
   final bool isArabic;
+  final bool isOpen;
   final VoidCallback onToggle;
 
   @override
@@ -205,12 +262,6 @@ class _BottomDetailsCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.xl,
-        AppSpacing.lg + paddingBottom,
-      ),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -229,16 +280,11 @@ class _BottomDetailsCard extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onToggle,
-            onVerticalDragUpdate: (details) {
-              if (details.primaryDelta != null && details.primaryDelta! > 6) {
-                onToggle();
-              }
-            },
+          // HEADER SECTION (Always Visible)
+          SizedBox(
+            height: 36, // Area for the drag handle
             child: Center(
               child: Container(
                 width: 54,
@@ -252,99 +298,143 @@ class _BottomDetailsCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withAlpha(31),
-                ),
-                child: const Icon(
-                  Icons.directions_bus_filled_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.t('tracking'),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Driver Info
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? Colors.white24 : Colors.transparent,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      isArabic
-                          ? 'عرض مباشر للحافلة مع ETA والمسافة'
-                          : 'Live bus view with ETA and distance',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? Colors.white70
-                            : AppColors.textSecondary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  child: const CircleAvatar(
+                    radius: 24,
+                    backgroundImage: NetworkImage(
+                      'https://i.pravatar.cc/150?u=driver',
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _Pill(
-                icon: Icons.access_time_filled_rounded,
-                label: '${tracking.etaMinutes} ${context.t('minutesSuffix')}',
-                background: AppColors.accent.withAlpha(36),
-                borderColor: AppColors.accent.withAlpha(77),
-                textColor: AppColors.accent,
-                iconColor: AppColors.accent,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              _TrackingStat(
-                icon: Icons.speed_rounded,
-                label: context.t('speed'),
-                value:
-                    '${tracking.speedKmh.toStringAsFixed(0)} ${context.t('kmh')}',
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _TrackingStat(
-                icon: Icons.route_rounded,
-                label: context.t('distance'),
-                value:
-                    '${tracking.distanceKm.toStringAsFixed(1)} ${context.t('km')}',
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              _TrackingStat(
-                icon: Icons.people_alt_rounded,
-                label: context.t('studentsOnBus'),
-                value: tracking.studentsOnBoard.toString(),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _TrackingStat(
-                icon: Icons.alt_route_rounded,
-                label: context.t('busStatus'),
-                value: Labels.busState(tracking.busState, arabic: isArabic),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            '${context.t('updated')} ${date_utils.timeAgo(tracking.updatedAt, locale: isArabic ? 'ar' : 'en')}',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isDark ? Colors.white60 : AppColors.textSecondary,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.t('driverName'), // "Mohamed Abdullah"
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '0551234567',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark
+                              ? Colors.white70
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                // Toggle Button
+                Material(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.grey.shade100,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onToggle,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Icon(
+                        isOpen
+                            ? Icons.keyboard_arrow_down_rounded
+                            : Icons.keyboard_arrow_up_rounded,
+                        color: isDark ? Colors.white : AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+
+          // EXPANDABLE BODY SECTION
+          AnimatedCrossFade(
+            firstChild: const SizedBox(height: AppSpacing.md),
+            secondChild: Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.xl,
+                AppSpacing.lg + paddingBottom,
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _TrackingStat(
+                        icon: Icons.speed_rounded,
+                        label: context.t('speed'),
+                        value:
+                            '${tracking.speedKmh.toStringAsFixed(0)} ${context.t('kmh')}',
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      _TrackingStat(
+                        icon: Icons.route_rounded,
+                        label: context.t('distance'),
+                        value:
+                            '${tracking.distanceKm.toStringAsFixed(1)} ${context.t('km')}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      _TrackingStat(
+                        icon: Icons.people_alt_rounded,
+                        label: context.t('studentsOnBus'),
+                        value: tracking.studentsOnBoard.toString(),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      // REPLACED Bus Status with Remaining Time
+                      _TrackingStat(
+                        icon: Icons.timer_rounded,
+                        label: context.t('remainingTime'),
+                        value:
+                            '${tracking.etaMinutes} ${context.t('minutesSuffix')}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    '${context.t('updated')} ${date_utils.timeAgo(tracking.updatedAt, locale: isArabic ? 'ar' : 'en')}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: isOpen
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+            alignment: Alignment.topCenter,
+            sizeCurve: Curves.easeInOut,
           ),
         ],
       ),
@@ -386,7 +476,7 @@ class _TrackingStat extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(20),
+                  color: AppColors.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppColors.primary),
@@ -431,18 +521,12 @@ class _Pill extends StatelessWidget {
     required this.label,
     this.iconColor = Colors.white,
     this.subtle = false,
-    this.background,
-    this.borderColor,
-    this.textColor,
   });
 
   final IconData icon;
   final String label;
   final Color iconColor;
   final bool subtle;
-  final Color? background;
-  final Color? borderColor;
-  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -452,19 +536,18 @@ class _Pill extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color:
-            background ?? (subtle ? Colors.white.withAlpha(46) : Colors.white),
+        color: subtle ? Colors.white.withValues(alpha: 0.18) : Colors.white,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color:
-              borderColor ??
-              (subtle ? Colors.white.withAlpha(77) : AppColors.border),
+          color: subtle
+              ? Colors.white.withValues(alpha: 0.3)
+              : AppColors.border,
         ),
         boxShadow: subtle
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withAlpha(15),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 18,
                   offset: const Offset(0, 10),
                 ),
@@ -479,8 +562,7 @@ class _Pill extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              color:
-                  textColor ?? (subtle ? Colors.white : AppColors.textPrimary),
+              color: subtle ? Colors.white : AppColors.textPrimary,
             ),
           ),
         ],

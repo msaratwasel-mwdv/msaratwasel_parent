@@ -5,7 +5,7 @@ import 'app_colors.dart';
 class AppTypography {
   const AppTypography._();
 
-  static const _fontFamily = 'Roboto';
+  static const _fontFamily = 'GoogleSans';
 
   static TextTheme get textTheme {
     return const TextTheme(

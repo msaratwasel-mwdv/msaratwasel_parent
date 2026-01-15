@@ -25,6 +25,14 @@ class SampleData {
       bus: bus2,
       status: StudentStatus.atHome,
     ),
+    Student(
+      id: 'st-3',
+      name: 'خالد أحمد',
+      grade: 'الصف الثاني',
+      schoolId: '210347',
+      bus: bus1,
+      status: StudentStatus.atSchool,
+    ),
   ];
 
   static final tracking = <String, TrackingSnapshot>{
@@ -49,6 +57,17 @@ class SampleData {
       busState: BusState.atHome,
       updatedAt: DateTime.now().subtract(const Duration(minutes: 10)),
       routeDescription: 'لا توجد رحلة حالياً',
+    ),
+    'st-3': TrackingSnapshot(
+      lat: 24.7136,
+      lng: 46.6753,
+      speedKmh: 0,
+      etaMinutes: 0,
+      distanceKm: 0,
+      studentsOnBoard: 0,
+      busState: BusState.atSchool,
+      updatedAt: DateTime.now().subtract(const Duration(minutes: 30)),
+      routeDescription: 'وصل المدرسة',
     ),
   };
 

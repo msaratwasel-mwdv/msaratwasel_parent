@@ -6,7 +6,13 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/change_password_page.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
+import 'package:msaratwasel_user/src/features/settings/presentation/privacy_policy_page.dart';
+import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_page.dart';
+import 'package:msaratwasel_user/src/features/settings/presentation/about_app_page.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 
 class MorePage extends StatefulWidget {
   const MorePage({super.key});
@@ -17,6 +23,115 @@ class MorePage extends StatefulWidget {
 
 class _MorePageState extends State<MorePage> {
   bool notificationsEnabled = true;
+
+  void _showStudentSelectionSheet(BuildContext context) {
+    final controller = AppScope.of(context);
+    final students = controller.students;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              context.t('selectChildToChangeLocation'),
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ...students.map(
+              (student) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: ListTile(
+                  onTap: () async {
+                    Navigator.pop(context); // Close sheet
+                    // Navigate to Location Picker
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LocationPickerScreen(
+                          initialLocation: student.homeLocation,
+                        ),
+                      ),
+                    );
+
+                    if (result != null && context.mounted) {
+                      if (result is Map) {
+                        final location = result['location'] as LatLng;
+                        final note = result['note'] as String?;
+                        controller.updateStudentLocation(
+                          student.id,
+                          location,
+                          note: note,
+                        );
+                      } else if (result is LatLng) {
+                        controller.updateStudentLocation(student.id, result);
+                      }
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(context.t('locationUpdated')),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  },
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    child: Text(
+                      student.name[0],
+                      style: GoogleFonts.cairo(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    student.name,
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${context.t('studentGrade')}: ${student.grade}',
+                    style: GoogleFonts.cairo(
+                      color: isDark ? Colors.white70 : AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: isDark ? Colors.white30 : Colors.black26,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: isDark ? Colors.white12 : AppColors.border,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +152,7 @@ class _MorePageState extends State<MorePage> {
               child: IconButton(
                 icon: Icon(
                   Icons.menu_rounded,
-                  color: Theme.of(context).primaryColor,
+                  color: isDark ? Colors.white : AppColors.primary,
                 ),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
@@ -64,7 +179,7 @@ class _MorePageState extends State<MorePage> {
                         title: context.t('profile'),
                         subtitle: context.t('editProfile'),
                         onTap: () =>
-                            controller.setNavIndex(6), // Parent Profile
+                            controller.setNavIndex(7), // Parent Profile
                       ),
                       _Divider(),
                       _SettingsTile(
@@ -81,9 +196,52 @@ class _MorePageState extends State<MorePage> {
                       _Divider(),
                       _SettingsTile(
                         icon: PhosphorIcons.users(PhosphorIconsStyle.duotone),
-                        title: context.t('myKids'),
+                        title: context.t('changeChildrenLocation'),
                         subtitle: context.t('manageKids'),
-                        onTap: () => controller.setNavIndex(0), // Kids list
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(
+                                context.t('locationChangeWarningTitle'),
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: Text(
+                                context.t('locationChangeWarningBody'),
+                                style: GoogleFonts.cairo(),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(
+                                    context.t('cancel'),
+                                    style: GoogleFonts.cairo(
+                                      color: Colors.grey,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context); // Close warning
+                                    _showStudentSelectionSheet(context);
+                                  },
+                                  child: Text(
+                                    context.t('proceed'),
+                                    style: GoogleFonts.cairo(
+                                      color: isDark
+                                          ? AppColors.dark.accent
+                                          : AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -104,12 +262,18 @@ class _MorePageState extends State<MorePage> {
                         subtitle: isDark
                             ? context.t('dark')
                             : context.t('light'),
-                        trailing: Switch.adaptive(
+                        trailing: _SegmentedToggle(
                           value: isDark,
-                          activeTrackColor: AppColors.primary,
-                          onChanged: (v) => controller.toggleTheme(isDark),
+                          onChanged: (v) {
+                            if (v != isDark) controller.toggleTheme(isDark);
+                          },
+                          leftLabel: context.t('light'),
+                          rightLabel: context.t('dark'),
+                          leftIcon: PhosphorIcons.sun(PhosphorIconsStyle.bold),
+                          rightIcon: PhosphorIcons.moonStars(
+                            PhosphorIconsStyle.bold,
+                          ),
                         ),
-                        onTap: () => controller.toggleTheme(isDark),
                       ),
                       _Divider(),
                       _SettingsTile(
@@ -118,12 +282,24 @@ class _MorePageState extends State<MorePage> {
                         ),
                         title: context.t('language'),
                         subtitle: isArabic ? 'العربية' : 'English',
-                        trailing: Switch.adaptive(
-                          value: isArabic,
-                          activeTrackColor: AppColors.primary,
-                          onChanged: (v) => controller.toggleLanguage(),
+                        trailing: _SegmentedToggle(
+                          value:
+                              !isArabic, // False (Left) = Arabic, True (Right) = English
+                          onChanged: (targetIsEnglish) {
+                            // If target matches current isArabic state (e.g. Target English(true) and isArabic(true)), it means we need to toggle
+                            if (targetIsEnglish == isArabic) {
+                              controller.toggleLanguage();
+                            }
+                          },
+                          leftLabel: 'العربية',
+                          rightLabel: 'English',
+                          leftIcon: PhosphorIcons.translate(
+                            PhosphorIconsStyle.bold,
+                          ),
+                          rightIcon: PhosphorIcons.textAa(
+                            PhosphorIconsStyle.bold,
+                          ),
                         ),
-                        onTap: controller.toggleLanguage,
                       ),
                       _Divider(),
                       _SettingsTile(
@@ -161,14 +337,37 @@ class _MorePageState extends State<MorePage> {
                           PhosphorIconsStyle.duotone,
                         ),
                         title: context.t('contactUs'),
-                        onTap: () {},
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ContactUsPage(),
+                          ),
+                        ),
                       ),
                       _Divider(),
                       _SettingsTile(
                         icon: PhosphorIcons.info(PhosphorIconsStyle.duotone),
                         title: context.t('aboutApp'),
-                        subtitle: 'v1.0.0',
-                        onTap: () {},
+                        subtitle: 'v2.0.0',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutAppPage(),
+                          ),
+                        ),
+                      ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.shieldCheck(
+                          PhosphorIconsStyle.duotone,
+                        ),
+                        title: context.t('privacyPolicy'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacyPolicyPage(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -226,7 +425,7 @@ class _SectionHeader extends StatelessWidget {
         title,
         style: theme.textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.bold,
-          color: isDark ? AppColors.primary : AppColors.primary,
+          color: isDark ? Colors.white : AppColors.primary,
           letterSpacing: 0.5,
         ),
       ),
@@ -296,11 +495,15 @@ class _SettingsTile extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? AppColors.primary.withValues(alpha: 0.2)
+                      ? Colors.white.withValues(alpha: 0.1)
                       : AppColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 22),
+                child: Icon(
+                  icon,
+                  color: isDark ? Colors.white : AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -360,6 +563,124 @@ class _Divider extends StatelessWidget {
       color: isDark
           ? Colors.white.withValues(alpha: 0.05)
           : AppColors.border.withValues(alpha: 0.5),
+    );
+  }
+}
+
+class _SegmentedToggle extends StatelessWidget {
+  const _SegmentedToggle({
+    required this.value,
+    required this.onChanged,
+    required this.leftLabel,
+    required this.rightLabel,
+    required this.leftIcon,
+    required this.rightIcon,
+  });
+
+  final bool value; // false = left, true = right
+  final ValueChanged<bool> onChanged;
+  final String leftLabel;
+  final String rightLabel;
+  final IconData leftIcon;
+  final IconData rightIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.3)
+            : const Color(0xFFF1F5F9), // Lighter, cleaner grey
+        borderRadius: BorderRadius.circular(16), // Softer corners
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildSegment(
+            context: context,
+            isSelected: !value,
+            label: leftLabel,
+            icon: leftIcon,
+            onTap: () => onChanged(false),
+          ),
+          // Removed SizedBox to allow segments to touch/flow better if needed,
+          // or keep it small. keeping it but smaller for tight fit.
+          const SizedBox(width: 4),
+          _buildSegment(
+            context: context,
+            isSelected: value,
+            label: rightLabel,
+            icon: rightIcon,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegment({
+    required BuildContext context,
+    required bool isSelected,
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.fastOutSlowIn, // More responsive feel
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ), // More horizontal padding
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFF334155) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected && !isDark
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: 0.04,
+                    ), // Very subtle shadow
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            // Only show icon if selected or for specific "simple" look?
+            // User screenshot shows icons on both. Keeping icons.
+            Icon(
+              icon,
+              size: 18, // Slightly larger
+              color: isSelected
+                  ? (isDark ? Colors.white : AppColors.primary)
+                  : (isDark ? Colors.white38 : Colors.grey),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.cairo(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected
+                    ? (isDark ? Colors.white : AppColors.textPrimary)
+                    : (isDark ? Colors.white38 : Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

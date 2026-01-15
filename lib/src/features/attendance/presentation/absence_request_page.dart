@@ -1,8 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:msaratwasel_user/src/features/attendance/presentation/widgets/child_selector.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AbsenceRequestPage extends StatefulWidget {
   const AbsenceRequestPage({super.key});
@@ -12,575 +14,141 @@ class AbsenceRequestPage extends StatefulWidget {
 }
 
 class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
-  int _selectedTab = 0; // 0: Request, 1: Log
-  int selectedStudent = 1;
-  int selectedAbsenceType = 0;
-  DateTime? selectedDate;
-
-  // Extended mock data for "Whole Year"
-  final _fullLog = [
-    {
-      'date': DateTime.now().subtract(const Duration(days: 2)),
-      'type': 0, // Full Absence
-      'status': 'approved',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 4)),
-      'type': -1, // Present
-      'status': 'present',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 5)),
-      'type': -1, // Present
-      'status': 'present',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 10)),
-      'type': 1, // Return only
-      'status': 'pending',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 12)),
-      'type': -1, // Present
-      'status': 'present',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 25)),
-      'type': 2, // Morning only
-      'status': 'rejected',
-    },
-    {
-      'date': DateTime.now().subtract(const Duration(days: 60)),
-      'type': 0, // Full
-      'status': 'approved',
-    },
+  // Mock Data
+  final List<AttendanceChild> _children = [
+    AttendanceChild(id: '1', name: 'أحمد', grade: 'الخامس - أ'),
+    AttendanceChild(id: '2', name: 'سارة', grade: 'الثاني - ب'),
   ];
+
+  late AttendanceChild _selectedChild;
+  int _selectedAbsenceType = 0;
+  DateTime? _selectedDate;
+  final TextEditingController _reasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedChild = _children.first;
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _onChildSelected(AttendanceChild child) {
+    setState(() {
+      _selectedChild = child;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
 
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      slivers: [
-        CupertinoSliverNavigationBar(
-          largeTitle: Text(
-            context.t('attendance'),
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black,
-              fontFamily: 'Cairo', // Ensure font consistency
-            ),
-          ),
-          leading: Material(
-            color: Colors.transparent,
-            child: IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: Theme.of(context).primaryColor,
+    return Scaffold(
+      backgroundColor: isDark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : const Color(0xFFF8F9FD),
+      body: CustomScrollView(
+        slivers: [
+          AppSliverHeader(
+            title: context.t('requestAbsence'),
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
               ),
-              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          border: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              width: 0.0,
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          sliver: SliverToBoxAdapter(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(
-                bottom: viewInsets > 0 ? viewInsets + 12 : 0,
-              ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Student Selector (Moved here as requested)
+                  // Child Selector
+                  ChildSelector(
+                    children: _children,
+                    selectedChild: _selectedChild,
+                    onChildSelected: _onChildSelected,
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // Absence Type
                   Text(
-                    context.t('chooseStudent'),
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    context.t('absenceType'),
+                    style: GoogleFonts.cairo(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _studentSelector(textTheme, isDark),
+                  _buildAbsenceTypeRow(isDark),
+
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Tabs
-                  _modernTabs(textTheme, isDark),
+                  // Date Picker
+                  Text(
+                    context.t('selectDate'),
+                    style: GoogleFonts.cairo(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildDatePicker(isDark),
+
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Content
-                  if (_selectedTab == 0)
-                    _buildRequestForm(textTheme, isDark)
-                  else
-                    _buildAbsenceLog(textTheme, isDark),
-                  // Add bottom padding
+                  // Reason Field
+                  Text(
+                    context.t('absenceReason'),
+                    style: GoogleFonts.cairo(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildReasonField(isDark),
+
+                  const SizedBox(height: AppSpacing.xxl),
+
+                  // Submit Button
+                  _buildSubmitButton(context),
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                 ],
               ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRequestForm(TextTheme textTheme, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          // Assuming "Type of Absence" key or just localized hardcoded for now
-          // Adding key 'absenceType' or similar would be better, but 'attendance' context implies it.
-          // Let's use localized labels.
-          // "نوع الغياب" -> context.t('absenceType') ?? 'نوع الغياب' (if missing)
-          // I will use hardcoded map here for now or add key.
-          'نوع الغياب', // TODO: Add key 'absenceType'
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _absenceTypeRow(textTheme, isDark),
-        const SizedBox(height: AppSpacing.xl),
-        Text(
-          context.t('selectDate'),
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _modernDatePicker(textTheme, isDark),
-        const SizedBox(height: AppSpacing.xl),
-        Text(
-          context.t('absenceReason'),
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _modernReasonField(textTheme, isDark),
-        const SizedBox(height: AppSpacing.xxl),
-        _submitButton(textTheme),
-      ],
-    );
-  }
-
-  Widget _buildAbsenceLog(TextTheme textTheme, bool isDark) {
-    int presentCount = 0;
-    int absentCount = 0;
-
-    for (var item in _fullLog) {
-      if (item['type'] == -1) {
-        presentCount++;
-      } else {
-        absentCount++;
-      }
-    }
-
-    if (_fullLog.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            isDark ? 'لا يوجد سجل غياب' : 'No attendance history',
-            style: textTheme.bodyLarge?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Summary Table
-        Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : AppColors.border,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        "$presentCount",
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "أيام الحضور", // TODO: Localize context.t('presentDays')
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 60,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.1)
-                    : AppColors.border,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        "$absentCount",
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "أيام الغياب", // TODO: Localize context.t('absentDays')
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // List
-        ListView.separated(
-          shrinkWrap:
-              true, // Needed since it's inside a CustomScrollView -> SliverToBoxAdapter -> Column
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _fullLog.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-          itemBuilder: (context, index) {
-            final item = _fullLog[index];
-            final date = item['date'] as DateTime;
-            final type = item['type'] as int;
-            final status = item['status'] as String;
-
-            String typeLabel;
-            IconData icon;
-            Color color;
-
-            if (type == -1) {
-              typeLabel = 'حاضر';
-              icon = Icons.check_circle;
-              color = Colors.green;
-            } else if (type == 0) {
-              typeLabel = context.t('absenceFull');
-              icon = Icons.block;
-              color = Colors.redAccent;
-            } else if (type == 1) {
-              typeLabel = context.t('absenceIn');
-              icon = Icons.arrow_forward;
-              color = Colors.orange;
-            } else {
-              typeLabel = context.t('absenceOut');
-              icon = Icons.arrow_back;
-              color = Colors.orange;
-            }
-
-            final isPresent = type == -1;
-
-            return Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : AppColors.border,
-                ),
-                boxShadow: [
-                  if (!isDark)
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: color, size: 20),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          typeLabel,
-                          style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "${date.year}-${date.month}-${date.day}",
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!isPresent)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: status == 'approved'
-                            ? Colors.green.withValues(alpha: 0.1)
-                            : status == 'rejected'
-                            ? Colors.red.withValues(alpha: 0.1)
-                            : Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        status == 'approved'
-                            ? 'مقبول'
-                            : status == 'rejected'
-                            ? 'مرفوض'
-                            : 'قيد المراجعة',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: status == 'approved'
-                              ? Colors.green
-                              : status == 'rejected'
-                              ? Colors.red
-                              : Colors.orange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _modernTabs(TextTheme textTheme, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          _tab(textTheme, context.t('requestAbsence'), 0, isDark),
-          _tab(textTheme, context.t('absenceLog'), 1, isDark),
         ],
       ),
     );
   }
 
-  Widget _tab(TextTheme textTheme, String title, int index, bool isDark) {
-    final bool active = _selectedTab == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedTab = index),
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: active
-                ? (isDark
-                      ? AppColors.primary.withValues(alpha: 0.18)
-                      : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              title,
-              style: textTheme.labelLarge?.copyWith(
-                color: active
-                    ? (isDark ? Colors.white : Colors.black87)
-                    : (isDark ? Colors.white70 : AppColors.textSecondary),
-                fontWeight: active ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _studentSelector(TextTheme textTheme, bool isDark) {
-    return Column(
-      children: [
-        _studentCard(textTheme, "أحمد علي", 1, isDark),
-        const SizedBox(height: AppSpacing.md),
-        _studentCard(textTheme, "فاطمة محمد", 2, isDark),
-      ],
-    );
-  }
-
-  Widget _studentCard(TextTheme textTheme, String name, int id, bool isDark) {
-    final bool selected = selectedStudent == id;
-
-    return InkWell(
-      onTap: () => setState(() => selectedStudent = id),
-      borderRadius: BorderRadius.circular(24),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.lg,
-          horizontal: AppSpacing.xl,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08)
-              : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            if (!selected)
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-          ],
-          border: selected
-              ? Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.5),
-                  width: 1.5,
-                )
-              : Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.grey.withValues(alpha: 0.12),
-                ),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: selected
-                  ? AppColors.primary
-                  : (isDark
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : Colors.grey[100]),
-              child: Icon(
-                Icons.person_rounded,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.blueGrey),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Text(
-              name,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                color: selected
-                    ? AppColors.primary
-                    : (isDark ? Colors.white : AppColors.textPrimary),
-              ),
-            ),
-            const Spacer(),
-            if (selected)
-              Icon(
-                Icons.check_circle_rounded,
-                color: AppColors.primary,
-                size: 26,
-              )
-            else
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.4)
-                        : Colors.grey[300]!,
-                    width: 2,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _absenceTypeRow(TextTheme textTheme, bool isDark) {
+  Widget _buildAbsenceTypeRow(bool isDark) {
     return Row(
       children: [
-        _absenceCard(
-          textTheme,
-          context.t('absenceFull'),
-          Icons.block,
-          0,
-          isDark,
-        ),
+        _buildAbsenceCard(context.t('absenceFull'), Icons.block, 0, isDark),
         const SizedBox(width: AppSpacing.sm),
-        _absenceCard(
-          textTheme,
+        _buildAbsenceCard(
           context.t('absenceIn'),
-          Icons.arrow_forward,
+          Icons.arrow_forward_rounded,
           1,
           isDark,
         ),
         const SizedBox(width: AppSpacing.sm),
-        _absenceCard(
-          textTheme,
+        _buildAbsenceCard(
           context.t('absenceOut'),
-          Icons.arrow_back,
+          Icons.arrow_back_rounded,
           2,
           isDark,
         ),
@@ -588,71 +156,60 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
     );
   }
 
-  Widget _absenceCard(
-    TextTheme textTheme,
-    String title,
-    IconData icon,
-    int type,
-    bool isDark,
-  ) {
-    final bool active = selectedAbsenceType == type;
+  Widget _buildAbsenceCard(String title, IconData icon, int type, bool isDark) {
+    final bool active = _selectedAbsenceType == type;
 
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => selectedAbsenceType = type),
-        borderRadius: BorderRadius.circular(24),
+        onTap: () => setState(() => _selectedAbsenceType = type),
+        borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 24),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
           decoration: BoxDecoration(
             color: active
-                ? AppColors.primary.withValues(alpha: isDark ? 0.22 : 0.07)
+                ? const Color(0xFF1E3A8A).withValues(alpha: isDark ? 0.3 : 0.1)
                 : (isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Theme.of(context).cardColor),
-            borderRadius: BorderRadius.circular(24),
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.white),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFF1E3A8A)
+                  : (isDark ? Colors.white10 : Colors.grey[200]!),
+              width: active ? 1.5 : 1,
+            ),
             boxShadow: [
-              if (!active)
+              if (!active && !isDark)
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
             ],
-            border: active
-                ? Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.5),
-                    width: 1.5,
-                  )
-                : Border.all(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : Colors.grey.withValues(alpha: 0.12),
-                  ),
           ),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedScale(
-                scale: active ? 1.1 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  icon,
-                  color: active
-                      ? AppColors.primary
-                      : (isDark ? Colors.white70 : Colors.blueGrey[300]),
-                  size: 32,
-                ),
+              Icon(
+                icon,
+                color: active
+                    ? const Color(0xFF1E3A8A)
+                    : (isDark ? Colors.white70 : Colors.grey[400]),
+                size: 28,
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: 8),
               Text(
                 title,
-                style: textTheme.bodyMedium?.copyWith(
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
                   fontWeight: active ? FontWeight.bold : FontWeight.w600,
                   color: active
-                      ? AppColors.primary
-                      : (isDark ? Colors.white : AppColors.textSecondary),
+                      ? const Color(0xFF1E3A8A)
+                      : (isDark ? Colors.white70 : AppColors.textSecondary),
+                  height: 1.2,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -661,56 +218,73 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
     );
   }
 
-  Widget _modernDatePicker(TextTheme textTheme, bool isDark) {
+  Widget _buildDatePicker(bool isDark) {
     return InkWell(
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
-          initialDate: selectedDate ?? DateTime.now(),
+          initialDate: _selectedDate ?? DateTime.now(),
           firstDate: DateTime(2023),
           lastDate: DateTime(2030),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Color(0xFF1E3A8A), // Selection color
+                  onPrimary: Colors.white,
+                  onSurface: Colors.black,
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
         if (picked != null) {
-          setState(() => selectedDate = picked);
+          setState(() => _selectedDate = picked);
         }
       },
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : const Color(0xFFF8F9FA),
-          borderRadius: BorderRadius.circular(20),
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.grey.withValues(alpha: 0.14),
+            color: isDark ? Colors.white12 : Colors.grey[200]!,
           ),
+          boxShadow: [
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.calendar_today_rounded,
-              color: AppColors.primary,
+              color: Color(0xFF1E3A8A),
               size: 22,
             ),
             const SizedBox(width: AppSpacing.md),
             Text(
-              selectedDate != null
-                  ? "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}"
+              _selectedDate != null
+                  ? "${_selectedDate!.year}-${_selectedDate!.month}-${_selectedDate!.day}"
                   : context.t('selectDate'),
-              style: textTheme.bodyLarge?.copyWith(
-                color: selectedDate != null
-                    ? (isDark ? Colors.white : Colors.black87)
-                    : (isDark ? Colors.white70 : AppColors.textSecondary),
-                fontWeight: FontWeight.w500,
+              style: GoogleFonts.cairo(
+                color: _selectedDate != null
+                    ? (isDark ? Colors.white : AppColors.textPrimary)
+                    : (isDark ? Colors.white38 : Colors.grey[400]),
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
               ),
             ),
             const Spacer(),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: isDark ? Colors.white70 : AppColors.textSecondary,
+              color: isDark ? Colors.white70 : Colors.grey[400],
             ),
           ],
         ),
@@ -718,82 +292,81 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
     );
   }
 
-  Widget _modernReasonField(TextTheme textTheme, bool isDark) {
+  Widget _buildReasonField(bool isDark) {
     return TextField(
+      controller: _reasonController,
       maxLines: 4,
-      cursorColor: AppColors.primary,
-      style: textTheme.bodyLarge?.copyWith(
+      cursorColor: const Color(0xFF1E3A8A),
+      style: GoogleFonts.cairo(
         color: isDark ? Colors.white : AppColors.textPrimary,
       ),
       decoration: InputDecoration(
         filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : const Color(0xFFF8F9FA),
-        hintText: "مثال: موعد طبي...",
-        hintStyle: textTheme.bodyMedium?.copyWith(
-          color: isDark
-              ? Colors.white60
-              : AppColors.textSecondary.withValues(alpha: 0.6),
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        hintText: context.t('reasonHint'),
+        hintStyle: GoogleFonts.cairo(
+          color: isDark ? Colors.white38 : Colors.grey[400],
         ),
         contentPadding: const EdgeInsets.all(20),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.transparent,
-          ),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.transparent,
+            color: isDark ? Colors.white12 : Colors.grey[200]!,
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(
-            color: AppColors.primary.withValues(alpha: 0.5),
-            width: 1.5,
-          ),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.5),
         ),
       ),
     );
   }
 
-  Widget _submitButton(TextTheme textTheme) {
+  Widget _buildSubmitButton(BuildContext context) {
     return SizedBox(
       height: 56,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: AppColors.brandGradient,
+          borderRadius: BorderRadius.circular(16),
+          color: const Color(0xFF1E3A8A), // Dark Blue
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.3),
+              color: const Color(0xFF1E3A8A).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: () {
+            // TODO: Implement submission logic
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'تم إرسال الطلب بنجاح',
+                  style: GoogleFonts.cairo(),
+                ),
+              ),
+            );
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
             ),
           ),
           child: Text(
             context.t('sendAbsenceRequest'),
-            style: textTheme.titleMedium?.copyWith(
+            style: GoogleFonts.cairo(
               color: Colors.white,
               fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
         ),

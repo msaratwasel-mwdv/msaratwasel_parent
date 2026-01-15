@@ -1,11 +1,15 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChildrenScreen extends StatelessWidget {
   const ChildrenScreen({super.key});
@@ -18,35 +22,21 @@ class ChildrenScreen extends StatelessWidget {
     final trips = controller.trips;
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return CustomScrollView(
       slivers: [
         // Navigation Bar
-        CupertinoSliverNavigationBar(
-          backgroundColor: scaffoldBackgroundColor,
-          border: null,
-          largeTitle: Text(
-            'الأبناء (${students.length})',
-            style: TextStyle(
-              color: isDark ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        // Navigation Bar
+        AppSliverHeader(
+          title: '${context.t('myKids')} (${students.length})',
           leading: Material(
             color: Colors.transparent,
             child: IconButton(
-              icon: Icon(Icons.menu_rounded, color: AppColors.primary),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: isDark ? Colors.white : AppColors.primary,
+              ),
               onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-          trailing: Material(
-            color: Colors.transparent,
-            child: IconButton(
-              icon: Icon(Icons.add_rounded, color: AppColors.primary),
-              onPressed: () {
-                // TODO: Add new child
-              },
             ),
           ),
         ),
@@ -121,7 +111,7 @@ class _ChildCard extends StatelessWidget {
     final controller = AppScope.of(context);
     final statusText = Labels.studentStatus(student.status, arabic: isArabic);
     final statusIcon = _statusIcon(student.status);
-    final statusColor = _getStatusColor(student.status);
+    final statusColor = _getStatusColor(student.status, isDark);
 
     // Mock data for attendance and trips
     final attendancePercentage = student.id == 'st-1' ? 95 : 98;
@@ -168,7 +158,7 @@ class _ChildCard extends StatelessWidget {
                       child: Text(
                         student.name[0],
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: isDark ? AppColors.primary : AppColors.primary,
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
                         ),
@@ -192,7 +182,7 @@ class _ChildCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${student.grade} • ${student.schoolId}',
+                          '${context.t('studentGrade')}: ${student.grade} • ${student.schoolId}',
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white70
@@ -240,7 +230,7 @@ class _ChildCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'الحافلة ${student.bus.number} • ${student.bus.plate}',
+                            '${context.t('bus')} ${student.bus.number} • ${student.bus.plate}',
                             style: TextStyle(
                               color: isDark
                                   ? Colors.white70
@@ -270,7 +260,7 @@ class _ChildCard extends StatelessWidget {
                   Expanded(
                     child: _StatItem(
                       icon: Icons.check_circle_outline,
-                      label: 'الحضور',
+                      label: context.t('attendance'),
                       value: '$attendancePercentage%',
                       color: Colors.green,
                       isDark: isDark,
@@ -280,7 +270,9 @@ class _ChildCard extends StatelessWidget {
                   Expanded(
                     child: _StatItem(
                       icon: Icons.route_rounded,
-                      label: 'الرحلات',
+                      label: context.t(
+                        'tripsHistory',
+                      ), // or "Trips", using tripsHistory
                       value: totalTrips.toString(),
                       color: AppColors.accent,
                       isDark: isDark,
@@ -297,17 +289,25 @@ class _ChildCard extends StatelessWidget {
                   Expanded(
                     child: _ActionButton(
                       icon: Icons.directions_bus_rounded,
-                      label: 'تتبع',
+                      label: context.t('track'),
                       color: AppColors.accent,
                       isDark: isDark,
-                      onTap: () => controller.setNavIndex(2),
+                      onTap: () {
+                        // TODO: Since we are in a list, finding the index of 'student' in the full list
+                        // is required if `students` here is filtered. Assuming `students` comes directly from controller order.
+                        final index = controller.students.indexOf(student);
+                        if (index != -1) {
+                          controller.selectStudent(index);
+                          controller.setNavIndex(2);
+                        }
+                      },
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _ActionButton(
                       icon: Icons.calendar_month_rounded,
-                      label: 'الحضور',
+                      label: context.t('attendance'),
                       color: Colors.orange,
                       isDark: isDark,
                       onTap: () => controller.setNavIndex(5),
@@ -317,8 +317,8 @@ class _ChildCard extends StatelessWidget {
                   Expanded(
                     child: _ActionButton(
                       icon: Icons.person_outline,
-                      label: 'الملف',
-                      color: AppColors.primary,
+                      label: context.t('file'),
+                      color: isDark ? Colors.white : AppColors.primary,
                       isDark: isDark,
                       onTap: onTap,
                     ),
@@ -347,7 +347,10 @@ class _ChildCard extends StatelessWidget {
     }
   }
 
-  Color _getStatusColor(StudentStatus status) {
+  Color _getStatusColor(StudentStatus status, bool isDark) {
+    if (isDark && status == StudentStatus.atSchool) {
+      return Colors.white; // Ensure "At School" is white in Dark Mode
+    }
     switch (status) {
       case StudentStatus.onBus:
         return AppColors.accent;
@@ -542,7 +545,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${student.grade} • ${student.schoolId}',
+                        '${context.t('studentGrade')}: ${student.grade} • ${student.schoolId}',
                         style: TextStyle(
                           color: isDark
                               ? Colors.white70
@@ -575,23 +578,23 @@ class _ChildDetailsSheet extends StatelessWidget {
               children: [
                 // Bus Information
                 _DetailSection(
-                  title: 'معلومات الحافلة',
+                  title: context.t('busInfoTitle'),
                   icon: Icons.directions_bus_rounded,
                   isDark: isDark,
                   child: Column(
                     children: [
                       _DetailRow(
-                        label: 'رقم الحافلة',
+                        label: context.t('busNumber'),
                         value: student.bus.number,
                         isDark: isDark,
                       ),
                       _DetailRow(
-                        label: 'لوحة الحافلة',
+                        label: context.t('busPlate'),
                         value: student.bus.plate,
                         isDark: isDark,
                       ),
                       _DetailRow(
-                        label: 'الحالة الحالية',
+                        label: context.t('statusLabel'),
                         value: Labels.studentStatus(
                           student.status,
                           arabic: isArabic,
@@ -604,29 +607,151 @@ class _ChildDetailsSheet extends StatelessWidget {
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // Attendance History
+                // Home Location
                 _DetailSection(
-                  title: 'سجل الحضور',
-                  icon: Icons.calendar_month_rounded,
+                  title: context.t('homeLocation'),
+                  icon: Icons.location_on_rounded,
                   isDark: isDark,
                   child: Column(
-                    children: attendance.map((entry) {
-                      return _AttendanceItem(entry: entry, isDark: isDark);
-                    }).toList(),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  student.homeLocation != null
+                                      ? '${student.homeLocation!.latitude.toStringAsFixed(4)}, ${student.homeLocation!.longitude.toStringAsFixed(4)}'
+                                      : context.t('notAvailable'),
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (student.locationNote != null &&
+                                    student.locationNote!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    student.locationNote!,
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white70
+                                          : AppColors.textSecondary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.map_rounded, size: 22),
+                            color: isDark ? Colors.white : AppColors.primary,
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => LocationPickerScreen(
+                                    initialLocation: student.homeLocation,
+                                    isReadOnly: true,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // Trip History
+                // School Information
                 _DetailSection(
-                  title: 'سجل الرحلات',
-                  icon: Icons.route_rounded,
+                  title: context.t('schoolInfo'),
+                  icon: Icons.school_rounded,
                   isDark: isDark,
                   child: Column(
-                    children: trips.map((trip) {
-                      return _TripItem(trip: trip, isDark: isDark);
-                    }).toList(),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isArabic
+                            ? 'مدارس الأقصى الأهلية'
+                            : 'Al Aqsa Private Schools',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Mock Location
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              isArabic
+                                  ? 'الرياض، حي الملقا'
+                                  : 'Riyadh, Al Malqa Dist.',
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white70
+                                    : AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // Bus Driver Info
+                _DetailSection(
+                  title: context.t('busDriver'),
+                  icon: Icons.airline_seat_recline_normal_rounded,
+                  isDark: isDark,
+                  child: _ContactInfoRow(
+                    name: isArabic ? 'محمد عبدالله' : 'Mohammed Abdullah',
+                    phone: '0551234567',
+                    avatarUrl:
+                        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+                    isDark: isDark,
+                    context: context,
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // Bus Supervisor Info
+                _DetailSection(
+                  title: context.t('busSupervisor'),
+                  icon: Icons.verified_user_rounded,
+                  isDark: isDark,
+                  child: _ContactInfoRow(
+                    name: isArabic ? 'سارة خالد' : 'Sara Khalid',
+                    phone: '0509876543',
+                    avatarUrl:
+                        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+                    isDark: isDark,
+                    context: context,
                   ),
                 ),
 
@@ -660,7 +785,11 @@ class _DetailSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 20),
+            Icon(
+              icon,
+              color: isDark ? Colors.white : AppColors.primary,
+              size: 20,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Text(
               title,
@@ -680,6 +809,11 @@ class _DetailSection extends StatelessWidget {
                 ? const Color(0xFF1E293B)
                 : Colors.grey.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.transparent,
+            ),
           ),
           child: child,
         ),
@@ -727,163 +861,77 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _AttendanceItem extends StatelessWidget {
-  const _AttendanceItem({required this.entry, required this.isDark});
+class _ContactInfoRow extends StatelessWidget {
+  const _ContactInfoRow({
+    required this.name,
+    required this.phone,
+    required this.avatarUrl,
+    required this.isDark,
+    required this.context,
+  });
 
-  final AttendanceEntry entry;
+  final String name;
+  final String phone;
+  final String avatarUrl;
   final bool isDark;
+  final BuildContext context;
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = '${entry.date.day}/${entry.date.month}/${entry.date.year}';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.calendar_today_rounded,
-            size: 16,
-            color: isDark ? Colors.white70 : AppColors.textSecondary,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (entry.note != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    entry.note!,
-                    style: TextStyle(
-                      color: isDark ? Colors.white60 : AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: entry.status.contains('حضرت')
-                  ? Colors.green.withValues(alpha: 0.1)
-                  : Colors.orange.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              entry.status,
-              style: TextStyle(
-                color: entry.status.contains('حضرت')
-                    ? Colors.green
-                    : Colors.orange,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TripItem extends StatelessWidget {
-  const _TripItem({required this.trip, required this.isDark});
-
-  final TripEntry trip;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = '${trip.date.day}/${trip.date.month}/${trip.date.year}';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+          final uri = Uri.parse('tel:$cleanPhone');
+          try {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (e) {
+            debugPrint('Error launching call: $e');
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Row(
             children: [
-              Icon(
-                Icons.route_rounded,
-                size: 16,
-                color: isDark ? Colors.white70 : AppColors.textSecondary,
+              CircleAvatar(
+                radius: 20,
+                backgroundImage: NetworkImage(avatarUrl),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                dateStr,
-                style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              if (trip.delayed)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'متأخر',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      phone,
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white60
+                            : AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              Icon(
+                Icons.phone_in_talk_rounded,
+                color: isDark ? Colors.white : AppColors.primary,
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          ...trip.events.map(
-            (event) => Padding(
-              padding: const EdgeInsets.only(top: 2, right: 20),
-              child: Text(
-                '• $event',
-                style: TextStyle(
-                  color: isDark ? Colors.white60 : AppColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

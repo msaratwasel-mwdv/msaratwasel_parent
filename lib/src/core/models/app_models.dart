@@ -1,3 +1,5 @@
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 enum StudentStatus { onBus, atSchool, atHome, notBoarded, late }
 
 enum BusState { enRoute, atSchool, atHome }
@@ -34,6 +36,8 @@ class Student {
     required this.bus,
     required this.status,
     this.avatarUrl,
+    this.homeLocation,
+    this.locationNote,
   });
 
   final String id;
@@ -43,6 +47,8 @@ class Student {
   final BusInfo bus;
   final StudentStatus status;
   final String? avatarUrl;
+  final LatLng? homeLocation;
+  final String? locationNote;
 }
 
 class TrackingSnapshot {

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:msaratwasel_user/src/features/attendance/presentation/absence_request_page.dart';
+import 'package:msaratwasel_user/src/features/attendance/presentation/pages/request_absence_page.dart';
+import 'package:msaratwasel_user/src/features/attendance/presentation/pages/attendance_history_page.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/children_screen.dart';
 import 'package:msaratwasel_user/src/features/home/presentation/home_screen.dart';
 import 'package:msaratwasel_user/src/features/messages/presentation/messages_page.dart';
@@ -9,6 +10,7 @@ import 'package:msaratwasel_user/src/features/notifications/presentation/notific
 import 'package:msaratwasel_user/src/features/profile/presentation/parent_profile_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/more_page.dart';
 import 'package:msaratwasel_user/src/features/tracking/presentation/tracking_page.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 
@@ -27,7 +29,7 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
-    _pages = List<Widget?>.filled(8, null, growable: false);
+    _pages = List<Widget?>.filled(9, null, growable: false);
     // Preload the first tab only to avoid initializing heavy widgets (e.g., Google Maps) prematurely.
     _pages[0] = const HomeScreen();
   }
@@ -80,9 +82,10 @@ class _RootShellState extends State<RootShell> {
       2 => const TrackingPage(),
       3 => const NotificationsPage(),
       4 => const MessagesPage(),
-      5 => const AbsenceRequestPage(),
-      6 => const ParentProfilePage(),
-      7 => const MorePage(),
+      5 => const RequestAbsencePage(),
+      6 => const AttendanceHistoryPage(),
+      7 => const ParentProfilePage(),
+      8 => const MorePage(),
       _ => const HomeScreen(),
     };
     return _pages[index]!;
@@ -153,7 +156,7 @@ class CustomDrawer extends StatelessWidget {
                 child: Column(
                   children: [
                     InkWell(
-                      onTap: () => onSelect(6), // Profile
+                      onTap: () => onSelect(7), // Profile
                       child: Stack(
                         alignment: Alignment.bottomRight,
                         children: [
@@ -221,7 +224,7 @@ class CustomDrawer extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        "ولي الأمر",
+                        context.t('guardianRole'),
                         style: TextStyle(
                           color: subTextColor, // Adaptive Color
                           fontSize: 12,
@@ -243,53 +246,60 @@ class CustomDrawer extends StatelessWidget {
                 ),
                 children: [
                   _DrawerItem(
-                    title: "الرئيسية",
+                    title: context.t('home'),
                     icon: Icons.home_rounded,
                     isSelected: currentIndex == 0,
                     isDark: isDark,
                     onTap: () => onSelect(0),
                   ),
                   _DrawerItem(
-                    title: "الأبناء",
+                    title: context.t('myKids'),
                     icon: Icons.family_restroom_rounded,
                     isSelected: currentIndex == 1,
                     isDark: isDark,
                     onTap: () => onSelect(1),
                   ),
                   _DrawerItem(
-                    title: "تتبع الحافلة",
+                    title: context.t('busTracking'),
                     icon: Icons.directions_bus_rounded,
                     isSelected: currentIndex == 2,
                     isDark: isDark,
                     onTap: () => onSelect(2),
                   ),
                   _DrawerItem(
-                    title: "الإشعارات",
+                    title: context.t('notifications'),
                     icon: Icons.notifications_active_rounded,
                     isSelected: currentIndex == 3,
                     isDark: isDark,
                     onTap: () => onSelect(3),
                   ),
                   _DrawerItem(
-                    title: "الدردشة",
+                    title: context.t('chat'),
                     icon: Icons.chat_bubble_rounded,
                     isSelected: currentIndex == 4,
                     isDark: isDark,
                     onTap: () => onSelect(4),
                   ),
                   _DrawerItem(
-                    title: "إدارة الحضور",
-                    icon: Icons.calendar_month_rounded,
+                    title: context.t('requestAbsence'),
+                    icon: Icons.edit_calendar_rounded,
                     isSelected: currentIndex == 5,
                     isDark: isDark,
                     onTap: () => onSelect(5),
                   ),
                   _DrawerItem(
-                    title: "الإعدادات",
-                    icon: Icons.settings_rounded,
-                    isSelected: currentIndex == 7,
+                    title: context.t('attendanceHistory'),
+                    icon: Icons.history_rounded,
+                    isSelected: currentIndex == 6,
                     isDark: isDark,
-                    onTap: () => onSelect(7),
+                    onTap: () => onSelect(6),
+                  ),
+                  _DrawerItem(
+                    title: context.t('settings'),
+                    icon: Icons.settings_rounded,
+                    isSelected: currentIndex == 8,
+                    isDark: isDark,
+                    onTap: () => onSelect(8),
                   ),
                 ],
               ),
@@ -305,21 +315,30 @@ class CustomDrawer extends StatelessWidget {
                     // Logout logic
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.error,
+                    foregroundColor: isDark
+                        ? Colors.redAccent[100]
+                        : AppColors.error,
                     padding: const EdgeInsets.all(AppSpacing.md),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(
-                        color: AppColors.error.withValues(alpha: 0.2),
+                        color:
+                            (isDark ? Colors.redAccent[100]! : AppColors.error)
+                                .withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
-                    backgroundColor: Colors.transparent,
+                    backgroundColor: isDark
+                        ? Colors.red.withValues(alpha: 0.1)
+                        : Colors.transparent,
                   ),
                   icon: const Icon(Icons.logout_rounded, size: 22),
-                  label: const Text(
-                    "تسجيل الخروج",
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  label: Text(
+                    context.t('logout'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),

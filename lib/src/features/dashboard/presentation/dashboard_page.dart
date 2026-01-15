@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
@@ -7,6 +8,7 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -34,20 +36,36 @@ class DashboardPage extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               CupertinoSliverNavigationBar(
-                largeTitle: Text(
-                  context.t('dashboardTitle'),
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
-                  ),
-                ),
+                largeTitle: Platform.isAndroid
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          context.t('dashboardTitle'),
+                          style: TextStyle(
+                            height: 1.2,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        context.t('dashboardTitle'),
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
+                        ),
+                      ),
                 leading: Material(
                   color: Colors.transparent,
                   child: IconButton(
                     icon: Icon(
                       Icons.menu_rounded,
-                      color: Theme.of(context).primaryColor,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : AppColors.primary,
                     ),
                     onPressed: () => Scaffold.of(context).openDrawer(),
                   ),
@@ -97,7 +115,7 @@ class DashboardPage extends StatelessWidget {
                         isArabic: isArabic,
                         studentName: students.isNotEmpty
                             ? students.first.name
-                            : 'Student',
+                            : 'Student', // TODO: Localize if needed, but it's a name
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _ActivityCard(
@@ -113,7 +131,12 @@ class DashboardPage extends StatelessWidget {
                         onTrack: () => controller.setNavIndex(1),
                         onCanteen: () => controller.setNavIndex(4),
                         onKids: () => controller.setNavIndex(0),
-                        onSupport: () => controller.setNavIndex(3),
+                        onSupport: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ContactUsPage(),
+                          ),
+                        ),
                         isArabic: isArabic,
                       ),
                       const SizedBox(height: AppSpacing.xl),
@@ -179,11 +202,11 @@ class _WelcomeHeader extends StatelessWidget {
     final hour = DateTime.now().hour;
     String greeting;
     if (hour < 12) {
-      greeting = isArabic ? 'صباح الخير' : 'Good Morning';
+      greeting = context.t('greetingMorning');
     } else if (hour < 17) {
-      greeting = isArabic ? 'مساء الخير' : 'Good Afternoon';
+      greeting = context.t('greetingAfternoon');
     } else {
-      greeting = isArabic ? 'مساء الخير' : 'Good Evening';
+      greeting = context.t('greetingEvening');
     }
 
     return Container(
@@ -211,9 +234,7 @@ class _WelcomeHeader extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            isArabic
-                ? 'مرحباً بك يا ${studentName.split(' ').first}'
-                : 'Welcome, ${studentName.split(' ').first}',
+            '${context.t('welcomeUser')} ${studentName.split(' ').first}',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w800,
@@ -244,16 +265,14 @@ class _EmptyStudentsCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              isArabic ? 'لا يوجد أبناء مسجلون' : 'No students registered',
+              context.t('noStudentsRegistered'),
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              isArabic
-                  ? 'أضف طالباً للبدء في تتبع الرحلات'
-                  : 'Add a student to start tracking trips',
+              context.t('addStudentToStart'),
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
@@ -263,7 +282,7 @@ class _EmptyStudentsCard extends StatelessWidget {
             FilledButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.add),
-              label: Text(isArabic ? 'إضافة طالب' : 'Add Student'),
+              label: Text(context.t('addChild')),
             ),
           ],
         ),
@@ -426,22 +445,22 @@ class _QuickServicesGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _QuickItemData(
-        label: isArabic ? 'تتبع الحافلة' : 'Track bus',
+        label: context.t('busTracking'),
         icon: Icons.directions_bus_rounded,
         onTap: onTrack,
       ),
       _QuickItemData(
-        label: isArabic ? 'المقصف' : 'Canteen',
+        label: context.t('canteen'),
         icon: Icons.restaurant_rounded,
         onTap: onCanteen,
       ),
       _QuickItemData(
-        label: isArabic ? 'أبنائي' : 'My kids',
+        label: context.t('myKids'),
         icon: Icons.group_rounded,
         onTap: onKids,
       ),
       _QuickItemData(
-        label: isArabic ? 'الدعم' : 'Support',
+        label: context.t('support'),
         icon: Icons.support_agent_rounded,
         onTap: onSupport,
       ),
@@ -797,34 +816,7 @@ class _BusInfoCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Column(
-              children: items
-                  .map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(item.icon, color: AppColors.textSecondary),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Text(
-                              item.label,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppColors.textSecondary),
-                            ),
-                          ),
-                          Text(
-                            item.value,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                            textAlign: TextAlign.end,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
+              children: items.map((item) => _InfoRow(item: item)).toList(),
             ),
           ],
         ),
@@ -845,6 +837,51 @@ class _InfoItem {
   final String value;
 }
 
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.item});
+
+  final _InfoItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(item.icon, size: 20, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  item.value,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
 
@@ -854,19 +891,35 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        color: AppColors.primary,
-        fontWeight: FontWeight.w800,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 }
 
-class _ChipColors {
-  const _ChipColors({required this.background, required this.text});
+class _BadgeIcon extends StatelessWidget {
+  const _BadgeIcon({
+    required this.icon,
+    required this.count,
+    required this.color,
+  });
 
-  final Color background;
-  final Color text;
+  final IconData icon;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, color: color),
+        if (count > 0)
+          Positioned(top: -4, right: -4, child: _Badge(count: count)),
+      ],
+    );
+  }
 }
 
 class _Badge extends StatelessWidget {
@@ -877,63 +930,28 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
+      padding: const EdgeInsets.all(4),
+      decoration: const BoxDecoration(
+        color: AppColors.error,
+        shape: BoxShape.circle,
       ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
       child: Text(
-        count > 99 ? '99+' : count.toString(),
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w800,
+        '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
         ),
+        textAlign: TextAlign.center,
       ),
     );
   }
 }
 
-class _BadgeIcon extends StatelessWidget {
-  const _BadgeIcon({required this.icon, required this.count, this.color});
+class _ChipColors {
+  const _ChipColors({required this.background, required this.text});
 
-  final IconData icon;
-  final int count;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon, color: color),
-        if (count > 0)
-          Positioned(
-            top: -5,
-            right: -5,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Center(
-                child: Text(
-                  count > 99 ? '99+' : count.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
+  final Color background;
+  final Color text;
 }
