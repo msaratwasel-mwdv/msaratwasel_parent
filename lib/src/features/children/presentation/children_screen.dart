@@ -310,7 +310,7 @@ class _ChildCard extends StatelessWidget {
                       label: context.t('attendance'),
                       color: Colors.orange,
                       isDark: isDark,
-                      onTap: () => controller.setNavIndex(5),
+                      onTap: () => controller.setNavIndex(7),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),

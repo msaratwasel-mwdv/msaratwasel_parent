@@ -179,7 +179,7 @@ class _MorePageState extends State<MorePage> {
                         title: context.t('profile'),
                         subtitle: context.t('editProfile'),
                         onTap: () =>
-                            controller.setNavIndex(7), // Parent Profile
+                            controller.setNavIndex(8), // Parent Profile
                       ),
                       _Divider(),
                       _SettingsTile(
@@ -281,7 +281,7 @@ class _MorePageState extends State<MorePage> {
                           PhosphorIconsStyle.duotone,
                         ),
                         title: context.t('language'),
-                        subtitle: isArabic ? 'العربية' : 'English',
+                        // Subtitle removed to avoid redundancy with the toggle
                         trailing: _SegmentedToggle(
                           value:
                               !isArabic, // False (Left) = Arabic, True (Right) = English
@@ -377,7 +377,33 @@ class _MorePageState extends State<MorePage> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: controller.logout,
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(context.t('logout')),
+                            content: Text(
+                              context.t('logoutConfirmationRequest'),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text(context.t('cancel')),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context); // Close dialog
+                                  controller.logout();
+                                },
+                                child: Text(
+                                  context.t('logout'),
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.error.withValues(alpha: 0.1),
                         foregroundColor: AppColors.error,

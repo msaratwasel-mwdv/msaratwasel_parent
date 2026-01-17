@@ -39,10 +39,10 @@ class _TrackingPageState extends State<TrackingPage> {
               Positioned.fill(
                 child: _TrackingMap(students: controller.students),
               ),
-              // Menu button at top-right (RTL)
-              Positioned(
+              // Menu button (Adaptive Start position)
+              PositionedDirectional(
                 top: MediaQuery.of(context).padding.top + AppSpacing.sm,
-                right: AppSpacing.md,
+                start: AppSpacing.md,
                 child: Material(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   shape: const CircleBorder(),
@@ -63,8 +63,10 @@ class _TrackingPageState extends State<TrackingPage> {
               ),
               Positioned(
                 top: MediaQuery.of(context).padding.top + AppSpacing.lg,
-                right: AppSpacing.lg + 60, // Offset for menu button (RTL)
-                left: AppSpacing.lg,
+                right: isArabic
+                    ? AppSpacing.lg + 60
+                    : AppSpacing.lg, // Adjust padding based on direction
+                left: isArabic ? AppSpacing.lg : AppSpacing.lg + 60,
                 child: Row(
                   children: [
                     _Pill(
@@ -77,9 +79,9 @@ class _TrackingPageState extends State<TrackingPage> {
                     ),
                     const Spacer(),
                     _Pill(
-                      icon: Icons.my_location_rounded,
+                      icon: Icons.refresh_rounded,
                       label: isArabic ? 'تحديث' : 'Refresh',
-                      subtle: true,
+                      subtle: false,
                     ),
                   ],
                 ),
@@ -97,6 +99,8 @@ class _TrackingPageState extends State<TrackingPage> {
                   child: _BottomDetailsCard(
                     tracking: tracking,
                     isArabic: isArabic,
+                    busNumber:
+                        controller.students.firstOrNull?.bus.number ?? 'N/A',
                     isOpen: detailsVisible,
                     onToggle: () =>
                         setState(() => detailsVisible = !detailsVisible),
@@ -167,13 +171,13 @@ class _TrackingMapState extends State<_TrackingMap> {
     }
   }
 
+  GoogleMapController? _mapController;
+
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final markers = <Marker>{};
-
-    // Calculate bounding box to include all buses
-    LatLngBounds? bounds;
 
     for (var i = 0; i < widget.students.length; i++) {
       final student = widget.students[i];
@@ -201,42 +205,52 @@ class _TrackingMapState extends State<_TrackingMap> {
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
         ),
       );
-
-      // Update bounds
-      if (bounds == null) {
-        bounds = LatLngBounds(southwest: position, northeast: position);
-      } else {
-        bounds = LatLngBounds(
-          southwest: LatLng(
-            position.latitude < bounds.southwest.latitude
-                ? position.latitude
-                : bounds.southwest.latitude,
-            position.longitude < bounds.southwest.longitude
-                ? position.longitude
-                : bounds.southwest.longitude,
-          ),
-          northeast: LatLng(
-            position.latitude > bounds.northeast.latitude
-                ? position.latitude
-                : bounds.northeast.latitude,
-            position.longitude > bounds.northeast.longitude
-                ? position.longitude
-                : bounds.northeast.longitude,
-          ),
-        );
-      }
     }
 
     final primaryTracking = controller.currentTracking;
     final primaryPos = LatLng(primaryTracking.lat, primaryTracking.lng);
 
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: primaryPos, zoom: 14),
-      markers: markers,
-      myLocationEnabled: true,
-      zoomControlsEnabled: false,
-      compassEnabled: true,
-      mapToolbarEnabled: false,
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(target: primaryPos, zoom: 14),
+          markers: markers,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false, // Disable default button
+          zoomControlsEnabled: false,
+          compassEnabled: true,
+          mapToolbarEnabled: false,
+          onMapCreated: (controller) {
+            _mapController = controller;
+          },
+        ),
+        // Custom Location FAB
+        PositionedDirectional(
+          bottom: 230, // Position above the bottom card area
+          end: AppSpacing.md,
+          child: Material(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: const CircleBorder(),
+            elevation: 4,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () {
+                _mapController?.animateCamera(
+                  CameraUpdate.newLatLng(primaryPos),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(
+                  Icons.my_location_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -245,12 +259,14 @@ class _BottomDetailsCard extends StatelessWidget {
   const _BottomDetailsCard({
     required this.tracking,
     required this.isArabic,
+    required this.busNumber,
     required this.isOpen,
     required this.onToggle,
   });
 
   final TrackingSnapshot tracking;
   final bool isArabic;
+  final String busNumber;
   final bool isOpen;
   final VoidCallback onToggle;
 
@@ -334,13 +350,24 @@ class _BottomDetailsCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        '0551234567',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? Colors.white70
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${context.t('busNumber')} $busNumber',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? Colors.white70
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],

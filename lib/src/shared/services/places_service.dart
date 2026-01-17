@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:msaratwasel_user/src/core/config/api_keys.dart';
 
 class PlacesService {
   final Dio _dio = Dio();
-  // Using the API key provided in context/history
-  final String _apiKey = 'AIzaSyA4Njj1ohfXqbPbNOb3HOainiexMR5WFs0';
+  // Using ApiKeys for centralized key management
+  final String _apiKey = ApiKeys.googleMaps;
 
   Future<List<PlacePrediction>> getPredictions(
     String input,

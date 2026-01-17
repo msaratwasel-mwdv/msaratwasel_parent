@@ -78,9 +78,10 @@ class _LoginScreenState extends State<LoginScreen>
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-      child: Material(
-        color: theme.scaffoldBackgroundColor,
-        child: Stack(
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        resizeToAvoidBottomInset: true,
+        body: Stack(
           children: [
             // 1. Animated Background
             // 1. Animated Background

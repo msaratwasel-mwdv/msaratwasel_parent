@@ -214,7 +214,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                     // Navigate to children screen
                     final controller = AppScope.of(context);
                     controller.setNavIndex(1);
-                    Navigator.of(context).pop(); // Close drawer if open
                   },
                   icon: const Icon(Icons.arrow_forward_rounded, size: 18),
                   label: Text(isArabic ? "عرض الكل" : "View All"),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/features/children/presentation/pages/children_status_page.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/pages/request_absence_page.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/pages/attendance_history_page.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/children_screen.dart';
@@ -29,7 +30,7 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
-    _pages = List<Widget?>.filled(9, null, growable: false);
+    _pages = List<Widget?>.filled(10, null, growable: false);
     // Preload the first tab only to avoid initializing heavy widgets (e.g., Google Maps) prematurely.
     _pages[0] = const HomeScreen();
   }
@@ -80,12 +81,13 @@ class _RootShellState extends State<RootShell> {
       0 => const HomeScreen(),
       1 => const ChildrenScreen(),
       2 => const TrackingPage(),
-      3 => const NotificationsPage(),
-      4 => const MessagesPage(),
-      5 => const RequestAbsencePage(),
-      6 => const AttendanceHistoryPage(),
-      7 => const ParentProfilePage(),
-      8 => const MorePage(),
+      3 => const ChildrenStatusPage(), // New Page
+      4 => const NotificationsPage(),
+      5 => const MessagesPage(),
+      6 => const RequestAbsencePage(),
+      7 => const AttendanceHistoryPage(),
+      8 => const ParentProfilePage(),
+      9 => const MorePage(),
       _ => const HomeScreen(),
     };
     return _pages[index]!;
@@ -156,7 +158,7 @@ class CustomDrawer extends StatelessWidget {
                 child: Column(
                   children: [
                     InkWell(
-                      onTap: () => onSelect(7), // Profile
+                      onTap: () => onSelect(8), // Profile (Updated Index)
                       child: Stack(
                         alignment: Alignment.bottomRight,
                         children: [
@@ -172,10 +174,10 @@ class CustomDrawer extends StatelessWidget {
                                 width: 2,
                               ),
                             ),
-                            child: const CircleAvatar(
+                            child: CircleAvatar(
                               radius: 42,
                               backgroundImage: NetworkImage(
-                                "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
+                                controller.userAvatarUrl,
                               ),
                             ),
                           ),
@@ -203,7 +205,7 @@ class CustomDrawer extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
-                      "عبدالله الأحمد",
+                      controller.userName,
                       style: TextStyle(
                         color: textColor, // Adaptive Color
                         fontSize: 20,
@@ -267,39 +269,46 @@ class CustomDrawer extends StatelessWidget {
                     onTap: () => onSelect(2),
                   ),
                   _DrawerItem(
-                    title: context.t('notifications'),
-                    icon: Icons.notifications_active_rounded,
+                    title: context.t('childrenStatus'),
+                    icon: Icons.timeline_rounded,
                     isSelected: currentIndex == 3,
                     isDark: isDark,
                     onTap: () => onSelect(3),
                   ),
                   _DrawerItem(
-                    title: context.t('chat'),
-                    icon: Icons.chat_bubble_rounded,
-                    isSelected: currentIndex == 4,
+                    title: context.t('notifications'),
+                    icon: Icons.notifications_active_rounded,
+                    isSelected: currentIndex == 4, // Shifted from 3
                     isDark: isDark,
                     onTap: () => onSelect(4),
                   ),
                   _DrawerItem(
-                    title: context.t('requestAbsence'),
-                    icon: Icons.edit_calendar_rounded,
-                    isSelected: currentIndex == 5,
+                    title: context.t('chat'),
+                    icon: Icons.chat_bubble_rounded,
+                    isSelected: currentIndex == 5, // Shifted from 4
                     isDark: isDark,
                     onTap: () => onSelect(5),
                   ),
                   _DrawerItem(
-                    title: context.t('attendanceHistory'),
-                    icon: Icons.history_rounded,
-                    isSelected: currentIndex == 6,
+                    title: context.t('requestAbsence'),
+                    icon: Icons.edit_calendar_rounded,
+                    isSelected: currentIndex == 6, // Shifted from 5
                     isDark: isDark,
                     onTap: () => onSelect(6),
                   ),
                   _DrawerItem(
+                    title: context.t('attendanceHistory'),
+                    icon: Icons.history_rounded,
+                    isSelected: currentIndex == 7, // Shifted from 6
+                    isDark: isDark,
+                    onTap: () => onSelect(7),
+                  ),
+                  _DrawerItem(
                     title: context.t('settings'),
                     icon: Icons.settings_rounded,
-                    isSelected: currentIndex == 8,
+                    isSelected: currentIndex == 9, // Shifted from 8
                     isDark: isDark,
-                    onTap: () => onSelect(8),
+                    onTap: () => onSelect(9),
                   ),
                 ],
               ),
@@ -312,7 +321,29 @@ class CustomDrawer extends StatelessWidget {
                 top: false,
                 child: TextButton.icon(
                   onPressed: () {
-                    // Logout logic
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(context.t('logout')),
+                        content: Text(context.t('logoutConfirmationRequest')),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text(context.t('cancel')),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context); // Close dialog
+                              controller.logout();
+                            },
+                            child: Text(
+                              context.t('logout'),
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: isDark

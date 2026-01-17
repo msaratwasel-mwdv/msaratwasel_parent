@@ -76,7 +76,7 @@ class HomeScreen extends StatelessWidget {
                 isArabic: isArabic,
                 isDark: isDark,
                 onViewAll: () =>
-                    controller.setNavIndex(3), // Navigate to Notifications
+                    controller.setNavIndex(4), // Navigate to Notifications
               ),
               const SizedBox(height: AppSpacing.xl),
 
@@ -620,7 +620,7 @@ class _QuickActions extends StatelessWidget {
             label: context.t('chat'), // Was 'رسائل' which matches 'chat' key
             color: isDark ? AppColors.dark.accent : AppColors.primary,
             isDark: isDark,
-            onTap: () => controller.setNavIndex(4),
+            onTap: () => controller.setNavIndex(5),
           ),
         ),
         const SizedBox(width: AppSpacing.md),
@@ -630,7 +630,7 @@ class _QuickActions extends StatelessWidget {
             label: context.t('attendance'), // Was 'حضور'
             color: Colors.orange,
             isDark: isDark,
-            onTap: () => controller.setNavIndex(5),
+            onTap: () => controller.setNavIndex(7),
           ),
         ),
         const SizedBox(width: AppSpacing.md),
@@ -640,7 +640,7 @@ class _QuickActions extends StatelessWidget {
             label: context.t('settings'),
             color: Colors.grey,
             isDark: isDark,
-            onTap: () => controller.setNavIndex(7),
+            onTap: () => controller.setNavIndex(9),
           ),
         ),
       ],

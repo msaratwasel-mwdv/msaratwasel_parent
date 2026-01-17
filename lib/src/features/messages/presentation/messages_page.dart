@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -45,223 +44,191 @@ class _MessagesPageState extends State<MessagesPage> {
         final name = isArabic ? 'عائشة' : 'Aisha';
         // final role = isArabic ? 'مشرفة الحافلة' : 'Bus Supervisor';
 
-        return NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              CupertinoSliverNavigationBar(
-                largeTitle: Platform.isAndroid
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            height: 1.2,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                      )
-                    : Text(
-                        name,
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white
-                              : AppColors.textPrimary,
-                        ),
-                      ),
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(
-                      context,
-                    ).dividerColor.withValues(alpha: 0.5),
-                    width: 0.0,
-                  ),
-                ),
-                leading: Material(
-                  color: Colors.transparent,
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.menu_rounded,
-                      color: isDark ? Colors.white : AppColors.primary,
-                    ),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                  ),
-                ),
-                // trailing: removed call and video icons
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              name,
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
-            ];
-          },
-          body: SafeArea(
-            top: false,
-            bottom: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: hasMessages
-                      ? ListView.builder(
-                          // controller: _scrollController, // let NestedScrollView handle it?
-                          // Actually, for reverse list in NestedScrollView, it's tricky.
-                          // Standard NestedScrollView body expects top-to-bottom.
-                          // If I use reverse: true, the scroll might not link to header correctly.
-                          // Let's try keeping the controller separate first,
-                          // BUT NestedScrollView acts on the OUTER scrollable.
-                          // If ListView has its own controller, OUTER won't scroll.
-                          // So Header won't collapse.
-                          // To make Header collapse, the scrolling must occur on the NestedScrollView's viewport.
-                          // This works if we use `CustomScrollView` with `SliverList` inside `body`? No.
-                          // Let's try omitting controller so it uses Primary (injected by NestedScrollView).
-                          reverse: true,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.lg,
-                          ),
-                          itemCount: messages.length,
-                          itemBuilder: (context, index) {
-                            final msg = messages[index];
-                            final previous = index + 1 < messages.length
-                                ? messages[index + 1]
-                                : null;
-                            final showDateSeparator =
-                                previous == null ||
-                                msg.time.day != previous.time.day ||
-                                msg.time.month != previous.time.month ||
-                                msg.time.year != previous.time.year;
-
-                            final widgets = <Widget>[];
-
-                            if (showDateSeparator) {
-                              widgets.add(
-                                _DateSeparator(
-                                  date: msg.time,
-                                  isArabic: isArabic,
-                                ),
-                              );
-                            }
-
-                            widgets.add(
-                              _MessageBubble(
-                                message: msg,
-                                isArabic: isArabic,
-                                isParent: !msg.incoming,
-                              ),
-                            );
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: widgets,
-                            );
-                          },
-                        )
-                      : Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 48,
-                                color: AppColors.textSecondary,
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                isArabic
-                                    ? 'لا توجد رسائل بعد'
-                                    : 'No messages yet',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                isArabic
-                                    ? 'ابدأ المراسلة مع المشرفة'
-                                    : 'Start chatting with the supervisor',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                if (isSupervisorTyping) const _TypingIndicator(),
-                if (isSupervisorTyping) const SizedBox(height: AppSpacing.sm),
-                Container(
-                  padding: EdgeInsets.only(
-                    left: AppSpacing.lg,
-                    right: AppSpacing.lg,
-                    bottom:
-                        MediaQuery.of(context).padding.bottom + AppSpacing.md,
-                    top: AppSpacing.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    border: Border(
-                      top: BorderSide(color: Theme.of(context).dividerColor),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(10),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => _pickImage(context),
-                        icon: const Icon(Icons.photo_camera_outlined),
-                        color: AppColors.textSecondary,
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          minLines: 1,
-                          maxLines: 4,
-                          style: textTheme.bodyMedium,
-                          decoration: InputDecoration(
-                            hintText: isArabic
-                                ? 'اكتب رسالتك…'
-                                : 'Type your message…',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      SizedBox(
-                        height: 48,
-                        width: 48,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: AppColors.brandGradient,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withAlpha(90),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                              app.addMessage(_controller.text);
-                              _controller.clear();
-                              FocusScope.of(context).unfocus();
-                            },
-                            icon: const Icon(
-                              Icons.send_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
+            centerTitle: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            elevation: 0,
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(
+                height: 1,
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          body: Column(
+            children: [
+              Expanded(
+                child: hasMessages
+                    ? ListView.builder(
+                        reverse: true,
+                        // Add some bottom padding for visual comfort above input
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: AppSpacing.lg,
+                        ),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[index];
+                          final previous = index + 1 < messages.length
+                              ? messages[index + 1]
+                              : null;
+                          final showDateSeparator =
+                              previous == null ||
+                              msg.time.day != previous.time.day ||
+                              msg.time.month != previous.time.month ||
+                              msg.time.year != previous.time.year;
+
+                          final widgets = <Widget>[];
+
+                          if (showDateSeparator) {
+                            widgets.add(
+                              _DateSeparator(
+                                date: msg.time,
+                                isArabic: isArabic,
+                              ),
+                            );
+                          }
+
+                          widgets.add(
+                            _MessageBubble(
+                              message: msg,
+                              isArabic: isArabic,
+                              isParent: !msg.incoming,
+                            ),
+                          );
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: widgets,
+                          );
+                        },
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 48,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              isArabic
+                                  ? 'لا توجد رسائل بعد'
+                                  : 'No messages yet',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              isArabic
+                                  ? 'ابدأ المراسلة مع المشرفة'
+                                  : 'Start chatting with the supervisor',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (isSupervisorTyping) const _TypingIndicator(),
+              if (isSupervisorTyping) const SizedBox(height: AppSpacing.sm),
+              Container(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  bottom: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+                  top: AppSpacing.md,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  border: Border(
+                    top: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => _pickImage(context),
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      color: AppColors.textSecondary,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        style: textTheme.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: isArabic
+                              ? 'اكتب رسالتك…'
+                              : 'Type your message…',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    SizedBox(
+                      height: 48,
+                      width: 48,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: AppColors.brandGradient,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withAlpha(90),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            app.addMessage(_controller.text);
+                            _controller.clear();
+                            FocusScope.of(context).unfocus();
+                          },
+                          icon: const Icon(
+                            Icons.send_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },

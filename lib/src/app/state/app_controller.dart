@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:developer' as developer;
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
@@ -33,6 +34,13 @@ class AppController extends ChangeNotifier {
   int _selectedStudentIndex = 0;
   bool _isAuthenticated = false;
   bool _bootCompleted = false;
+  bool _shouldShowOnboarding = false;
+
+  // Current user data (mock data - replace with API data in production)
+  String _userName = 'عبدالله الأحمد';
+  String _userNameEn = 'Abdullah Al-Ahmad';
+  String _userAvatarUrl =
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400';
 
   final List<Student> _students;
   final Map<String, TrackingSnapshot> _tracking;
@@ -47,6 +55,7 @@ class AppController extends ChangeNotifier {
   int get navIndex => _navIndex;
   bool get isAuthenticated => _isAuthenticated;
   bool get isBootCompleted => _bootCompleted;
+  bool get shouldShowOnboarding => _shouldShowOnboarding;
   List<Student> get students => List.unmodifiable(_students);
   Student get currentStudent => _students[_selectedStudentIndex];
   TrackingSnapshot get currentTracking => _tracking[currentStudent.id]!;
@@ -54,6 +63,10 @@ class AppController extends ChangeNotifier {
   List<MessageItem> get messages => List.unmodifiable(_messages);
   List<AttendanceEntry> get attendance => List.unmodifiable(_attendance);
   List<TripEntry> get trips => List.unmodifiable(_trips);
+
+  // User data getters
+  String get userName => _locale.languageCode == 'ar' ? _userName : _userNameEn;
+  String get userAvatarUrl => _userAvatarUrl;
 
   TrackingSnapshot trackingForStudent(String studentId) {
     return _tracking[studentId] ?? _tracking.values.first;
@@ -67,10 +80,20 @@ class AppController extends ChangeNotifier {
   Future<void> bootstrap() async {
     try {
       // Simulate loading configuration, cached session, etc.
-      await Future.delayed(const Duration(seconds: 1));
+      // await Future.delayed(const Duration(seconds: 1)); // Removed delay to make it faster
+
+      final prefs = await SharedPreferences.getInstance();
+      // If the key is NOT present, it means it's the first time.
+      // Or we can explicitly check constraints.
+      // For now: if 'has_seen_onboarding' is absent or false, show onboarding.
+      final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
+      _shouldShowOnboarding = !hasSeen;
 
       _bootCompleted = true;
-      developer.log('🏁 AppController: Bootstrap completed', name: 'BOOT');
+      developer.log(
+        '🏁 AppController: Bootstrap completed. Onboarding needed: $_shouldShowOnboarding',
+        name: 'BOOT',
+      );
     } catch (e, st) {
       developer.log(
         '❌ AppController: Bootstrap failed',
@@ -90,6 +113,13 @@ class AppController extends ChangeNotifier {
       developer.log('✨ AppController: Native splash removed', name: 'BOOT');
       notifyListeners();
     }
+  }
+
+  Future<void> completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_onboarding', true);
+    _shouldShowOnboarding = false;
+    notifyListeners();
   }
 
   Future<bool> login({

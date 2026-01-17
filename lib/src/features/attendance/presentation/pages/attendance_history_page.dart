@@ -5,6 +5,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/widgets/child_selector.dart';
+import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -60,10 +61,8 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
       'status': 'present',
       'label': 'حاضر',
     };
-    _attendanceEvents[normalize(now.subtract(const Duration(days: 5)))] = {
-      'status': 'excused',
-      'label': 'عذر',
-    };
+    // Excused removed as per request
+    // Weekend logic is handled by calendar builder, events are extra
     // Weekend logic is handled by calendar builder, events are extra
   }
 
@@ -77,6 +76,8 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final locale = AppScope.of(context).locale;
+    final isArabic = locale.languageCode == 'ar';
 
     // Calculate stats for the viewed month
     int presentCount = 0;
@@ -188,7 +189,9 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                 },
                               ),
                               Text(
-                                intl.DateFormat.yMMMM('ar').format(_focusedDay),
+                                intl.DateFormat.yMMMM(
+                                  locale.languageCode,
+                                ).format(_focusedDay),
                                 style: GoogleFonts.cairo(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -225,103 +228,96 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                               // Standard calendar has 7 days.
                               // So we make the calendar width = constraints.maxWidth * (7/5)
                               // Alignment.centerRight keeps Sunday-Thursday visible (in RTL logic)
-                              return SizedBox(
-                                height: 380, // Approximate height for content
-                                child: Stack(
-                                  children: [
-                                    Positioned(
-                                      right: 0, // Align to Start (Since RTL)
-                                      top: 0,
-                                      bottom: 0,
-                                      width: constraints.maxWidth * (7 / 5),
-                                      child: TableCalendar(
-                                        firstDay: DateTime.utc(2023, 1, 1),
-                                        lastDay: DateTime.utc(2030, 12, 31),
-                                        focusedDay: _focusedDay,
-                                        locale: 'ar',
-                                        startingDayOfWeek:
-                                            StartingDayOfWeek.sunday,
-                                        weekendDays: const [],
-                                        calendarFormat: CalendarFormat.month,
-                                        availableCalendarFormats: const {
-                                          CalendarFormat.month: 'شهر',
-                                        },
-                                        headerVisible:
-                                            false, // Use custom header
-                                        daysOfWeekHeight: 40,
-                                        daysOfWeekStyle: DaysOfWeekStyle(
-                                          weekdayStyle: GoogleFonts.cairo(
-                                            color: const Color(0xFF64748B),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          weekendStyle: GoogleFonts.cairo(
-                                            color: const Color(0xFFEF5350),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        rowHeight:
-                                            60, // Slightly reduced to fit nicely
-                                        calendarBuilders: CalendarBuilders(
-                                          // We don't need to hide weekends manually anymore since they are clipped off-screen
-                                          defaultBuilder:
-                                              (context, day, focusedDay) {
-                                                return _buildDateCell(
-                                                  day,
-                                                  isDark: isDark,
-                                                );
-                                              },
-                                          todayBuilder:
-                                              (context, day, focusedDay) {
-                                                return _buildDateCell(
-                                                  day,
-                                                  isDark: isDark,
-                                                  isToday: true,
-                                                );
-                                              },
-                                          selectedBuilder:
-                                              (context, day, focusedDay) {
-                                                return _buildDateCell(
-                                                  day,
-                                                  isDark: isDark,
-                                                  isSelected: true,
-                                                );
-                                              },
-                                          prioritizedBuilder:
-                                              (context, day, focusedDay) {
-                                                final normalizedDay = DateTime(
-                                                  day.year,
-                                                  day.month,
-                                                  day.day,
-                                                );
-                                                final event =
-                                                    _attendanceEvents[normalizedDay];
-                                                if (event != null) {
-                                                  return _buildEventCell(
-                                                    day,
-                                                    event,
-                                                    isDark,
-                                                  );
-                                                }
-                                                return null;
-                                              },
-                                        ),
-                                        onDaySelected:
-                                            (selectedDay, focusedDay) {
-                                              setState(() {
-                                                _selectedDay = selectedDay;
-                                                _focusedDay = focusedDay;
-                                              });
-                                            },
-                                        onPageChanged: (focusedDay) {
-                                          setState(() {
-                                            _focusedDay = focusedDay;
-                                          });
-                                        },
-                                        selectedDayPredicate: (day) =>
-                                            isSameDay(_selectedDay, day),
+                              return SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const NeverScrollableScrollPhysics(),
+                                child: SizedBox(
+                                  // Force width to show 5 days
+                                  width: constraints.maxWidth * (7 / 5),
+                                  child: TableCalendar(
+                                    firstDay: DateTime.utc(2020, 1, 1),
+                                    lastDay: DateTime.utc(2030, 12, 31),
+                                    focusedDay: _focusedDay,
+                                    locale: locale.languageCode,
+                                    startingDayOfWeek: StartingDayOfWeek.sunday,
+                                    weekendDays: const [],
+                                    calendarFormat: CalendarFormat.month,
+                                    availableCalendarFormats: {
+                                      CalendarFormat.month: isArabic
+                                          ? 'شهر'
+                                          : 'Month',
+                                    },
+                                    headerVisible: false, // Use custom header
+                                    daysOfWeekHeight: 40,
+                                    daysOfWeekStyle: DaysOfWeekStyle(
+                                      weekdayStyle: GoogleFonts.cairo(
+                                        color: const Color(0xFF64748B),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      weekendStyle: GoogleFonts.cairo(
+                                        color: const Color(0xFFEF5350),
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  ],
+                                    // Adjusted rowHeight to be standard and square-like
+                                    rowHeight: 54,
+                                    calendarBuilders: CalendarBuilders(
+                                      // We don't need to hide weekends manually anymore since they are clipped off-screen
+                                      defaultBuilder:
+                                          (context, day, focusedDay) {
+                                            return _buildDateCell(
+                                              day,
+                                              isDark: isDark,
+                                            );
+                                          },
+                                      todayBuilder: (context, day, focusedDay) {
+                                        return _buildDateCell(
+                                          day,
+                                          isDark: isDark,
+                                          isToday: true,
+                                        );
+                                      },
+                                      selectedBuilder:
+                                          (context, day, focusedDay) {
+                                            return _buildDateCell(
+                                              day,
+                                              isDark: isDark,
+                                              isSelected: true,
+                                            );
+                                          },
+                                      prioritizedBuilder:
+                                          (context, day, focusedDay) {
+                                            final normalizedDay = DateTime(
+                                              day.year,
+                                              day.month,
+                                              day.day,
+                                            );
+                                            final event =
+                                                _attendanceEvents[normalizedDay];
+                                            if (event != null) {
+                                              return _buildEventCell(
+                                                day,
+                                                event,
+                                                isDark,
+                                              );
+                                            }
+                                            return null;
+                                          },
+                                    ),
+                                    onDaySelected: (selectedDay, focusedDay) {
+                                      setState(() {
+                                        _selectedDay = selectedDay;
+                                        _focusedDay = focusedDay;
+                                      });
+                                    },
+                                    onPageChanged: (focusedDay) {
+                                      setState(() {
+                                        _focusedDay = focusedDay;
+                                      });
+                                    },
+                                    selectedDayPredicate: (day) =>
+                                        isSameDay(_selectedDay, day),
+                                  ),
                                 ),
                               );
                             },
@@ -385,69 +381,27 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   ) {
     Color bg = Colors.transparent;
     Color text = isDark ? Colors.white : AppColors.textPrimary;
-    Color dotColor = Colors.transparent;
 
     if (event['status'] == 'present') {
       bg = const Color(0xFFE8F5E9); // Light Green
       text = const Color(0xFF2E7D32); // Dark Green
-      dotColor = const Color(0xFF2E7D32);
     } else if (event['status'] == 'absent') {
       bg = const Color(0xFFFFEBEE); // Light Red
       text = const Color(0xFFC62828); // Dark Red
-      dotColor = const Color(0xFFC62828);
-    } else if (event['status'] == 'excused') {
-      bg = Colors.grey[100]!;
-      text = Colors.grey[700]!;
-      dotColor = Colors.grey[500]!;
     }
 
     return Container(
-      margin: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: bg), // To match sizing
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 6,
-            child: Text(
-              '${day.day}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: const Color(
-                  0xFF1E293B,
-                ), // Date always dark in design? Or match text? Screenshot shows black date for events.
-                fontSize: 16,
-              ),
-            ),
+      margin: const EdgeInsets.all(6),
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      child: Center(
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: text,
+            fontSize: 16,
           ),
-          Positioned(
-            bottom: 16,
-            child: Text(
-              event['label'],
-              style: GoogleFonts.cairo(
-                fontSize: 10,
-                color: text,
-                fontWeight: FontWeight.bold,
-                height: 1.0,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 6,
-            child: Container(
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

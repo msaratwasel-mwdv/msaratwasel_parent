@@ -168,7 +168,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
             if (selected)
               Icon(
                 Icons.check_circle_rounded,
-                color: AppColors.primary,
+                color: isDark ? Colors.white : AppColors.primary,
                 size: 26,
               )
             else

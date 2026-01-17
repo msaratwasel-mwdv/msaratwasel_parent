@@ -76,7 +76,9 @@ class ChildSelector extends StatelessWidget {
             // Avatar Background: Solid Primary
             final selectedAvatarBg = AppColors.primary;
             // Checkmark: Primary color
-            final selectedCheckmarkColor = AppColors.primary;
+            final selectedCheckmarkColor = isDark
+                ? Colors.white
+                : AppColors.primary;
 
             return GestureDetector(
               onTap: () => onChildSelected(child),
