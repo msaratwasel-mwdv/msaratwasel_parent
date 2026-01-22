@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'dart:developer' as developer;
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
@@ -80,7 +79,8 @@ class AppController extends ChangeNotifier {
   Future<void> bootstrap() async {
     try {
       // Simulate loading configuration, cached session, etc.
-      // await Future.delayed(const Duration(seconds: 1)); // Removed delay to make it faster
+      // Playing video for 4 seconds (from 4s to 8s)
+      await Future.delayed(const Duration(seconds: 4));
 
       final prefs = await SharedPreferences.getInstance();
       // If the key is NOT present, it means it's the first time.
@@ -104,13 +104,11 @@ class AppController extends ChangeNotifier {
       // Fallback to allow app entry (or handle error state appropriately)
       _bootCompleted = true;
     } finally {
-      // Remove native splash screen if it exists
-      try {
-        FlutterNativeSplash.remove();
-      } catch (e) {
-        developer.log('⚠️ Failed to remove splash', error: e);
-      }
-      developer.log('✨ AppController: Native splash removed', name: 'BOOT');
+      // Native splash is removed in SplashScreen to ensure continuity
+      developer.log(
+        '✨ AppController: Bootstrap sequence finished',
+        name: 'BOOT',
+      );
       notifyListeners();
     }
   }
