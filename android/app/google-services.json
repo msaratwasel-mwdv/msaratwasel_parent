@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "893934602338",
+    "project_id": "msarart-wasel",
+    "storage_bucket": "msarart-wasel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893934602338:android:0c56e41b38971585fea93b",
+        "android_client_info": {
+          "package_name": "com.example.msaratwasel_user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxoVpA2rapNIRtpa-cRTgwl_ZIhlrjvrU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

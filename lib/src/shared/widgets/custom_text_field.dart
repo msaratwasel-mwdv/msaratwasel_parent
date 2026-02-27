@@ -9,6 +9,8 @@ class CustomTextField extends StatelessWidget {
     required this.icon,
     this.keyboardType = TextInputType.text,
     this.validator,
+    this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -16,6 +18,8 @@ class CustomTextField extends StatelessWidget {
   final IconData icon;
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
+  final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +30,7 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
+      obscureText: obscureText,
       style: GoogleFonts.cairo(
         fontWeight: FontWeight.w600,
         color: isDark ? Colors.white : Colors.black87,
@@ -40,6 +45,7 @@ class CustomTextField extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
         prefixIcon: Icon(icon, color: isDark ? Colors.white70 : Colors.black54),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: (isDark ? Colors.white : Colors.black).withValues(
           alpha: .08,

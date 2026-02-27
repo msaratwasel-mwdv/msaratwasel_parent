@@ -11,7 +11,11 @@ import 'package:msaratwasel_user/src/features/onboarding/presentation/onboarding
 import 'package:msaratwasel_user/src/shared/theme/app_theme.dart';
 
 class MsaratWaselApp extends StatefulWidget {
-  const MsaratWaselApp({super.key});
+  const MsaratWaselApp({super.key, this.controller});
+
+  /// Optional pre-built controller (e.g. created in main() before runApp).
+  /// If null, a fresh instance is created inside the widget.
+  final AppController? controller;
 
   @override
   State<MsaratWaselApp> createState() => _MsaratWaselAppState();
@@ -24,7 +28,9 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
   void initState() {
     super.initState();
     developer.log('⚡ MsaratWaselApp: initState', name: 'UI');
-    _controller = AppController();
+    // Use the externally provided controller (wired to OneSignal in main),
+    // or fall back to creating a new one.
+    _controller = widget.controller ?? AppController();
     _controller.bootstrap();
   }
 

@@ -159,7 +159,7 @@ class _WelcomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${context.t('welcomeUser')} عبدالله الأحمد', // TODO: Localize Name if needed
+                  '${context.t('welcomeUser')} ${AppScope.of(context).userName}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,

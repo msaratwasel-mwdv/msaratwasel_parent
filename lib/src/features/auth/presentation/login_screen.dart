@@ -23,7 +23,8 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _civilIdController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -42,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _animC.dispose();
     _civilIdController.dispose();
-    _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -60,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       final ok = await widget.controller.login(
         civilId: _civilIdController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        password: _passwordController.text.trim(),
       );
       if (!mounted) return;
       if (!ok) setState(() => _errorMessage = context.t('loginError'));
@@ -116,13 +117,23 @@ class _LoginScreenState extends State<LoginScreen>
                               ).animate().fadeIn(delay: 150.ms).scale(),
                               const SizedBox(height: 16),
                               CustomTextField(
-                                controller: _phoneController,
-                                label: context.t('phoneNumber'),
-                                icon: Icons.phone_rounded,
-                                keyboardType: TextInputType.phone,
+                                controller: _passwordController,
+                                label: context.t('password'),
+                                icon: Icons.lock_rounded,
+                                keyboardType: TextInputType.visiblePassword,
+                                obscureText: _obscurePassword,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_rounded
+                                        : Icons.visibility_rounded,
+                                  ),
+                                  onPressed: () => setState(() =>
+                                      _obscurePassword = !_obscurePassword),
+                                ),
                                 validator: (v) => v?.isNotEmpty == true
                                     ? null
-                                    : context.t('phoneError'),
+                                    : context.t('passwordError'),
                               ).animate().fadeIn(delay: 250.ms).scale(),
                               const SizedBox(height: 8),
                               Align(

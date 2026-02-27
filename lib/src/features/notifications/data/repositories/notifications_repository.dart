@@ -1,6 +1,6 @@
-import '../../domain/entities/app_notification.dart';
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
 abstract class NotificationsRepository {
-  /// TODO: call GET_NOTIFICATIONS_API and sync with local store.
+  /// Calls GET /api/guardian/notifications and returns [AppNotification] list.
   Future<List<AppNotification>> fetchNotifications();
 }

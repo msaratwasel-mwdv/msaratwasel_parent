@@ -1,0 +1,1 @@
+As a parent, I want to receive a notification when my son boards the bus in the morning, so that I can be reassured that he has left for school safely.

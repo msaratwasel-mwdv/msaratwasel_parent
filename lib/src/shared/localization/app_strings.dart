@@ -90,6 +90,8 @@ class AppStrings {
       'civilId': 'الرقم المدني',
       'civilIdError': 'الرقم المدني لولي الامر',
       'phoneError': 'رقم جوال ولي الامر',
+      'password': 'كلمة المرور',
+      'passwordError': 'أدخل كلمة المرور',
       'rememberMe': 'تذكرني',
       'forgotData': 'نسيت كلمة المرور؟',
       'login': 'تسجيل الدخول',
@@ -375,6 +377,8 @@ class AppStrings {
       'civilIdError': 'Guardian Civil ID',
 
       'phoneError': 'Guardian Phone Number',
+      'password': 'Password',
+      'passwordError': 'Enter your password',
       'rememberMe': 'Remember me',
       'forgotData': 'Forgot Password?',
       'login': 'Login',
