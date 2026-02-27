@@ -290,6 +290,7 @@ class AppStrings {
       'start': 'ابدأ',
       'timeWaited': 'وقت الانتظار',
       'busPhotos': 'صور الحافلة',
+      'pressAgainToExit': 'اضغط مرة أخرى للخروج',
     },
     'en': {
       'appName': 'Msarat Wasel',
@@ -583,6 +584,7 @@ class AppStrings {
       'start': 'Start',
       'timeWaited': 'Time Waited',
       'busPhotos': 'Bus Photos',
+      'pressAgainToExit': 'Press again to exit',
     },
   };
 

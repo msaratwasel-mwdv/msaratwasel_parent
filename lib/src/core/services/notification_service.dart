@@ -161,6 +161,8 @@ class NotificationService {
       case 'student_boarded':
         return NotificationType.checkIn;
       case 'student_alighted':
+      case 'bus_alighting':
+      case 'alighting':
         return NotificationType.checkOut;
       case 'bus_proximity':
         return NotificationType.approach;

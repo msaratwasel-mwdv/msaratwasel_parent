@@ -35,6 +35,9 @@ class _RootShellState extends State<RootShell> {
     _pages[0] = const HomeScreen();
   }
 
+  DateTime? _lastPressedAt;
+  bool _canPopNow = false;
+
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
@@ -46,30 +49,72 @@ class _RootShellState extends State<RootShell> {
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
         final page = _buildPage(currentIndex);
 
-        return Scaffold(
-          key: _scaffoldKey,
+        return PopScope(
+          canPop: _canPopNow,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
 
-          drawer: CustomDrawer(
-            controller: controller,
-            currentIndex: currentIndex,
-            isArabic: isArabic,
-            onSelect: (index) {
-              controller.setNavIndex(index);
-              // Close drawer after selection
-              if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-                Navigator.of(context).pop();
+            // 1. If we are NOT on the Home tab (index 0), go back to it first.
+            if (currentIndex != 0) {
+              controller.setNavIndex(0);
+              return;
+            }
+
+            // 2. If we ARE on the Home tab, check for double-press to exit.
+            final now = DateTime.now();
+            final backButtonHasNotBeenPressedOrTimeHasExpired =
+                _lastPressedAt == null ||
+                now.difference(_lastPressedAt!) > const Duration(seconds: 2);
+
+            if (backButtonHasNotBeenPressedOrTimeHasExpired) {
+              _lastPressedAt = now;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    context.t('pressAgainToExit'),
+                    textAlign: TextAlign.center,
+                  ),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.all(20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+              return;
+            }
+
+            // 3. If pressed again within 2 seconds, exit the app.
+            setState(() => _canPopNow = true);
+            // Allow the system to handle the pop on the NEXT event loop iteration
+            // or we can manually trigger it for better responsiveness on some devices.
+            Future.delayed(Duration.zero, () {
+              if (mounted) {
+                Navigator.of(context).maybePop();
               }
-            },
+            });
+          },
+          child: Scaffold(
+            key: _scaffoldKey,
+            drawer: CustomDrawer(
+              controller: controller,
+              currentIndex: currentIndex,
+              isArabic: isArabic,
+              onSelect: (index) {
+                controller.setNavIndex(index);
+                // Close drawer after selection
+                if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+            appBar: null,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: currentIndex == 2
+                ? page
+                : SafeArea(top: true, bottom: false, child: page),
           ),
-
-          // AppBar removed to allow pages to have their own CupertinoSliverNavigationBar
-          appBar: null,
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          // Keep SafeArea for scrollable pages (unified status/app bar color),
-          // but allow TrackingPage (Google Maps) to be truly fullscreen.
-          body: currentIndex == 2
-              ? page
-              : SafeArea(top: true, bottom: false, child: page),
         );
       },
     );
