@@ -29,31 +29,6 @@ class Labels {
     }
   }
 
-  static String notification(NotificationType type, {required bool arabic}) {
-    switch (type) {
-      case NotificationType.approach:
-        return arabic ? 'اقتراب الحافلة' : 'Bus approaching';
-      case NotificationType.checkIn:
-        return arabic ? 'صعود' : 'Check-in';
-      case NotificationType.checkOut:
-        return arabic ? 'نزول' : 'Check-out';
-      case NotificationType.arrival:
-        return arabic ? 'وصول' : 'Arrival';
-      case NotificationType.delay:
-        return arabic ? 'تأخير' : 'Delay';
-      case NotificationType.routeChange:
-        return arabic ? 'تغيير مسار' : 'Route change';
-      case NotificationType.absence:
-        return arabic ? 'غياب' : 'Absence';
-      case NotificationType.lateBoarding:
-        return arabic ? 'تأخر في الصعود' : 'Late boarding';
-      case NotificationType.schoolAlert:
-        return arabic ? 'تنبيه المدرسة' : 'School alert';
-      case NotificationType.supervisorMessage:
-        return arabic ? 'رسالة من المشرفة' : 'Supervisor message';
-    }
-  }
-
   static String attendanceDirection(
     AttendanceDirection direction, {
     required bool arabic,

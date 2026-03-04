@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,8 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/core/network/api_client.dart';
+import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class ChangePasswordPage extends StatefulWidget {
@@ -34,22 +37,63 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final storage = StorageService();
+      final apiClient = ApiClient(storage: storage);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      await apiClient.client.post(
+        '/api/auth/change-password',
+        data: {
+          'current_password': _currentController.text,
+          'new_password': _newController.text,
+          'new_password_confirmation': _confirmController.text,
+        },
+        options: Options(headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }),
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          context.t('passwordUpdatedSuccess'),
-          style: GoogleFonts.cairo(color: Colors.white),
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.t('passwordUpdatedSuccess'),
+            style: GoogleFonts.cairo(color: Colors.white),
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
-    Navigator.pop(context);
+      );
+      Navigator.pop(context);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      String errorMsg = context.t('fieldRequired');
+      if (e.response?.data != null && e.response!.data is Map) {
+        final data = e.response!.data as Map;
+        if (data['errors'] != null) {
+          final errors = data['errors'] as Map;
+          errorMsg = errors.values
+              .expand((v) => v is List ? v : [v])
+              .join('\n');
+        } else if (data['message'] != null) {
+          errorMsg = data['message'];
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMsg,
+            style: GoogleFonts.cairo(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

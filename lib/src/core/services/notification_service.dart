@@ -136,7 +136,7 @@ class NotificationService {
   /// Converts a Firebase [RemoteMessage] payload into [AppNotification].
   static void _handleRemoteMessage(RemoteMessage message) {
     final data = message.data;
-    final type = _resolveType(data['type'] as String?);
+    final type = AppNotification.parseType(data['type'] as String?);
 
     final notification = AppNotification(
       id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -147,27 +147,5 @@ class NotificationService {
     );
 
     _onReceived?.call(notification);
-  }
-
-  /// Maps the Laravel `type` string to [NotificationType].
-  ///
-  /// Laravel sends: bus_boarding_morning | bus_boarding_afternoon |
-  /// student_boarded | student_alighted | bus_proximity | general
-  static NotificationType _resolveType(String? raw) {
-    switch (raw) {
-      case 'bus_boarding_morning':
-      case 'bus_boarding_afternoon':
-      case 'bus_boarding':
-      case 'student_boarded':
-        return NotificationType.checkIn;
-      case 'student_alighted':
-      case 'bus_alighting':
-      case 'alighting':
-        return NotificationType.checkOut;
-      case 'bus_proximity':
-        return NotificationType.approach;
-      default:
-        return NotificationType.schoolAlert;
-    }
   }
 }

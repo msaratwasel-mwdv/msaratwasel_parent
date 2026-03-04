@@ -6,7 +6,7 @@ import 'package:msaratwasel_user/src/features/attendance/presentation/pages/requ
 import 'package:msaratwasel_user/src/features/attendance/presentation/pages/attendance_history_page.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/children_screen.dart';
 import 'package:msaratwasel_user/src/features/home/presentation/home_screen.dart';
-import 'package:msaratwasel_user/src/features/messages/presentation/messages_page.dart';
+import 'package:msaratwasel_user/src/features/chat/presentation/contacts_page.dart';
 import 'package:msaratwasel_user/src/features/notifications/presentation/notifications_page.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/parent_profile_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/more_page.dart';
@@ -128,7 +128,7 @@ class _RootShellState extends State<RootShell> {
       2 => const TrackingPage(),
       3 => const ChildrenStatusPage(), // New Page
       4 => const NotificationsPage(),
-      5 => const MessagesPage(),
+      5 => const ContactsPage(),
       6 => const RequestAbsencePage(),
       7 => const AttendanceHistoryPage(),
       8 => const ParentProfilePage(),

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
 
 class ParentProfilePage extends StatefulWidget {
   const ParentProfilePage({super.key});
@@ -246,6 +247,24 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               ),
 
               const SizedBox(height: AppSpacing.xl),
+
+              // Change Password Button
+              _ProfileActionButton(
+                icon: Icons.lock_reset_rounded,
+                label: isArabic ? "تغيير كلمة السر" : "Change Password",
+                color: AppColors.primary,
+                isDark: isDark,
+                isHorizontal: true,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
 
               // Logout Button
               _ProfileActionButton(

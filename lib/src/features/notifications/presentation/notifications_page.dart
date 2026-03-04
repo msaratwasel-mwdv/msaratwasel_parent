@@ -8,7 +8,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
-import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/shared/utils/notification_utils.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -162,10 +162,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final item = filtered[index];
-                      final label = Labels.notification(
-                        item.type,
-                        arabic: isArabic,
-                      );
+                      final label = item.type.label(isArabic);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -179,7 +176,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   ? Colors.white.withAlpha(20)
                                   : AppColors.primary.withAlpha(30),
                               child: Icon(
-                                _notificationIcon(item.type),
+                                item.type.icon,
                                 color: isDark
                                     ? AppColors.dark.accent
                                     : AppColors.primary,
@@ -238,30 +235,5 @@ class _NotificationsPageState extends State<NotificationsPage> {
           : AppColors.primary.withAlpha(30),
       checkmarkColor: isDark ? Colors.white : AppColors.primary,
     );
-  }
-}
-
-IconData _notificationIcon(NotificationType type) {
-  switch (type) {
-    case NotificationType.approach:
-      return Icons.near_me_rounded;
-    case NotificationType.checkIn:
-      return Icons.login_rounded;
-    case NotificationType.checkOut:
-      return Icons.logout_rounded;
-    case NotificationType.arrival:
-      return Icons.flag_rounded;
-    case NotificationType.delay:
-      return Icons.schedule_rounded;
-    case NotificationType.routeChange:
-      return Icons.alt_route_rounded;
-    case NotificationType.absence:
-      return Icons.event_busy_rounded;
-    case NotificationType.lateBoarding:
-      return Icons.warning_amber_rounded;
-    case NotificationType.schoolAlert:
-      return Icons.campaign_rounded;
-    case NotificationType.supervisorMessage:
-      return Icons.support_agent_rounded;
   }
 }

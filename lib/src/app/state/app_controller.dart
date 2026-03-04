@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -169,11 +170,23 @@ class AppController extends ChangeNotifier {
       final loginData = {
         'national_id': civilId.trim(),
         'password': password.trim(),
-        'device_name': 'flutter_parent_app',
+        'device_name': 'device_1',
       };
+      
       developer.log('🔐 LOGIN URL  => ${AppConfig.apiBaseUrl}/api/auth/login', name: 'AUTH');
       developer.log('🔐 LOGIN BODY => $loginData', name: 'AUTH');
-      final response = await dio.post('/api/auth/login', data: loginData);
+      
+      final formData = FormData.fromMap(loginData);
+
+      final response = await dio.post(
+        '/api/auth/login', 
+        data: formData,
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+          },
+        ),
+      );
       developer.log('🔐 LOGIN STATUS => ${response.statusCode}', name: 'AUTH');
       developer.log('🔐 LOGIN DATA   => ${response.data}', name: 'AUTH');
 
@@ -203,9 +216,18 @@ class AppController extends ChangeNotifier {
       _isAuthenticated = true;
       _bootCompleted = true;
       _navIndex = 0;
+
+      // تحميل الإشعارات من API بعد تسجيل الدخول
+      loadNotificationsFromApi();
+
       notifyListeners();
       return true;
     } on DioException catch (e, st) {
+      print('=== LOGIN DIO EXCEPTION ===');
+      print('Status: ${e.response?.statusCode}');
+      print('Data: ${e.response?.data}');
+      print('Message: ${e.message}');
+      print('===========================');
       developer.log(
         '❌ LOGIN ERROR => ${e.response?.statusCode} | ${e.response?.data}',
         name: 'AUTH',

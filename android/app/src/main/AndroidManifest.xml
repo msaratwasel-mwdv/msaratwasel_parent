@@ -17,7 +17,8 @@
     <application
         android:label="msaratwasel_user"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:enableOnBackInvokedCallback="true">
 
         <!-- Google Maps API key -->
         <meta-data
