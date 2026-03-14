@@ -5,12 +5,16 @@ class Labels {
 
   static String studentStatus(StudentStatus status, {required bool arabic}) {
     switch (status) {
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
+      case StudentStatus.atHome:
+        return arabic ? 'في المنزل' : 'At home';
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
       case StudentStatus.onBus:
         return arabic ? 'في الحافلة' : 'On the bus';
       case StudentStatus.atSchool:
         return arabic ? 'في المدرسة' : 'At school';
-      case StudentStatus.atHome:
-        return arabic ? 'في المنزل' : 'At home';
       case StudentStatus.notBoarded:
         return arabic ? 'لم يصعد' : 'Not boarded';
       case StudentStatus.late:

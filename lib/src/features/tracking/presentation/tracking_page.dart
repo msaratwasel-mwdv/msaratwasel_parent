@@ -21,6 +21,20 @@ class TrackingPage extends StatefulWidget {
 
 class _TrackingPageState extends State<TrackingPage> {
   bool detailsVisible = true;
+  AppController? _appController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appController = AppScope.of(context);
+    _appController?.startTrackingPoll();
+  }
+
+  @override
+  void dispose() {
+    _appController?.stopTrackingPoll();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +46,25 @@ class _TrackingPageState extends State<TrackingPage> {
         final tracking = controller.currentTracking;
         final isArabic = controller.locale.languageCode == 'ar';
         final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        // While children are loading, show a placeholder
+        if (tracking == null) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(isArabic ? 'جاري تحميل بيانات التتبع...' : 'Loading tracking data...'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // At this point tracking is non-null (narrowed)
+        final trackingData = tracking;
 
         return Scaffold(
           body: Stack(
@@ -65,7 +98,7 @@ class _TrackingPageState extends State<TrackingPage> {
                 top: MediaQuery.of(context).padding.top + AppSpacing.lg,
                 right: isArabic
                     ? AppSpacing.lg + 60
-                    : AppSpacing.lg, // Adjust padding based on direction
+                    : AppSpacing.lg,
                 left: isArabic ? AppSpacing.lg : AppSpacing.lg + 60,
                 child: Row(
                   children: [
@@ -73,20 +106,23 @@ class _TrackingPageState extends State<TrackingPage> {
                       icon: Icons.circle,
                       iconColor: Colors.greenAccent,
                       label: Labels.busState(
-                        tracking.busState,
+                        trackingData.busState,
                         arabic: isArabic,
                       ),
                     ),
                     const Spacer(),
-                    _Pill(
-                      icon: Icons.refresh_rounded,
-                      label: isArabic ? 'تحديث' : 'Refresh',
-                      subtle: false,
+                    InkWell(
+                      onTap: () => controller.startTrackingPoll(),
+                      child: _Pill(
+                        icon: Icons.refresh_rounded,
+                        label: isArabic ? 'تحديث' : 'Refresh',
+                        subtle: false,
+                      ),
                     ),
                   ],
                 ),
               ),
-              // Card aligns to bottom - no external sliding, internal animation used
+              // Card aligns to bottom
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Padding(
@@ -97,10 +133,10 @@ class _TrackingPageState extends State<TrackingPage> {
                     AppSpacing.xl,
                   ),
                   child: _BottomDetailsCard(
-                    tracking: tracking,
+                    tracking: trackingData,
                     isArabic: isArabic,
                     busNumber:
-                        controller.students.firstOrNull?.bus.number ?? 'N/A',
+                        controller.currentStudent?.bus.number ?? 'N/A',
                     isOpen: detailsVisible,
                     onToggle: () =>
                         setState(() => detailsVisible = !detailsVisible),
@@ -208,12 +244,15 @@ class _TrackingMapState extends State<_TrackingMap> {
     }
 
     final primaryTracking = controller.currentTracking;
-    final primaryPos = LatLng(primaryTracking.lat, primaryTracking.lng);
+    final primaryPos = primaryTracking != null
+        ? LatLng(primaryTracking.lat, primaryTracking.lng)
+        : const LatLng(24.7136, 46.6753); // Riyadh default fallback
 
     return Stack(
       children: [
         GoogleMap(
-          initialCameraPosition: CameraPosition(target: primaryPos, zoom: 14),
+          initialCameraPosition: CameraPosition(target: primaryPos, zoom: 15),
+          onCameraMove: (pos) => {}, // Logic to track if user is manual
           markers: markers,
           myLocationEnabled: true,
           myLocationButtonEnabled: false, // Disable default button
@@ -328,10 +367,10 @@ class _BottomDetailsCard extends StatelessWidget {
                       color: isDark ? Colors.white24 : Colors.transparent,
                     ),
                   ),
-                  child: const CircleAvatar(
+                  child: CircleAvatar(
                     radius: 24,
                     backgroundImage: NetworkImage(
-                      'https://i.pravatar.cc/150?u=driver',
+                      tracking.driverImageUrl ?? 'https://i.pravatar.cc/150?u=driver',
                     ),
                   ),
                 ),
@@ -341,7 +380,7 @@ class _BottomDetailsCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.t('driverName'), // "Mohamed Abdullah"
+                        tracking.driverName ?? context.t('driverName'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : AppColors.textPrimary,

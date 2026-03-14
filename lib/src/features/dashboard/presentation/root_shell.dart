@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/pages/children_status_page.dart';
@@ -11,6 +12,8 @@ import 'package:msaratwasel_user/src/features/notifications/presentation/notific
 import 'package:msaratwasel_user/src/features/profile/presentation/parent_profile_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/more_page.dart';
 import 'package:msaratwasel_user/src/features/tracking/presentation/tracking_page.dart';
+import 'package:msaratwasel_user/src/features/absence/presentation/pages/absence_history_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
@@ -30,7 +33,7 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
-    _pages = List<Widget?>.filled(10, null, growable: false);
+    _pages = List<Widget?>.filled(11, null, growable: false);
     // Preload the first tab only to avoid initializing heavy widgets (e.g., Google Maps) prematurely.
     _pages[0] = const HomeScreen();
   }
@@ -50,13 +53,13 @@ class _RootShellState extends State<RootShell> {
         final page = _buildPage(currentIndex);
 
         return PopScope(
-          canPop: _canPopNow,
+          canPop: false, // Fully control back button behavior
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
 
-            // 1. If we are NOT on the Home tab (index 0), go back to it first.
+            // 1. If not on Home (index 0), go back according to history
             if (currentIndex != 0) {
-              controller.setNavIndex(0);
+              controller.moveBack();
               return;
             }
 
@@ -85,15 +88,8 @@ class _RootShellState extends State<RootShell> {
               return;
             }
 
-            // 3. If pressed again within 2 seconds, exit the app.
-            setState(() => _canPopNow = true);
-            // Allow the system to handle the pop on the NEXT event loop iteration
-            // or we can manually trigger it for better responsiveness on some devices.
-            Future.delayed(Duration.zero, () {
-              if (mounted) {
-                Navigator.of(context).maybePop();
-              }
-            });
+            // 3. If pressed again within 2 seconds, exit the app properly.
+            SystemNavigator.pop();
           },
           child: Scaffold(
             key: _scaffoldKey,
@@ -133,6 +129,7 @@ class _RootShellState extends State<RootShell> {
       7 => const AttendanceHistoryPage(),
       8 => const ParentProfilePage(),
       9 => const MorePage(),
+      10 => const AbsenceHistoryPage(),
       _ => const HomeScreen(),
     };
     return _pages[index]!;
@@ -221,9 +218,22 @@ class CustomDrawer extends StatelessWidget {
                             ),
                             child: CircleAvatar(
                               radius: 42,
-                              backgroundImage: NetworkImage(
-                                controller.userAvatarUrl,
-                              ),
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                              backgroundImage: controller.userAvatarUrl.isNotEmpty
+                                  ? CachedNetworkImageProvider(controller.userAvatarUrl)
+                                  : null,
+                              child: controller.userAvatarUrl.isEmpty
+                                  ? Text(
+                                      controller.userName.isNotEmpty
+                                          ? controller.userName.characters.first
+                                          : '?',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : AppColors.primary,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    )
+                                  : null,
                             ),
                           ),
                           Container(
@@ -347,6 +357,13 @@ class CustomDrawer extends StatelessWidget {
                     isSelected: currentIndex == 7, // Shifted from 6
                     isDark: isDark,
                     onTap: () => onSelect(7),
+                  ),
+                  _DrawerItem(
+                    title: isArabic ? 'سجل طلبات الغياب' : 'Absence Requests',
+                    icon: Icons.assignment_turned_in_rounded,
+                    isSelected: currentIndex == 10,
+                    isDark: isDark,
+                    onTap: () => onSelect(10),
                   ),
                   _DrawerItem(
                     title: context.t('settings'),

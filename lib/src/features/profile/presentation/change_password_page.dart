@@ -49,7 +49,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         },
       ));
 
-      final response = await dio.post('/api/auth/change-password', data: {
+      final response = await dio.post('auth/change-password', data: {
         'current_password': _currentCtrl.text,
         'new_password': _newCtrl.text,
         'new_password_confirmation': _confirmCtrl.text,

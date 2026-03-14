@@ -172,12 +172,16 @@ class SampleData {
 
   static String studentStatusText(StudentStatus status) {
     switch (status) {
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
+      case StudentStatus.atHome:
+        return 'في المنزل';
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
       case StudentStatus.onBus:
         return 'في الحافلة';
       case StudentStatus.atSchool:
         return 'في المدرسة';
-      case StudentStatus.atHome:
-        return 'في المنزل';
       case StudentStatus.notBoarded:
         return 'لم يصعد';
       case StudentStatus.late:
@@ -188,10 +192,14 @@ class SampleData {
   static IconData statusIcon(StudentStatus status) {
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return Icons.directions_bus_filled_outlined;
       case StudentStatus.atSchool:
         return Icons.school_outlined;
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return Icons.home_outlined;
       case StudentStatus.notBoarded:
         return Icons.hourglass_top_outlined;

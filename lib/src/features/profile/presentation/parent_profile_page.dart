@@ -2,9 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
@@ -19,26 +23,11 @@ class ParentProfilePage extends StatefulWidget {
 class _ParentProfilePageState extends State<ParentProfilePage> {
   final ImagePicker _picker = ImagePicker();
   File? _avatarFile;
-  String _name = '';
-  String _phone = '';
-  String _email = '';
-  bool _initializedFromLocale = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
     super.initState();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_initializedFromLocale) return;
-
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    _name = isArabic ? "عبدالله الأحمد" : "Abdullah Al-Ahmad";
-    _phone = "0501234567";
-    _email = "abdullah@example.com";
-    _initializedFromLocale = true;
   }
 
   @override
@@ -54,7 +43,39 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     );
     if (file == null) return;
 
-    setState(() => _avatarFile = File(file.path));
+    setState(() {
+      _avatarFile = File(file.path);
+      _isUploadingAvatar = true;
+    });
+
+    // Upload to backend
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token != null) {
+        final dio = Dio(BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ));
+        final formData = FormData.fromMap({
+          'avatar': await MultipartFile.fromFile(file.path, filename: 'avatar.jpg'),
+        });
+        final response = await dio.post('parent/profile/avatar', data: formData);
+        if (response.statusCode == 200 && mounted) {
+          final imageUrl = response.data['image_url'] as String?;
+          if (imageUrl != null) {
+            AppScope.of(context).updateAvatarUrl(imageUrl);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Avatar upload failed: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
   }
 
   void _showPhotoOptions() {
@@ -95,14 +116,19 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
-    final ImageProvider avatarImage = _avatarFile != null
+
+    // Avatar: local file > backend URL > initial letter
+    final bool hasLocalFile = _avatarFile != null;
+    final bool hasRemoteUrl = controller.userAvatarUrl.isNotEmpty;
+    final ImageProvider? avatarImage = hasLocalFile
         ? FileImage(_avatarFile!)
-        : const NetworkImage(
-            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
-          );
+        : hasRemoteUrl
+            ? CachedNetworkImageProvider(controller.userAvatarUrl)
+            : null;
 
     return CustomScrollView(
       slivers: [
@@ -163,11 +189,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             delegate: SliverChildListDelegate([
               // Profile Header
               _ProfileHeader(
-                name: _name,
+                name: controller.userName,
                 isArabic: isArabic,
                 isDark: isDark,
                 avatar: avatarImage,
+                nameInitial: controller.userName.isNotEmpty ? controller.userName[0] : '?',
                 onChangePhoto: _showPhotoOptions,
+                isUploading: _isUploadingAvatar,
               ),
 
               const SizedBox(height: AppSpacing.xl),
@@ -183,7 +211,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               _InfoCard(
                 icon: Icons.badge_outlined,
                 label: isArabic ? "الرقم المدني" : "Civil ID",
-                value: "123456",
+                value: controller.userNationalId.isNotEmpty
+                    ? controller.userNationalId
+                    : (isArabic ? 'غير محدد' : 'Not specified'),
                 isDark: isDark,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -191,7 +221,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               _InfoCard(
                 icon: Icons.phone_outlined,
                 label: isArabic ? "رقم الهاتف" : "Phone Number",
-                value: _phone,
+                value: controller.userPhone.isNotEmpty
+                    ? controller.userPhone
+                    : (isArabic ? 'غير محدد' : 'Not specified'),
                 isDark: isDark,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -199,7 +231,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               _InfoCard(
                 icon: Icons.email_outlined,
                 label: isArabic ? "البريد الإلكتروني" : "Email",
-                value: _email,
+                value: controller.userEmail.isNotEmpty
+                    ? controller.userEmail
+                    : (isArabic ? 'غير محدد' : 'Not specified'),
                 isDark: isDark,
               ),
 
@@ -227,24 +261,39 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              _ChildQuickCard(
-                name: isArabic ? "سارة أحمد" : "Sarah Ahmed",
-                grade: isArabic ? "الصف الرابع" : "Grade 4",
-                avatar:
-                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-                isDark: isDark,
-                isArabic: isArabic,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              _ChildQuickCard(
-                name: isArabic ? "عبدالله محمد" : "Abdullah Mohammed",
-                grade: isArabic ? "الصف الأول" : "Grade 1",
-                avatar:
-                    "https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d?w=200",
-                isDark: isDark,
-                isArabic: isArabic,
-              ),
+              // Dynamic children list from AppController
+              if (controller.students.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.grey.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      isArabic ? 'لا يوجد أبناء مسجلون' : 'No children registered',
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...controller.students.map((student) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _ChildQuickCard(
+                    name: student.name,
+                    grade: student.grade,
+                    avatarUrl: student.avatarUrl,
+                    isDark: isDark,
+                    isArabic: isArabic,
+                  ),
+                )),
 
               const SizedBox(height: AppSpacing.xl),
 
@@ -289,8 +338,10 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                           child: Text(isArabic ? "إلغاء" : "Cancel"),
                         ),
                         TextButton(
-                          onPressed: () {
+                          onPressed: () async {
                             Navigator.pop(context);
+                            final controller = AppScope.of(context);
+                            await controller.logout();
                           },
                           child: Text(
                             isArabic ? "تسجيل الخروج" : "Logout",
@@ -320,14 +371,18 @@ class _ProfileHeader extends StatelessWidget {
     required this.isArabic,
     required this.isDark,
     required this.avatar,
+    required this.nameInitial,
     required this.onChangePhoto,
+    this.isUploading = false,
   });
 
   final String name;
   final bool isArabic;
   final bool isDark;
-  final ImageProvider avatar;
+  final ImageProvider? avatar;
+  final String nameInitial;
   final VoidCallback onChangePhoto;
+  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
@@ -358,7 +413,23 @@ class _ProfileHeader extends StatelessWidget {
                     width: 3,
                   ),
                 ),
-                child: CircleAvatar(radius: 50, backgroundImage: avatar),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundImage: avatar,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.3),
+                  child: avatar == null
+                      ? Text(
+                          nameInitial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        )
+                      : (isUploading
+                          ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                          : null),
+                ),
               ),
               Material(
                 color: Colors.transparent,
@@ -523,19 +594,20 @@ class _ChildQuickCard extends StatelessWidget {
   const _ChildQuickCard({
     required this.name,
     required this.grade,
-    required this.avatar,
     required this.isDark,
     required this.isArabic,
+    this.avatarUrl,
   });
 
   final String name;
   final String grade;
-  final String avatar;
+  final String? avatarUrl;
   final bool isDark;
   final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
+    final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -549,7 +621,21 @@ class _ChildQuickCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(radius: 24, backgroundImage: NetworkImage(avatar)),
+          CircleAvatar(
+            radius: 24,
+            backgroundImage: hasAvatar ? CachedNetworkImageProvider(avatarUrl!) : null,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+            child: !hasAvatar
+                ? Text(
+                    name.isNotEmpty ? name[0] : '?',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  )
+                : null,
+          ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(

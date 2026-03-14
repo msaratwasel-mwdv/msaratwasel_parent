@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 
@@ -23,9 +24,12 @@ class ChildrenScreen extends StatelessWidget {
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return CustomScrollView(
-      slivers: [
-        // Navigation Bar
+    return RefreshIndicator(
+      onRefresh: () => controller.loadChildrenFromApi(),
+      color: AppColors.primary,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      child: CustomScrollView(
+        slivers: [
         // Navigation Bar
         AppSliverHeader(
           title: '${context.t('myKids')} (${students.length})',
@@ -41,32 +45,56 @@ class ChildrenScreen extends StatelessWidget {
           ),
         ),
 
-        // Content
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final student = students[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                child: _ChildCard(
-                  student: student,
-                  isDark: isDark,
-                  isArabic: isArabic,
-                  onTap: () => _showChildDetails(
-                    context,
-                    student,
-                    isDark,
-                    isArabic,
-                    attendance,
-                    trips,
+        // Loading state
+        if (controller.isLoadingChildren)
+          const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          )
+        // Empty state
+        else if (students.isEmpty)
+          SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.child_care_rounded, size: 64, color: isDark ? Colors.white30 : Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    isArabic ? 'لا يوجد أبناء مسجلون' : 'No children registered',
+                    style: TextStyle(color: isDark ? Colors.white54 : AppColors.textSecondary),
                   ),
-                ),
-              );
-            }, childCount: students.length),
+                ],
+              ),
+            ),
+          )
+        // Content
+        else
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final student = students[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  child: _ChildCard(
+                    student: student,
+                    isDark: isDark,
+                    isArabic: isArabic,
+                    onTap: () => _showChildDetails(
+                      context,
+                      student,
+                      isDark,
+                      isArabic,
+                      attendance,
+                      trips,
+                    ),
+                  ),
+                );
+              }, childCount: students.length),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -113,10 +141,6 @@ class _ChildCard extends StatelessWidget {
     final statusIcon = _statusIcon(student.status);
     final statusColor = _getStatusColor(student.status, isDark);
 
-    // Mock data for attendance and trips
-    final attendancePercentage = student.id == 'st-1' ? 95 : 98;
-    final totalTrips = student.id == 'st-1' ? 142 : 156;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -155,14 +179,20 @@ class _ChildCard extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 32,
                       backgroundColor: Colors.white,
-                      child: Text(
-                        student.name[0],
-                        style: TextStyle(
-                          color: isDark ? AppColors.primary : AppColors.primary,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      // Show real photo if available and not empty, else initials
+                      backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                          ? CachedNetworkImageProvider(student.avatarUrl!)
+                          : null,
+                      child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                          ? Text(
+                              student.name.isNotEmpty ? student.name[0] : '?',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -182,7 +212,9 @@ class _ChildCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${context.t('studentGrade')}: ${student.grade} • ${student.schoolId}',
+                          student.nationalId != null
+                              ? '${context.t('studentGrade')}: ${student.grade} • ${student.nationalId}'
+                              : '${context.t('studentGrade')}: ${student.grade}',
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white70
@@ -230,7 +262,7 @@ class _ChildCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${context.t('bus')} ${student.bus.number} • ${student.bus.plate}',
+                            '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
                             style: TextStyle(
                               color: isDark
                                   ? Colors.white70
@@ -254,27 +286,25 @@ class _ChildCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // Stats Row
+              // Stats Row — trips count + attendance %
               Row(
                 children: [
                   Expanded(
-                    child: _StatItem(
-                      icon: Icons.check_circle_outline,
-                      label: context.t('attendance'),
-                      value: '$attendancePercentage%',
-                      color: Colors.green,
+                    child: _StatBox(
+                      value: student.tripCount.toString(),
+                      label: context.t('tripLog'),
+                      icon: Icons.directions_bus_rounded,
+                      color: AppColors.primary,
                       isDark: isDark,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: _StatItem(
-                      icon: Icons.route_rounded,
-                      label: context.t(
-                        'tripsHistory',
-                      ), // or "Trips", using tripsHistory
-                      value: totalTrips.toString(),
-                      color: AppColors.accent,
+                    child: _StatBox(
+                      value: '${student.attendancePercentage}%',
+                      label: context.t('attendance'),
+                      icon: Icons.check_circle_outline_rounded,
+                      color: Colors.green,
                       isDark: isDark,
                     ),
                   ),
@@ -283,24 +313,16 @@ class _ChildCard extends StatelessWidget {
 
               const SizedBox(height: AppSpacing.md),
 
-              // Action Buttons
+              // Action Buttons — order: [الملف] [الحضور والغياب] [تتبع]
               Row(
                 children: [
                   Expanded(
                     child: _ActionButton(
-                      icon: Icons.directions_bus_rounded,
-                      label: context.t('track'),
-                      color: AppColors.accent,
+                      icon: Icons.person_outline,
+                      label: context.t('file'),
+                      color: isDark ? Colors.white : AppColors.primary,
                       isDark: isDark,
-                      onTap: () {
-                        // TODO: Since we are in a list, finding the index of 'student' in the full list
-                        // is required if `students` here is filtered. Assuming `students` comes directly from controller order.
-                        final index = controller.students.indexOf(student);
-                        if (index != -1) {
-                          controller.selectStudent(index);
-                          controller.setNavIndex(2);
-                        }
-                      },
+                      onTap: onTap,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -316,11 +338,17 @@ class _ChildCard extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _ActionButton(
-                      icon: Icons.person_outline,
-                      label: context.t('file'),
-                      color: isDark ? Colors.white : AppColors.primary,
+                      icon: Icons.directions_bus_rounded,
+                      label: context.t('track'),
+                      color: AppColors.accent,
                       isDark: isDark,
-                      onTap: onTap,
+                      onTap: () {
+                        final index = controller.students.indexOf(student);
+                        if (index != -1) {
+                          controller.selectStudent(index);
+                          controller.setNavIndex(2);
+                        }
+                      },
                     ),
                   ),
                 ],
@@ -335,10 +363,14 @@ class _ChildCard extends StatelessWidget {
   IconData _statusIcon(StudentStatus status) {
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return Icons.directions_bus_filled_outlined;
       case StudentStatus.atSchool:
         return Icons.school_outlined;
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return Icons.home_outlined;
       case StudentStatus.notBoarded:
         return Icons.hourglass_top_outlined;
@@ -353,10 +385,14 @@ class _ChildCard extends StatelessWidget {
     }
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return AppColors.accent;
       case StudentStatus.atSchool:
         return AppColors.primary;
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return Colors.green;
       case StudentStatus.notBoarded:
         return Colors.orange;
@@ -366,60 +402,7 @@ class _ChildCard extends StatelessWidget {
   }
 }
 
-class _StatItem extends StatelessWidget {
-  const _StatItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.isDark,
-  });
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
@@ -470,6 +453,59 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
+// ─── StatBox ─────────────────────────────────────────────────────────────────
+class _StatBox extends StatelessWidget {
+  const _StatBox({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(isDark ? 30 : 20),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : AppColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _ChildDetailsSheet extends StatelessWidget {
   const _ChildDetailsSheet({
     required this.student,
@@ -585,12 +621,16 @@ class _ChildDetailsSheet extends StatelessWidget {
                     children: [
                       _DetailRow(
                         label: context.t('busNumber'),
-                        value: student.bus.number,
+                        value: (student.bus.number.isNotEmpty && student.bus.number != '-') 
+                            ? student.bus.number 
+                            : context.t('notSpecified'),
                         isDark: isDark,
                       ),
                       _DetailRow(
-                        label: context.t('busPlate'),
-                        value: student.bus.plate,
+                        label: context.t('busPlate') ?? 'رقم اللوحة',
+                        value: (student.bus.plate.isNotEmpty && student.bus.plate != '-') 
+                            ? student.bus.plate 
+                            : context.t('notSpecified'),
                         isDark: isDark,
                       ),
                       _DetailRow(
@@ -655,6 +695,15 @@ class _ChildDetailsSheet extends StatelessWidget {
                             icon: const Icon(Icons.map_rounded, size: 22),
                             color: isDark ? Colors.white : AppColors.primary,
                             onPressed: () {
+                              if (student.homeLocation == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(context.t('noHomeLocation')),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                                return;
+                              }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -683,9 +732,9 @@ class _ChildDetailsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isArabic
-                            ? 'مدارس الأقصى الأهلية'
-                            : 'Al Aqsa Private Schools',
+                        (student.schoolName != null && student.schoolName!.isNotEmpty)
+                            ? student.schoolName!
+                            : (isArabic ? 'غير محدد' : 'Not Specified'),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16,
@@ -704,9 +753,9 @@ class _ChildDetailsSheet extends StatelessWidget {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              isArabic
-                                  ? 'الرياض، حي الملقا'
-                                  : 'Riyadh, Al Malqa Dist.',
+                              (student.schoolLocation != null && student.schoolLocation!.isNotEmpty)
+                                  ? student.schoolLocation!
+                                  : (isArabic ? 'غير محدد' : 'Not Specified'),
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white70
@@ -724,36 +773,36 @@ class _ChildDetailsSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Bus Driver Info
-                _DetailSection(
-                  title: context.t('busDriver'),
-                  icon: Icons.airline_seat_recline_normal_rounded,
-                  isDark: isDark,
-                  child: _ContactInfoRow(
-                    name: isArabic ? 'محمد عبدالله' : 'Mohammed Abdullah',
-                    phone: '0551234567',
-                    avatarUrl:
-                        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+                if (student.bus.driver != null)
+                  _DetailSection(
+                    title: context.t('busDriver'),
+                    icon: Icons.airline_seat_recline_normal_rounded,
                     isDark: isDark,
-                    context: context,
+                    child: _ContactInfoRow(
+                      name: student.bus.driver!.name,
+                      phone: student.bus.driver!.phone ?? '',
+                      avatarUrl: student.bus.driver!.imageUrl,
+                      isDark: isDark,
+                      context: context,
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: AppSpacing.lg),
+                if (student.bus.driver != null) const SizedBox(height: AppSpacing.lg),
 
                 // Bus Supervisor Info
-                _DetailSection(
-                  title: context.t('busSupervisor'),
-                  icon: Icons.verified_user_rounded,
-                  isDark: isDark,
-                  child: _ContactInfoRow(
-                    name: isArabic ? 'سارة خالد' : 'Sara Khalid',
-                    phone: '0509876543',
-                    avatarUrl:
-                        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+                if (student.bus.supervisor != null)
+                  _DetailSection(
+                    title: context.t('busSupervisor'),
+                    icon: Icons.verified_user_rounded,
                     isDark: isDark,
-                    context: context,
+                    child: _ContactInfoRow(
+                      name: student.bus.supervisor!.name,
+                      phone: student.bus.supervisor!.phone ?? '',
+                      avatarUrl: student.bus.supervisor!.imageUrl,
+                      isDark: isDark,
+                      context: context,
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: AppSpacing.xxl),
               ],
@@ -872,7 +921,7 @@ class _ContactInfoRow extends StatelessWidget {
 
   final String name;
   final String phone;
-  final String avatarUrl;
+  final String? avatarUrl;
   final bool isDark;
   final BuildContext context;
 
@@ -897,7 +946,13 @@ class _ContactInfoRow extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage(avatarUrl),
+                backgroundImage: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                    ? NetworkImage(avatarUrl!)
+                    : null,
+                backgroundColor: AppColors.primary.withAlpha(30),
+                child: (avatarUrl == null || avatarUrl!.trim().isEmpty)
+                    ? const Icon(Icons.person_rounded, color: AppColors.primary, size: 18)
+                    : null,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(

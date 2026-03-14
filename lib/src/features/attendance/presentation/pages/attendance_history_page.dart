@@ -6,6 +6,9 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/widgets/child_selector.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/core/network/api_client.dart';
+import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -17,60 +20,81 @@ class AttendanceHistoryPage extends StatefulWidget {
 }
 
 class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
-  // Mock Data
-  final List<AttendanceChild> _children = [
-    AttendanceChild(id: '1', name: 'أحمد', grade: 'الخامس - أ'),
-    AttendanceChild(id: '2', name: 'سارة', grade: 'الثاني - ب'),
-  ];
-
-  late AttendanceChild _selectedChild;
+  Student? _selectedChild;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  bool _isLoading = false;
 
-  // Mock Attendance Logs for Calendar
-  // Map Key: DateTime(year, month, day) - normalize time
   final Map<DateTime, Map<String, dynamic>> _attendanceEvents = {};
+  int _presentCount = 0;
+  int _absentCount = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _selectedChild = _children.first;
-    _generateMockData();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_selectedChild == null) {
+      final students = AppScope.of(context).students;
+      if (students.isNotEmpty) {
+        _selectedChild = students.first;
+        _fetchAttendanceData();
+      }
+    }
   }
 
-  void _generateMockData() {
-    // Generate some random data for the current month
-    final now = DateTime.now();
-    // Helper to normalize date to midnight
-    DateTime normalize(DateTime date) =>
-        DateTime(date.year, date.month, date.day);
+  Future<void> _fetchAttendanceData() async {
+    if (_selectedChild == null) return;
 
-    _attendanceEvents[normalize(now.subtract(const Duration(days: 0)))] = {
-      'status': 'present',
-      'label': 'حاضر',
-    }; // Today
-    _attendanceEvents[normalize(now.subtract(const Duration(days: 2)))] = {
-      'status': 'absent',
-      'label': 'غياب',
-    };
-    _attendanceEvents[normalize(now.subtract(const Duration(days: 3)))] = {
-      'status': 'present',
-      'label': 'حاضر',
-    };
-    _attendanceEvents[normalize(now.subtract(const Duration(days: 4)))] = {
-      'status': 'present',
-      'label': 'حاضر',
-    };
-    // Excused removed as per request
-    // Weekend logic is handled by calendar builder, events are extra
-    // Weekend logic is handled by calendar builder, events are extra
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final storage = StorageService();
+      final apiClient = ApiClient(storage: storage);
+      final response = await apiClient.client.get(
+        '/parent/children/${_selectedChild!.id}/attendance',
+        queryParameters: {
+          'year': _focusedDay.year,
+          'month': _focusedDay.month,
+        },
+      );
+
+      final data = response.data['data'];
+      final logs = data['logs'] as Map<String, dynamic>;
+      final summary = data['summary'] as Map<String, dynamic>;
+
+      _attendanceEvents.clear();
+      logs.forEach((dateStr, val) {
+        final parts = dateStr.split('-');
+        if (parts.length == 3) {
+          final date = DateTime(
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+          );
+          _attendanceEvents[date] = val as Map<String, dynamic>;
+        }
+      });
+
+      _presentCount = summary['present_days'] ?? 0;
+      _absentCount = summary['absent_days'] ?? 0;
+    } catch (e) {
+      // Ignored for UI
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
-  void _onChildSelected(AttendanceChild child) {
+  void _onChildSelected(Student child) {
+    if (_selectedChild?.id == child.id) return;
     setState(() {
       _selectedChild = child;
-      // In a real app, fetch new data for this child here
     });
+    _fetchAttendanceData();
   }
 
   @override
@@ -79,16 +103,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
     final locale = AppScope.of(context).locale;
     final isArabic = locale.languageCode == 'ar';
 
-    // Calculate stats for the viewed month
-    int presentCount = 0;
-    int absentCount = 0;
-
-    _attendanceEvents.forEach((date, event) {
-      if (date.month == _focusedDay.month) {
-        if (event['status'] == 'present') presentCount++;
-        if (event['status'] == 'absent') absentCount++;
-      }
-    });
+    final students = AppScope.of(context).students;
 
     return Scaffold(
       backgroundColor: isDark
@@ -116,11 +131,20 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Child Selector shared widget
-                  ChildSelector(
-                    children: _children,
-                    selectedChild: _selectedChild,
-                    onChildSelected: _onChildSelected,
-                  ),
+                  if (students.isNotEmpty)
+                    ChildSelector(
+                      children: students,
+                      selectedChild: _selectedChild,
+                      onChildSelected: _onChildSelected,
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
+                      child: Text(
+                        isArabic ? 'لا يوجد أبناء مسجلون' : 'No children found',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
 
                   const SizedBox(height: AppSpacing.lg),
                   // Summary Cards
@@ -129,7 +153,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                       Expanded(
                         child: _SummaryCard(
                           title: context.t('absentDays'),
-                          count: absentCount,
+                          count: _absentCount,
                           color: const Color(0xFFEF5350),
                           icon: Icons.cancel_rounded,
                           isDark: isDark,
@@ -139,7 +163,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                       Expanded(
                         child: _SummaryCard(
                           title: context.t('presentDays'),
-                          count: presentCount,
+                          count: _presentCount,
                           color: const Color(0xFF00C853),
                           icon: Icons.check_circle_rounded,
                           isDark: isDark,
@@ -180,12 +204,15 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                       : AppColors.textPrimary,
                                 ),
                                 onPressed: () {
-                                  setState(() {
-                                    _focusedDay = DateTime(
-                                      _focusedDay.year,
-                                      _focusedDay.month - 1,
-                                    );
-                                  });
+                                  if (!_isLoading) {
+                                    setState(() {
+                                      _focusedDay = DateTime(
+                                        _focusedDay.year,
+                                        _focusedDay.month - 1,
+                                      );
+                                    });
+                                    _fetchAttendanceData();
+                                  }
                                 },
                               ),
                               Text(
@@ -209,12 +236,15 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                       : AppColors.textPrimary,
                                 ),
                                 onPressed: () {
-                                  setState(() {
-                                    _focusedDay = DateTime(
-                                      _focusedDay.year,
-                                      _focusedDay.month + 1,
-                                    );
-                                  });
+                                  if (!_isLoading) {
+                                    setState(() {
+                                      _focusedDay = DateTime(
+                                        _focusedDay.year,
+                                        _focusedDay.month + 1,
+                                      );
+                                    });
+                                    _fetchAttendanceData();
+                                  }
                                 },
                               ),
                             ],
@@ -234,8 +264,13 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                 child: SizedBox(
                                   // Force width to show 5 days
                                   width: constraints.maxWidth * (7 / 5),
-                                  child: TableCalendar(
-                                    firstDay: DateTime.utc(2020, 1, 1),
+                                  child: _isLoading
+                                      ? const Center(child: Padding(
+                                        padding: EdgeInsets.all(32.0),
+                                        child: CircularProgressIndicator(),
+                                      ))
+                                      : TableCalendar(
+                                      firstDay: DateTime.utc(2020, 1, 1),
                                     lastDay: DateTime.utc(2030, 12, 31),
                                     focusedDay: _focusedDay,
                                     locale: locale.languageCode,
@@ -314,6 +349,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                       setState(() {
                                         _focusedDay = focusedDay;
                                       });
+                                      _fetchAttendanceData();
                                     },
                                     selectedDayPredicate: (day) =>
                                         isSameDay(_selectedDay, day),

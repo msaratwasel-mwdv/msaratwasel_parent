@@ -27,7 +27,7 @@ class ChatContact {
 }
 
 class ChatConversation {
-  const ChatConversation({
+  ChatConversation({
     required this.id,
     required this.type,
     required this.participants,
@@ -40,7 +40,7 @@ class ChatConversation {
   final String type;
   final List<ChatParticipant> participants;
   final ChatMessage? lastMessage;
-  final int unreadCount;
+  int unreadCount;
   final DateTime? updatedAt;
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {

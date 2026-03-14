@@ -82,6 +82,8 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       if (messages.length != _messages.length) {
         setState(() => _messages = messages);
+        // Also mark as read on the server if we got new messages while polling
+        _repo.markAsRead(widget.conversationId);
       }
     } catch (_) {
       // Silently ignore poll errors

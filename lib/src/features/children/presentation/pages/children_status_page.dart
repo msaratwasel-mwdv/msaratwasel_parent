@@ -3,6 +3,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:msaratwasel_user/src/features/tracking/presentation/tracking_page.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:intl/intl.dart';
@@ -41,6 +42,7 @@ class ChildrenStatusPage extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                 child: _ChildStatusCard(
                   student: student,
+                  studentIndex: index,
                   isDark: isDark,
                   isArabic: isArabic,
                   context: context,
@@ -57,18 +59,21 @@ class ChildrenStatusPage extends StatelessWidget {
 class _ChildStatusCard extends StatelessWidget {
   const _ChildStatusCard({
     required this.student,
+    required this.studentIndex,
     required this.isDark,
     required this.isArabic,
     required this.context,
   });
 
   final Student student;
+  final int studentIndex;
   final bool isDark;
   final bool isArabic;
   final BuildContext context;
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -149,6 +154,24 @@ class _ChildStatusCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: AppSpacing.md),
+                if (student.status == StudentStatus.onBus)
+                  IconButton(
+                    onPressed: () {
+                      controller.selectStudent(studentIndex);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TrackingPage(),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.map_rounded,
+                      color: AppColors.primary,
+                    ),
+                    tooltip: isArabic ? 'تتبع الحافلة' : 'Track Bus',
+                  ),
               ],
             ),
           ),
@@ -198,68 +221,97 @@ class _ChildStatusCard extends StatelessWidget {
             color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.1),
           ),
 
-          // Timelines
+          // Timelines - Full 5-step daily cycle
           Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
+              horizontal: AppSpacing.sm,
               vertical: AppSpacing.lg,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _TimelineStep(
-                  label: context.t('atHome'),
-                  time: '06:30 AM',
-                  isActive: true,
-                  isCompleted: true,
-                  isDark: isDark,
-                  stepIcon: Icons.home_rounded,
-                ),
-                Expanded(
-                  child: _TimelineConnector(isCompleted: true, isDark: isDark),
-                ),
-                _TimelineStep(
-                  label: context.t('onBus'),
-                  time: '06:45 AM',
-                  isActive: true,
-                  isCompleted: true,
-                  isDark: isDark,
-                  stepIcon: Icons.directions_bus_rounded,
-                ),
-                Expanded(
-                  child: _TimelineConnector(isCompleted: true, isDark: isDark),
-                ),
-                _TimelineStep(
-                  label: context.t('atSchool'),
-                  time: '07:15 AM',
-                  isActive: true,
-                  isCompleted: true,
-                  isDark: isDark,
-                  stepIcon: Icons.school_rounded,
-                ),
-                Expanded(
-                  child: _TimelineConnector(isCompleted: false, isDark: isDark),
-                ),
-                _TimelineStep(
-                  label: context.t('onBus'),
-                  time: '--:--',
-                  isActive: false,
-                  isCompleted: false,
-                  isDark: isDark,
-                  stepIcon: Icons.directions_bus_rounded,
-                ),
-                Expanded(
-                  child: _TimelineConnector(isCompleted: false, isDark: isDark),
-                ),
-                _TimelineStep(
-                  label: context.t('atHome'),
-                  time: '--:--',
-                  isActive: false,
-                  isCompleted: false,
-                  isDark: isDark,
-                  stepIcon: Icons.home_rounded,
-                ),
-              ],
+            child: Builder(
+              builder: (context) {
+                final status = student.status;
+
+                // Direct 5-state mapping from enum
+                int currentStep;
+                switch (status) {
+                  case StudentStatus.waitingAtHome:
+                  case StudentStatus.notBoarded:
+                    currentStep = 1;
+                  case StudentStatus.onBusToSchool:
+                    currentStep = 2;
+                  case StudentStatus.atSchool:
+                    currentStep = 3;
+                  case StudentStatus.onBusToHome:
+                    currentStep = 4;
+                  case StudentStatus.arrivedHome:
+                    currentStep = 5;
+                  // Legacy fallbacks
+                  case StudentStatus.onBus:
+                    currentStep = student.suggestedDirection == 'to_home' ? 4 : 2;
+                  case StudentStatus.atHome:
+                    currentStep = student.suggestedDirection == 'to_home' ? 5 : 1;
+                  case StudentStatus.late:
+                    currentStep = 1;
+                }
+
+                return Row(
+                  children: [
+                    // Step 1: Waiting at home
+                    _TimelineStep(
+                      label: context.t('atHome'),
+                      time: currentStep >= 1 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      isActive: currentStep == 1,
+                      isCompleted: currentStep > 1,
+                      isDark: isDark,
+                      stepIcon: Icons.home_rounded,
+                    ),
+                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 1, isDark: isDark)),
+
+                    // Step 2: On bus to school
+                    _TimelineStep(
+                      label: context.t('onBus'),
+                      time: currentStep == 2 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      isActive: currentStep == 2,
+                      isCompleted: currentStep > 2,
+                      isDark: isDark,
+                      stepIcon: Icons.directions_bus_rounded,
+                    ),
+                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 2, isDark: isDark)),
+
+                    // Step 3: At school
+                    _TimelineStep(
+                      label: context.t('atSchool'),
+                      time: currentStep == 3 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      isActive: currentStep == 3,
+                      isCompleted: currentStep > 3,
+                      isDark: isDark,
+                      stepIcon: Icons.school_rounded,
+                    ),
+                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 3, isDark: isDark)),
+
+                    // Step 4: On bus to home
+                    _TimelineStep(
+                      label: context.t('onBus'),
+                      time: currentStep == 4 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      isActive: currentStep == 4,
+                      isCompleted: currentStep > 4,
+                      isDark: isDark,
+                      stepIcon: Icons.directions_bus_rounded,
+                    ),
+                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 4, isDark: isDark)),
+
+                    // Step 5: Arrived home
+                    _TimelineStep(
+                      label: context.t('atHome'),
+                      time: currentStep == 5 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      isActive: currentStep == 5,
+                      isCompleted: false,
+                      isDark: isDark,
+                      stepIcon: Icons.home_rounded,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -336,8 +388,8 @@ class _TimelineStep extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 44, // Slightly larger
-          height: 44,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: circleColor,
             shape: BoxShape.circle,
@@ -346,8 +398,8 @@ class _TimelineStep extends StatelessWidget {
                 ? [
                     BoxShadow(
                       color: circleColor.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
                     ),
                   ]
                 : null,
@@ -355,16 +407,16 @@ class _TimelineStep extends StatelessWidget {
           child: Center(
             child: Icon(
               isCompleted ? Icons.check_rounded : stepIcon,
-              size: 20,
+              size: 16,
               color: iconColor,
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             fontWeight: isActive || isCompleted
                 ? FontWeight.bold
                 : FontWeight.w500,
@@ -374,16 +426,17 @@ class _TimelineStep extends StatelessWidget {
                       ? AppColors.textPrimary
                       : AppColors.textSecondary),
           ),
+          textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           time,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 9,
             color: isDark
                 ? Colors.white38
                 : AppColors.textSecondary.withValues(alpha: 0.7),
-            fontFamily: 'Roboto', // Ensure numbers look good
+            fontFamily: 'Roboto',
           ),
         ),
       ],

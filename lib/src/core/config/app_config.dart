@@ -1,13 +1,18 @@
 class AppConfig {
   const AppConfig._();
 
+  // هذا هو المتغير الوحيد الذي ستغيره للربط بين المحلي والاستضافة
+  static const bool isLocal = false;
+
+  // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
+  static const String _localUrl = 'http://192.168.8.188:8001/api/';
+
+  // رابط الاستضافة
+  static const String _productionUrl = 'https://srv1428362.hstgr.cloud/api/';
+
   // ─── Base URL ────────────────────────────────────────────────────────────
-  // Android Emulator  → http://10.0.2.2:8000
-  // Real Device (USB) → http://<IP_OF_YOUR_PC>:8000
-  // Real device (USB) → use your PC's local IP
-  // Android Emulator  → use http://10.0.2.2:8000
-  static const String apiBaseUrl = 'https://srv1428362.hstgr.cloud';
+  static String get apiBaseUrl => isLocal ? _localUrl : _productionUrl;
 
   // ─── Timeouts ────────────────────────────────────────────────────────────
-  static const Duration defaultTimeout = Duration(seconds: 15);
+  static const Duration defaultTimeout = Duration(seconds: 30);
 }

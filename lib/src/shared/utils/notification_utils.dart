@@ -24,6 +24,8 @@ extension NotificationTypeUI on NotificationType {
         return Icons.campaign_rounded;
       case NotificationType.supervisorMessage:
         return Icons.support_agent_rounded;
+      case NotificationType.chat:
+        return Icons.chat_bubble_outline_rounded;
     }
   }
 }

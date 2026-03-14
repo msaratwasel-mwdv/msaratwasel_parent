@@ -1,6 +1,19 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-enum StudentStatus { onBus, atSchool, atHome, notBoarded, late }
+enum StudentStatus {
+  // 5 distinct trip-cycle states
+  waitingAtHome,   // Step 1: Morning - waiting for bus at home
+  onBusToSchool,   // Step 2: On bus heading to school
+  atSchool,        // Step 3: At school
+  onBusToHome,     // Step 4: On bus heading back home
+  arrivedHome,     // Step 5: Arrived home after school
+
+  // Legacy/utility states (kept for compatibility)
+  onBus,           // Generic on bus (fallback)
+  atHome,          // Generic at home (fallback)
+  notBoarded,
+  late,
+}
 
 enum BusState { enRoute, atSchool, atHome }
 
@@ -17,6 +30,7 @@ enum NotificationType {
   lateBoarding,
   schoolAlert,
   supervisorMessage,
+  chat,
 }
 
 extension NotificationTypeX on NotificationType {
@@ -42,6 +56,8 @@ extension NotificationTypeX on NotificationType {
         return arabic ? 'تنبيه المدرسة' : 'School alert';
       case NotificationType.supervisorMessage:
         return arabic ? 'رسالة من المشرفة' : 'Supervisor message';
+      case NotificationType.chat:
+        return arabic ? 'محادثة جديدة' : 'New chat message';
     }
   }
 
@@ -53,12 +69,52 @@ extension NotificationTypeX on NotificationType {
   // It's not. So I'll move the Icon mapping to a UI extension or keep it in the page but cleaner.
 }
 
+class BusStaffInfo {
+  const BusStaffInfo({required this.id, required this.name, this.phone, this.imageUrl});
+
+  final int id;
+  final String name;
+  final String? phone;
+  final String? imageUrl;
+
+  factory BusStaffInfo.fromJson(Map<String, dynamic> json) {
+    return BusStaffInfo(
+      id: json['id'] as int,
+      name: json['name'] as String? ?? '',
+      phone: json['phone'] as String?,
+      imageUrl: json['image_url'] as String?,
+    );
+  }
+}
+
 class BusInfo {
-  const BusInfo({required this.id, required this.number, required this.plate});
+  const BusInfo({
+    required this.id,
+    required this.number,
+    required this.plate,
+    this.driver,
+    this.supervisor,
+  });
 
   final String id;
   final String number;
   final String plate;
+  final BusStaffInfo? driver;
+  final BusStaffInfo? supervisor;
+
+  factory BusInfo.fromJson(Map<String, dynamic> json) {
+    return BusInfo(
+      id: json['id'].toString(),
+      number: json['bus_number'] as String? ?? '',
+      plate: json['plate_number'] as String? ?? '',
+      driver: json['driver'] != null
+          ? BusStaffInfo.fromJson(json['driver'] as Map<String, dynamic>)
+          : null,
+      supervisor: json['supervisor'] != null
+          ? BusStaffInfo.fromJson(json['supervisor'] as Map<String, dynamic>)
+          : null,
+    );
+  }
 }
 
 class Student {
@@ -69,21 +125,131 @@ class Student {
     required this.schoolId,
     required this.bus,
     required this.status,
+    this.nameEn,
+    this.nationalId,
+    this.gender,
+    this.studentCode,
+    this.suggestedDirection,
     this.avatarUrl,
+    this.tripCount = 0,
+    this.attendancePercentage = 0,
     this.homeLocation,
     this.locationNote,
+    this.schoolName,
+    this.schoolLocation,
   });
 
   final String id;
   final String name;
+  final String? nameEn;
   final String grade;
   final String schoolId;
+  final String? nationalId;
+  final String? gender;
+  final String? studentCode;
   final BusInfo bus;
   final StudentStatus status;
-  final String? avatarUrl;
+  final String? suggestedDirection;
+  final String? avatarUrl;     // image_url from API
+  final int tripCount;         // trip_count from API
+  final int attendancePercentage; // attendance_percentage from API
   final LatLng? homeLocation;
   final String? locationNote;
+  final String? schoolName;
+  final String? schoolLocation;
+
+  /// إنشاء كائن Student من استجابة الـ API
+  factory Student.fromJson(Map<String, dynamic> json) {
+    return Student(
+      id: json['id'].toString(),
+      name: json['name'] as String? ?? '',
+      nameEn: json['name_en'] as String?,
+      nationalId: json['national_id'] as String?,
+      gender: json['gender'] as String?,
+      studentCode: json['student_code'] as String?,
+      grade: json['grade'] as String? ?? '',
+      schoolId: json['school']?['id']?.toString() ?? '',
+      bus: json['bus'] != null
+          ? BusInfo.fromJson(json['bus'] as Map<String, dynamic>)
+          : const BusInfo(id: '', number: '-', plate: '-'),
+      status: _deriveStudentStatus(
+        json['status'] as String?,
+        json['suggested_direction'] as String?,
+      ),
+      suggestedDirection: json['suggested_direction'] as String?,
+      avatarUrl: json['image_url'] as String?,
+      tripCount: json['trip_count'] as int? ?? 0,
+      attendancePercentage: json['attendance_percentage'] as int? ?? 0,
+      homeLocation: (json['home_lat'] != null && json['home_lng'] != null)
+          ? LatLng(double.parse(json['home_lat'].toString()), double.parse(json['home_lng'].toString()))
+          : null,
+      locationNote: json['location_note'] as String?,
+      schoolName: json['school']?['name'] as String?,
+      schoolLocation: json['school']?['location'] as String?,
+    );
+  }
+
+  /// Derives the 5-state trip cycle status from API status + direction
+  static StudentStatus _deriveStudentStatus(String? rawStatus, String? direction) {
+    switch (rawStatus) {
+      case 'onBus':
+        if (direction == 'to_school') return StudentStatus.onBusToSchool;
+        if (direction == 'to_home') return StudentStatus.onBusToHome;
+        return StudentStatus.onBus; // fallback
+      case 'atSchool':
+        return StudentStatus.atSchool;
+      case 'atHome':
+        if (direction == 'to_home') return StudentStatus.arrivedHome;
+        return StudentStatus.waitingAtHome; // morning default
+      case 'notBoarded':
+        return StudentStatus.notBoarded;
+      case 'late':
+        return StudentStatus.late;
+      default:
+        return StudentStatus.waitingAtHome;
+    }
+  }
+
+  Student copyWith({
+    String? name,
+    String? nameEn,
+    String? grade,
+    String? schoolId,
+    String? nationalId,
+    String? gender,
+    String? studentCode,
+    BusInfo? bus,
+    StudentStatus? status,
+    String? avatarUrl,
+    int? tripCount,
+    int? attendancePercentage,
+    LatLng? homeLocation,
+    String? locationNote,
+    String? schoolName,
+    String? schoolLocation,
+  }) {
+    return Student(
+      id: id,
+      name: name ?? this.name,
+      nameEn: nameEn ?? this.nameEn,
+      grade: grade ?? this.grade,
+      schoolId: schoolId ?? this.schoolId,
+      nationalId: nationalId ?? this.nationalId,
+      gender: gender ?? this.gender,
+      studentCode: studentCode ?? this.studentCode,
+      bus: bus ?? this.bus,
+      status: status ?? this.status,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      tripCount: tripCount ?? this.tripCount,
+      attendancePercentage: attendancePercentage ?? this.attendancePercentage,
+      homeLocation: homeLocation ?? this.homeLocation,
+      locationNote: locationNote ?? this.locationNote,
+      schoolName: schoolName ?? this.schoolName,
+      schoolLocation: schoolLocation ?? this.schoolLocation,
+    );
+  }
 }
+
 
 class TrackingSnapshot {
   const TrackingSnapshot({
@@ -96,6 +262,8 @@ class TrackingSnapshot {
     required this.busState,
     required this.updatedAt,
     required this.routeDescription,
+    this.driverName,
+    this.driverImageUrl,
   });
 
   final double lat;
@@ -107,6 +275,8 @@ class TrackingSnapshot {
   final BusState busState;
   final DateTime updatedAt;
   final String routeDescription;
+  final String? driverName;
+  final String? driverImageUrl;
 }
 
 class AppNotification {
@@ -117,6 +287,7 @@ class AppNotification {
     required this.type,
     required this.time,
     this.read = false,
+    this.data = const {},
   });
 
   final String id;
@@ -125,6 +296,7 @@ class AppNotification {
   final NotificationType type;
   final DateTime time;
   bool read;
+  final Map<String, dynamic> data;
 
   /// Maps the raw Laravel `type` string to [NotificationType].
   static NotificationType parseType(String? raw) {
@@ -157,6 +329,8 @@ class AppNotification {
         return NotificationType.schoolAlert;
       case 'supervisor_message':
         return NotificationType.supervisorMessage;
+      case 'new_message':
+        return NotificationType.chat;
       default:
         return NotificationType.schoolAlert;
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -29,8 +30,8 @@ class DashboardPage extends StatelessWidget {
 
         return RefreshIndicator(
           onRefresh: () async {
-            // Simulate refresh
-            await Future.delayed(const Duration(seconds: 1));
+            await controller.loadChildrenFromApi();
+            await controller.loadNotificationsFromApi();
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -162,11 +163,13 @@ class DashboardPage extends StatelessWidget {
                         ],
                       ],
                       const SizedBox(height: AppSpacing.sm),
-                      _BusInfoCard(
-                        isArabic: isArabic,
-                        student: controller.currentStudent,
-                        tracking: controller.currentTracking,
-                      ),
+                      if (controller.currentStudent != null &&
+                          controller.currentTracking != null)
+                        _BusInfoCard(
+                          isArabic: isArabic,
+                          student: controller.currentStudent!,
+                          tracking: controller.currentTracking!,
+                        ),
                       const SizedBox(height: AppSpacing.lg),
                       Center(
                         child: TextButton.icon(
@@ -599,12 +602,12 @@ class _StudentCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: AppColors.primary.withAlpha(18),
-                  backgroundImage: student.avatarUrl != null
-                      ? NetworkImage(student.avatarUrl!)
+                  backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+                      ? CachedNetworkImageProvider(student.avatarUrl!)
                       : null,
-                  child: student.avatarUrl == null
+                  child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(
-                          student.name.characters.first,
+                          student.name.isNotEmpty ? student.name.characters.first : '?',
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w800,
@@ -724,6 +727,8 @@ class _StudentCard extends StatelessWidget {
   _ChipColors _statusChipColors(StudentStatus status) {
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return const _ChipColors(
           background: Color(0xFFE0ECFF),
           text: Color(0xFF1E3A8A),
@@ -734,6 +739,8 @@ class _StudentCard extends StatelessWidget {
           text: Color(0xFF166534),
         );
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return const _ChipColors(
           background: Color(0xFFF5E7D0),
           text: Color(0xFF92400E),
@@ -769,12 +776,12 @@ class _BusInfoCard extends StatelessWidget {
       _InfoItem(
         icon: Icons.person_rounded,
         label: context.t('driverName'),
-        value: isArabic ? 'عبدالله محمد' : 'Abdullah Mohammed',
+        value: student.bus.driver?.name ?? (isArabic ? 'غير محدد' : 'N/A'),
       ),
       _InfoItem(
         icon: Icons.escalator_warning_rounded,
         label: context.t('assistantName'),
-        value: isArabic ? 'مريم حسين' : 'Maryam Hussain',
+        value: student.bus.supervisor?.name ?? (isArabic ? 'غير محدد' : 'N/A'),
       ),
       _InfoItem(
         icon: Icons.pin_drop_rounded,

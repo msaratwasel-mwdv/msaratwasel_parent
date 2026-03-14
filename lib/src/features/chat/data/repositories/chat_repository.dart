@@ -20,7 +20,7 @@ class ChatRepository {
   // ─── Auth helper ──────────────────────────────────────────────────────
   Future<Options> _authOptions() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = prefs.getString('access_token');
     return Options(headers: {'Authorization': 'Bearer $token'});
   }
 
@@ -29,17 +29,24 @@ class ChatRepository {
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatContact>> getContacts() async {
     try {
+      print('💬 ChatRepo: calling GET ${_dio.options.baseUrl}chat/contacts');
       final response = await _dio.get(
-        '/api/chat/contacts',
+        'chat/contacts',
         options: await _authOptions(),
       );
+      print('💬 ChatRepo: contacts response status=${response.statusCode}');
       final data = response.data['data'] as List<dynamic>? ?? [];
-      developer.log('💬 ChatRepo: got ${data.length} contacts', name: 'CHAT');
+      print('💬 ChatRepo: got ${data.length} contacts');
       return data
           .map((json) => ChatContact.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e, st) {
-      developer.log('❌ ChatRepo.getContacts failed', name: 'CHAT', error: e, stackTrace: st);
+    } on DioException catch (e) {
+      print('❌ ChatRepo.getContacts DioException: status=${e.response?.statusCode}, '
+          'url=${e.requestOptions.uri}, '
+          'responseBody=${e.response?.data}');
+      rethrow;
+    } catch (e) {
+      print('❌ ChatRepo.getContacts failed: $e');
       rethrow;
     }
   }
@@ -49,17 +56,24 @@ class ChatRepository {
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatConversation>> getConversations() async {
     try {
+      print('💬 ChatRepo: calling GET ${_dio.options.baseUrl}chat/conversations');
       final response = await _dio.get(
-        '/api/chat/conversations',
+        'chat/conversations',
         options: await _authOptions(),
       );
+      print('💬 ChatRepo: conversations response status=${response.statusCode}');
       final data = response.data['data'] as List<dynamic>? ?? [];
-      developer.log('💬 ChatRepo: got ${data.length} conversations', name: 'CHAT');
+      print('💬 ChatRepo: got ${data.length} conversations');
       return data
           .map((json) => ChatConversation.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e, st) {
-      developer.log('❌ ChatRepo.getConversations failed', name: 'CHAT', error: e, stackTrace: st);
+    } on DioException catch (e) {
+      print('❌ ChatRepo.getConversations DioException: status=${e.response?.statusCode}, '
+          'url=${e.requestOptions.uri}, '
+          'responseBody=${e.response?.data}');
+      rethrow;
+    } catch (e) {
+      print('❌ ChatRepo.getConversations failed: $e');
       rethrow;
     }
   }
@@ -70,7 +84,7 @@ class ChatRepository {
   Future<ChatConversation> startConversation(int receiverId) async {
     try {
       final response = await _dio.post(
-        '/api/chat/conversations',
+        'chat/conversations',
         data: {'receiver_id': receiverId},
         options: await _authOptions(),
       );
@@ -90,7 +104,7 @@ class ChatRepository {
   Future<ChatMessage> sendMessage(int conversationId, String body, {String type = 'text'}) async {
     try {
       final response = await _dio.post(
-        '/api/chat/conversations/$conversationId/messages',
+        'chat/conversations/$conversationId/messages',
         data: {'body': body, 'type': type},
         options: await _authOptions(),
       );
@@ -110,7 +124,7 @@ class ChatRepository {
   Future<List<ChatMessage>> getMessages(int conversationId) async {
     try {
       final response = await _dio.get(
-        '/api/chat/conversations/$conversationId/messages',
+        'chat/conversations/$conversationId/messages',
         options: await _authOptions(),
       );
       final data = response.data['data'] as List<dynamic>? ?? [];
@@ -130,7 +144,7 @@ class ChatRepository {
   Future<void> markAsRead(int conversationId) async {
     try {
       await _dio.post(
-        '/api/chat/conversations/$conversationId/read',
+        'chat/conversations/$conversationId/read',
         options: await _authOptions(),
       );
       developer.log('💬 ChatRepo: conv $conversationId marked as read', name: 'CHAT');

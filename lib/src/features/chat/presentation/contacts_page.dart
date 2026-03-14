@@ -38,18 +38,21 @@ class _ContactsPageState extends State<ContactsPage> {
       _error = null;
     });
     try {
+      print('💬 ContactsPage: loading contacts and conversations...');
       final results = await Future.wait([
         _repo.getContacts(),
         _repo.getConversations(),
       ]);
       if (!mounted) return;
+      print('💬 ContactsPage: loaded ${(results[0] as List).length} contacts, ${(results[1] as List).length} conversations');
       setState(() {
         _contacts = results[0] as List<ChatContact>;
         _conversations = results[1] as List<ChatConversation>;
         _isLoading = false;
       });
     } catch (e, st) {
-      developer.log('❌ ContactsPage: load failed', name: 'CHAT', error: e, stackTrace: st);
+      print('❌ ContactsPage: load FAILED => $e');
+      print('❌ Stack trace: $st');
       if (!mounted) return;
       setState(() {
         _error = e.toString();
@@ -93,14 +96,22 @@ class _ContactsPageState extends State<ContactsPage> {
 
   Future<void> _openExistingConversation(ChatConversation conv) async {
     final other = conv.participants.isNotEmpty ? conv.participants.first : null;
+    
+    // Optimistic UI update BEFORE navigation
+    setState(() {
+      conv.unreadCount = 0;
+    });
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ChatPage(
-          conversationId: conv.id,
-          contactName: other?.name ?? '',
-          contactRole: other?.role ?? '',
-        ),
+        builder: (_) {
+          return ChatPage(
+            conversationId: conv.id,
+            contactName: other?.name ?? '',
+            contactRole: other?.role ?? '',
+          );
+        },
       ),
     ).then((_) => _loadData());
   }

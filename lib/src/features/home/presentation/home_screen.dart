@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
@@ -137,11 +138,24 @@ class _WelcomeHeader extends StatelessWidget {
                 width: 2,
               ),
             ),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 30,
-              backgroundImage: NetworkImage(
-                "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
-              ),
+              backgroundImage: AppScope.of(context).userAvatarUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(AppScope.of(context).userAvatarUrl)
+                  : null,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              child: AppScope.of(context).userAvatarUrl.isEmpty
+                  ? Text(
+                      AppScope.of(context).userName.isNotEmpty
+                          ? AppScope.of(context).userName[0]
+                          : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -208,7 +222,7 @@ class _SummaryStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onBusCount = students
-        .where((s) => s.status == StudentStatus.onBus)
+        .where((s) => s.status == StudentStatus.onBus || s.status == StudentStatus.onBusToSchool || s.status == StudentStatus.onBusToHome)
         .length;
     final unreadCount = notifications.where((n) => !n.read).length;
 
@@ -366,14 +380,19 @@ class _ChildQuickCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  child: Text(
-                    student.name[0],
-                    style: TextStyle(
-                      color: isDark ? Colors.white : AppColors.primary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+                      ? CachedNetworkImageProvider(student.avatarUrl!)
+                      : null,
+                  child: student.avatarUrl == null || student.avatarUrl!.isEmpty
+                      ? Text(
+                          student.name.isNotEmpty ? student.name.characters.first : '?',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : AppColors.primary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -397,6 +416,17 @@ class _ChildQuickCard extends StatelessWidget {
                               : AppColors.textSecondary,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
+                        style: TextStyle(
+                          color: isDark
+                              ? Colors.white54
+                              : AppColors.textSecondary.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
@@ -438,10 +468,14 @@ class _ChildQuickCard extends StatelessWidget {
   IconData _statusIcon(StudentStatus status) {
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return Icons.directions_bus_filled_outlined;
       case StudentStatus.atSchool:
         return Icons.school_outlined;
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return Icons.home_outlined;
       case StudentStatus.notBoarded:
         return Icons.hourglass_top_outlined;
@@ -456,10 +490,14 @@ class _ChildQuickCard extends StatelessWidget {
     }
     switch (status) {
       case StudentStatus.onBus:
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
         return AppColors.accent;
       case StudentStatus.atSchool:
         return AppColors.primary;
       case StudentStatus.atHome:
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.arrivedHome:
         return Colors.green;
       case StudentStatus.notBoarded:
         return Colors.orange;

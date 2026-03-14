@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
@@ -12,9 +14,97 @@ class RequestAbsencePage extends StatefulWidget {
 }
 
 class _RequestAbsencePageState extends State<RequestAbsencePage> {
-  int selectedStudent = 1;
+  String? selectedStudentId;
   int selectedAbsenceType = 0;
-  DateTime? selectedDate;
+  DateTime? selectedDate = DateTime.now();
+  final TextEditingController _reasonController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    if (selectedStudentId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء اختيار طالب')),
+        );
+      }
+      return;
+    }
+
+    if (selectedDate == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t('selectDate'))),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final controller = AppScope.of(context);
+      
+      final type = selectedAbsenceType == 0 
+          ? AbsenceType.both 
+          : selectedAbsenceType == 1 
+              ? AbsenceType.morning 
+              : AbsenceType.returnOnly;
+
+      final bool success = await controller.submitAbsenceRequest(
+        studentIds: [selectedStudentId!],
+        type: type,
+        date: selectedDate!,
+        reason: _reasonController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال طلب الغياب بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        // Ensure UI stays stable, wait before closing
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) {
+          AppScope.of(context).moveBack();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('فشل إرسال الطلب، الرجاء المحاولة مرة أخرى'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ABSENCE_SUBMIT_ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().contains('Exception') ? 'حدث خطأ غير متوقع' : e.toString()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +121,13 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               color: Colors.transparent,
               child: IconButton(
                 icon: Icon(
-                  Icons.menu_rounded,
+                  Icons.arrow_back_ios_new_rounded,
                   color: isDark ? Colors.white : AppColors.primary,
                 ),
-                onPressed: () => Scaffold.of(context).openDrawer(),
+                onPressed: () {
+                  // Navigate back to the previous index in AppController history
+                  AppScope.of(context).moveBack();
+                },
               ),
             ),
           ),
@@ -51,7 +144,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _studentSelector(textTheme, isDark),
+                  _studentSelector(context, textTheme, isDark),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
                     context.t('absenceType'),
@@ -91,21 +184,31 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     );
   }
 
-  Widget _studentSelector(TextTheme textTheme, bool isDark) {
+  Widget _studentSelector(BuildContext context, TextTheme textTheme, bool isDark) {
+    final students = AppScope.of(context).students;
+
+    if (students.isEmpty) {
+      return Center(child: Text(context.t('noStudentsRegistered')));
+    }
+
+    // Default to first student if not set
+    selectedStudentId ??= students.first.id;
+
     return Column(
       children: [
-        _studentCard(textTheme, "أحمد علي", 1, isDark),
-        const SizedBox(height: AppSpacing.md),
-        _studentCard(textTheme, "فاطمة محمد", 2, isDark),
+        for (var student in students) ...[
+          _studentCard(textTheme, student.name, student.id, isDark),
+          const SizedBox(height: AppSpacing.md),
+        ],
       ],
     );
   }
 
-  Widget _studentCard(TextTheme textTheme, String name, int id, bool isDark) {
-    final bool selected = selectedStudent == id;
+  Widget _studentCard(TextTheme textTheme, String name, String id, bool isDark) {
+    final bool selected = selectedStudentId == id;
 
     return InkWell(
-      onTap: () => setState(() => selectedStudent = id),
+      onTap: () => setState(() => selectedStudentId = id),
       borderRadius: BorderRadius.circular(24),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -353,6 +456,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
 
   Widget _modernReasonField(TextTheme textTheme, bool isDark) {
     return TextField(
+      controller: _reasonController,
       maxLines: 4,
       cursorColor: AppColors.primary,
       style: textTheme.bodyLarge?.copyWith(
@@ -413,7 +517,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: _isSubmitting ? null : _handleSubmit,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
@@ -422,13 +526,22 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               borderRadius: BorderRadius.circular(20),
             ),
           ),
-          child: Text(
-            context.t('sendAbsenceRequest'),
-            style: textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  context.t('sendAbsenceRequest'),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
       ),
     );

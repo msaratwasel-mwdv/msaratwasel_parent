@@ -42,7 +42,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       final apiClient = ApiClient(storage: storage);
 
       await apiClient.client.post(
-        '/api/auth/change-password',
+        '/auth/change-password',
         data: {
           'current_password': _currentController.text,
           'new_password': _newController.text,

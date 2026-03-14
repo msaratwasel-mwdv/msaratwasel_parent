@@ -10,7 +10,7 @@ class NotificationRepositoryImpl implements NotificationsRepository {
   @override
   Future<List<AppNotification>> fetchNotifications() async {
     try {
-      final response = await dio.get('/api/guardian/notifications');
+      final response = await dio.get('guardian/notifications');
 
       if (response.statusCode == 200) {
         // API returns { notifications: { data: [...] }, unread_count: N }

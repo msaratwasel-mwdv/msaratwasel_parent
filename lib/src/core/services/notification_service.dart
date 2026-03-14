@@ -144,6 +144,7 @@ class NotificationService {
       body: message.notification?.body ?? data['body'] ?? '',
       type: type,
       time: DateTime.now(),
+      data: data,
     );
 
     _onReceived?.call(notification);

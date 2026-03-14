@@ -4,6 +4,8 @@ import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/widgets/child_selector.dart';
+import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AbsenceRequestPage extends StatefulWidget {
@@ -14,21 +16,20 @@ class AbsenceRequestPage extends StatefulWidget {
 }
 
 class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
-  // Mock Data
-  final List<AttendanceChild> _children = [
-    AttendanceChild(id: '1', name: 'أحمد', grade: 'الخامس - أ'),
-    AttendanceChild(id: '2', name: 'سارة', grade: 'الثاني - ب'),
-  ];
-
-  late AttendanceChild _selectedChild;
+  Student? _selectedChild;
   int _selectedAbsenceType = 0;
   DateTime? _selectedDate;
   final TextEditingController _reasonController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _selectedChild = _children.first;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_selectedChild == null) {
+      final students = AppScope.of(context).students;
+      if (students.isNotEmpty) {
+        _selectedChild = students.first;
+      }
+    }
   }
 
   @override
@@ -37,7 +38,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
     super.dispose();
   }
 
-  void _onChildSelected(AttendanceChild child) {
+  void _onChildSelected(Student child) {
     setState(() {
       _selectedChild = child;
     });
@@ -73,11 +74,22 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Child Selector
-                  ChildSelector(
-                    children: _children,
-                    selectedChild: _selectedChild,
-                    onChildSelected: _onChildSelected,
-                  ),
+                  if (students.isNotEmpty)
+                    ChildSelector(
+                      children: students,
+                      selectedChild: _selectedChild,
+                      onChildSelected: _onChildSelected,
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
+                      child: Text(
+                        AppScope.of(context).locale.languageCode == 'ar'
+                            ? 'لا يوجد أبناء مسجلون'
+                            : 'No children found',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // Absence Type
@@ -327,6 +339,8 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
   }
 
   Widget _buildSubmitButton(BuildContext context) {
+    final controller = AppScope.of(context);
+    
     return SizedBox(
       height: 56,
       child: DecoratedBox(
@@ -342,16 +356,84 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {
-            // TODO: Implement submission logic
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'تم إرسال الطلب بنجاح',
-                  style: GoogleFonts.cairo(),
+          onPressed: () async {
+            if (_selectedChild == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    AppScope.of(context).locale.languageCode == 'ar'
+                        ? 'يرجى اختيار طالب'
+                        : 'Please select a student',
+                    style: GoogleFonts.cairo(),
+                  ),
                 ),
-              ),
+              );
+              return;
+            }
+
+            if (_selectedDate == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    AppScope.of(context).locale.languageCode == 'ar'
+                        ? 'يرجى اختيار التاريخ'
+                        : 'Please select a date',
+                    style: GoogleFonts.cairo(),
+                  ),
+                ),
+              );
+              return;
+            }
+
+            // Show loading
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => const Center(child: CircularProgressIndicator()),
             );
+
+            final success = await controller.submitAbsenceRequest(
+              studentIds: [_selectedChild!.id],
+              type: _selectedAbsenceType == 0 
+                  ? AbsenceType.both 
+                  : (_selectedAbsenceType == 1 ? AbsenceType.morning : AbsenceType.returnOnly),
+              date: _selectedDate!,
+              reason: _reasonController.text,
+            );
+
+            // Hide loading
+            if (context.mounted) Navigator.pop(context);
+
+            if (success) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      AppScope.of(context).locale.languageCode == 'ar'
+                          ? 'تم إرسال الطلب بنجاح'
+                          : 'Request sent successfully',
+                      style: GoogleFonts.cairo(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                Navigator.pop(context);
+              }
+            } else {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      AppScope.of(context).locale.languageCode == 'ar'
+                          ? 'فشل إرسال الطلب، يرجى المحاولة لاحقاً'
+                          : 'Failed to send request, please try again',
+                      style: GoogleFonts.cairo(),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,

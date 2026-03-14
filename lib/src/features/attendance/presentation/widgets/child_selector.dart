@@ -1,23 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-
-// View Model for the child
-class AttendanceChild {
-  final String id;
-  final String name;
-  final String? imageUrl;
-  final String grade;
-
-  AttendanceChild({
-    required this.id,
-    required this.name,
-    this.imageUrl,
-    required this.grade,
-  });
-}
 
 class ChildSelector extends StatelessWidget {
   const ChildSelector({
@@ -27,9 +13,9 @@ class ChildSelector extends StatelessWidget {
     required this.onChildSelected,
   });
 
-  final List<AttendanceChild> children;
-  final AttendanceChild selectedChild;
-  final ValueChanged<AttendanceChild> onChildSelected;
+  final List<Student> children;
+  final Student? selectedChild;
+  final ValueChanged<Student> onChildSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +44,7 @@ class ChildSelector extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
             final child = children[index];
-            final isSelected = child.id == selectedChild.id;
+            final isSelected = selectedChild != null && child.id == selectedChild!.id;
 
             // Unified Selected Style (Light/Tinted style matching RequestAbsencePage)
             // Background: Primary with low opacity (Higher opacity in dark mode for visibility)
