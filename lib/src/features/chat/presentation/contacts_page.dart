@@ -33,31 +33,31 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
-      print('💬 ContactsPage: loading contacts and conversations...');
+      final repository = GetIt.instance<ChatRepository>();
       final results = await Future.wait([
-        _repo.getContacts(),
-        _repo.getConversations(),
+        repository.getContacts(),
+        repository.getConversations(),
       ]);
-      if (!mounted) return;
-      print('💬 ContactsPage: loaded ${(results[0] as List).length} contacts, ${(results[1] as List).length} conversations');
-      setState(() {
-        _contacts = results[0] as List<ChatContact>;
-        _conversations = results[1] as List<ChatConversation>;
-        _isLoading = false;
-      });
-    } catch (e, st) {
-      print('❌ ContactsPage: load FAILED => $e');
-      print('❌ Stack trace: $st');
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+
+      if (mounted) {
+        setState(() {
+          _contacts = results[0] as List<ChatContact>;
+          _conversations = results[1] as List<ChatConversation>; // Changed from List<Conversation> to List<ChatConversation> to match the field type.
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('فشل تحميل البيانات')),
+          );
+        });
+      }
     }
   }
 

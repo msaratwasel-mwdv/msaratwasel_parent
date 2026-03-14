@@ -29,25 +29,12 @@ class ChatRepository {
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatContact>> getContacts() async {
     try {
-      print('💬 ChatRepo: calling GET ${_dio.options.baseUrl}chat/contacts');
-      final response = await _dio.get(
-        'chat/contacts',
-        options: await _authOptions(),
-      );
-      print('💬 ChatRepo: contacts response status=${response.statusCode}');
-      final data = response.data['data'] as List<dynamic>? ?? [];
-      print('💬 ChatRepo: got ${data.length} contacts');
-      return data
+      final response = await _dio.get('chat/contacts', options: await _authOptions());
+      return (response.data['data'] as List)
           .map((json) => ChatContact.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
-      print('❌ ChatRepo.getContacts DioException: status=${e.response?.statusCode}, '
-          'url=${e.requestOptions.uri}, '
-          'responseBody=${e.response?.data}');
-      rethrow;
-    } catch (e) {
-      print('❌ ChatRepo.getContacts failed: $e');
-      rethrow;
+      throw Exception('Failed to load contacts: ${e.message}');
     }
   }
 
@@ -56,25 +43,12 @@ class ChatRepository {
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatConversation>> getConversations() async {
     try {
-      print('💬 ChatRepo: calling GET ${_dio.options.baseUrl}chat/conversations');
-      final response = await _dio.get(
-        'chat/conversations',
-        options: await _authOptions(),
-      );
-      print('💬 ChatRepo: conversations response status=${response.statusCode}');
-      final data = response.data['data'] as List<dynamic>? ?? [];
-      print('💬 ChatRepo: got ${data.length} conversations');
-      return data
+      final response = await _dio.get('chat/conversations', options: await _authOptions());
+      return (response.data['data'] as List)
           .map((json) => ChatConversation.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
-      print('❌ ChatRepo.getConversations DioException: status=${e.response?.statusCode}, '
-          'url=${e.requestOptions.uri}, '
-          'responseBody=${e.response?.data}');
-      rethrow;
-    } catch (e) {
-      print('❌ ChatRepo.getConversations failed: $e');
-      rethrow;
+      throw Exception('Failed to load conversations: ${e.message}');
     }
   }
 
