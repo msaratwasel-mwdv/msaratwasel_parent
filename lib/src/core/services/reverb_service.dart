@@ -15,61 +15,69 @@ class ReverbService {
   Timer? _pingTimer;
   bool _isConnected = false;
   bool _isDisposed = false;
+  String? _lastSocketId; // حفظ آخر مُعرف سوكيت للمصادقة اللاحقة
 
   final String _token;
   final int _userId;
   final void Function(Map<String, dynamic> data) _onStudentStatusUpdated;
+  final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
 
-  // إعدادات Reverb
-  static const String _reverbKey = 'wasel_key';
+  // إعدادات Reverb المستمدة من إعدادات السيرفر الخاصة بك
+  static const String _reverbKey = 'masarat-wasel-key';
+  
   static String get _reverbHost {
-    // استخدام نفس host الخاص بالـ API (بدون /api/)
+    if (!AppConfig.isLocal) return '187.77.162.203';
     final apiUrl = AppConfig.apiBaseUrl;
     final uri = Uri.parse(apiUrl);
     return uri.host;
   }
-  static const int _reverbPort = 8080;
+
+  // نستخدم المنفذ 8082 كما حددت في إعدادات السيرفر
+  static const int _reverbPort = 8082;
+  
+  // نضبط البروتوكول ليكون ws وفقاً لإعداداتك في الاستضافة (REVERB_SCHEME=http)
+  static const bool _forceNonSecure = true; 
+  static bool get _isSecure => _forceNonSecure ? false : AppConfig.apiBaseUrl.startsWith('https');
+
+  // قائمة القنوات المشترك بها حالياً
+  final Set<String> _subscribedChannels = {};
 
   ReverbService({
     required String token,
     required int userId,
     required void Function(Map<String, dynamic> data) onStudentStatusUpdated,
+    void Function(Map<String, dynamic> data)? onBusLocationUpdated,
   })  : _token = token,
         _userId = userId,
-        _onStudentStatusUpdated = onStudentStatusUpdated;
+        _onStudentStatusUpdated = onStudentStatusUpdated,
+        _onBusLocationUpdated = onBusLocationUpdated;
 
-  /// الاتصال بـ Reverb والاشتراك في قناة ولي الأمر
+  /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
     if (_isDisposed) return;
+    _subscribedChannels.clear();
 
     try {
-      final wsUrl = 'ws://$_reverbHost:$_reverbPort/app/$_reverbKey';
+      final protocol = _isSecure ? 'wss' : 'ws';
+      final wsUrl = '$protocol://$_reverbHost:$_reverbPort/app/$_reverbKey';
       developer.log('🔌 Connecting to Reverb: $wsUrl', name: 'REVERB');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
-      // تأكد من تهيئة الاستماع داخل try/catch للتعامل مع أي استثناءات فورية
-      try {
-        _channel!.stream.listen(
-          _handleMessage,
-          onDone: () {
-            developer.log('🔌 WebSocket disconnected', name: 'REVERB');
-            _isConnected = false;
-            _scheduleReconnect();
-          },
-          onError: (error) {
-            developer.log('❌ WebSocket error (Stream): $error', name: 'REVERB');
-            _isConnected = false;
-            _scheduleReconnect();
-          },
-          cancelOnError: true,
-        );
-      } catch (e) {
-        developer.log('❌ Exception in WebSocket stream: $e', name: 'REVERB');
-        _scheduleReconnect();
-      }
+      _channel!.stream.listen(
+        _handleMessage,
+        onDone: () {
+          developer.log('🔌 WebSocket disconnected', name: 'REVERB');
+          _isConnected = false;
+          _scheduleReconnect();
+        },
+        onError: (error) {
+          developer.log('❌ WebSocket error: $error', name: 'REVERB');
+          _isConnected = false;
+          _scheduleReconnect();
+        },
+      );
 
-      // بدء Ping كل 30 ثانية للحفاظ على الاتصال
       _pingTimer?.cancel();
       _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         if (_isConnected) {
@@ -88,56 +96,83 @@ class ReverbService {
       final message = jsonDecode(rawMessage as String) as Map<String, dynamic>;
       final event = message['event'] as String?;
 
-      developer.log('📨 Reverb event: $event', name: 'REVERB');
-
       switch (event) {
         case 'pusher:connection_established':
           _isConnected = true;
           final data = jsonDecode(message['data'] as String);
           final socketId = data['socket_id'] as String;
+          _lastSocketId = socketId;
           developer.log('✅ Connected! Socket ID: $socketId', name: 'REVERB');
-          // الاشتراك في القناة الخاصة
-          _subscribeToPrivateChannel(socketId);
-          break;
-
-        case 'pusher_internal:subscription_succeeded':
-          developer.log('✅ Subscribed to guardian channel', name: 'REVERB');
-          break;
-
-        case 'pusher:pong':
-          // Heartbeat response — ignore
-          break;
-
-        case 'pusher:error':
-          developer.log('⚠️ Pusher error: ${message['data']}', name: 'REVERB');
+          
+          // 1. الاشتراك في القناة الخاصة بولي الأمر تلقائياً
+          subscribe('private-guardian.$_userId', socketId);
           break;
 
         case 'student.status.updated':
-          // الحدث المطلوب — تحديث حالة الطالب
-          final data = message['data'] is String
-              ? jsonDecode(message['data'] as String) as Map<String, dynamic>
-              : message['data'] as Map<String, dynamic>;
-          developer.log(
-            '🔔 Student status updated: ${data['student_name']} → ${data['new_status']}',
-            name: 'REVERB',
-          );
+          final data = _parseData(message['data']);
           _onStudentStatusUpdated(data);
           break;
 
+        case 'bus.location.updated':
+          final data = _parseData(message['data']);
+          if (_onBusLocationUpdated != null) {
+            _onBusLocationUpdated!(data);
+          }
+          break;
+
+        case 'pusher_internal:subscription_succeeded':
+          developer.log('✅ Subscription succeeded for: ${message['channel']}', name: 'REVERB');
+          break;
+
         default:
-          developer.log('📨 Unhandled event: $event', name: 'REVERB');
+          break;
       }
     } catch (e) {
       developer.log('❌ Error parsing message: $e', name: 'REVERB');
     }
   }
 
-  /// الاشتراك في القناة الخاصة بولي الأمر (تتطلب مصادقة)
-  Future<void> _subscribeToPrivateChannel(String socketId) async {
-    final channelName = 'private-guardian.$_userId';
+  Map<String, dynamic> _parseData(dynamic data) {
+    if (data is String) {
+      return jsonDecode(data) as Map<String, dynamic>;
+    }
+    return data as Map<String, dynamic>;
+  }
+
+  /// تنفيذ الاشتراك في قناة معينة (خاص أو عام)
+  Future<void> subscribe(String channelName, [String? socketId]) async {
+    if (!_isConnected || _channel == null) return;
+    if (_subscribedChannels.contains(channelName)) return;
+
+    final effectiveSocketId = socketId ?? _lastSocketId;
 
     try {
-      // مصادقة القناة عبر backend
+      // إذا كانت قناة خاصة، نحتاج لمصادقة
+      if (channelName.startsWith('private-')) {
+        if (effectiveSocketId == null) {
+          developer.log('⚠️ Cannot subscribe to private channel $channelName without socketId', name: 'REVERB');
+          return;
+        }
+        final authData = await _authenticateChannel(channelName, effectiveSocketId);
+        _send({
+          'event': 'pusher:subscribe',
+          'data': {'channel': channelName, 'auth': authData['auth']},
+        });
+      } else {
+        _send({
+          'event': 'pusher:subscribe',
+          'data': {'channel': channelName},
+        });
+      }
+      _subscribedChannels.add(channelName);
+      developer.log('📡 Subscribed to: $channelName', name: 'REVERB');
+    } catch (e) {
+      developer.log('❌ Subscription failed for $channelName: $e', name: 'REVERB');
+    }
+  }
+
+  Future<Map<String, dynamic>> _authenticateChannel(String channelName, String socketId) async {
+    try {
       final dio = Dio(BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,
         headers: {
@@ -152,19 +187,12 @@ class ReverbService {
       });
 
       if (response.statusCode == 200) {
-        final authData = response.data;
-        final auth = authData['auth'] as String;
-
-        // إرسال طلب الاشتراك مع التوقيع
-        _send({
-          'event': 'pusher:subscribe',
-          'data': {'channel': channelName, 'auth': auth},
-        });
-
-        developer.log('📡 Subscribing to: $channelName', name: 'REVERB');
+        return response.data as Map<String, dynamic>;
       }
+      throw Exception('Auth failed with status ${response.statusCode}');
     } catch (e) {
-      developer.log('❌ Channel auth failed: $e', name: 'REVERB');
+      developer.log('❌ Channel auth failed for $channelName: $e', name: 'REVERB');
+      rethrow;
     }
   }
 

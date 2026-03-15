@@ -6,6 +6,7 @@ import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_head
 import 'package:msaratwasel_user/src/features/attendance/presentation/widgets/child_selector.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AbsenceRequestPage extends StatefulWidget {
@@ -47,6 +48,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final students = AppScope.of(context).students;
 
     return Scaffold(
       backgroundColor: isDark

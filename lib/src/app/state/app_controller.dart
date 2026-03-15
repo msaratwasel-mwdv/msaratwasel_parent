@@ -147,6 +147,26 @@ class AppController extends ChangeNotifier {
         _students = rawList
             .map((e) => Student.fromJson(e as Map<String, dynamic>))
             .toList();
+
+        // 🚌 الاشتراك في قنوات الباصات للأبناء لتتبع مواقعهم لحظياً
+        for (var student in _students) {
+          if (student.bus.id.isNotEmpty) {
+            _reverbService?.subscribe('private-bus.${student.bus.id}');
+          }
+        }
+
+        // LOAD PERSISTED TIMESTAMPS FOR TODAY
+        final todayStr = "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
+        for (int i = 0; i < _students.length; i++) {
+          final sid = _students[i].id;
+          _students[i] = _students[i].copyWith(
+            waitingAtHomeTime: _parseTime(prefs.getString('ts_${sid}_waitingAtHome_$todayStr')),
+            onBusToSchoolTime: _parseTime(prefs.getString('ts_${sid}_onBusToSchool_$todayStr')),
+            atSchoolTime: _parseTime(prefs.getString('ts_${sid}_atSchool_$todayStr')),
+            onBusToHomeTime: _parseTime(prefs.getString('ts_${sid}_onBusToHome_$todayStr')),
+            arrivedHomeTime: _parseTime(prefs.getString('ts_${sid}_arrivedHome_$todayStr')),
+          );
+        }
             
         // Initialize tracking snapshots for real students
         for (final student in _students) {
@@ -289,7 +309,16 @@ class AppController extends ChangeNotifier {
                       orElse: () => StudentStatus.atHome,
                     );
                     if (_students[idx].status != newStatus) {
-                      _students[idx] = _students[idx].copyWith(status: newStatus);
+                      final now = DateTime.now();
+                      _students[idx] = _students[idx].copyWith(
+                        status: newStatus,
+                        waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
+                        onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
+                        atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
+                        onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
+                        arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
+                      );
+                      _persistTimestamps(_students[idx]);
                     }
                   }
                 }
@@ -346,10 +375,17 @@ class AppController extends ChangeNotifier {
           // Update bus info (may change between morning/afternoon)
           final newStudent = Student.fromJson(raw as Map<String, dynamic>);
           if (_students[idx].status != newStatus || _students[idx].bus.id != newStudent.bus.id) {
+            final now = DateTime.now();
             _students[idx] = _students[idx].copyWith(
               status: newStatus,
               bus: newStudent.bus,
+              waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
+              onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
+              atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
+              onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
+              arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
             );
+            _persistTimestamps(_students[idx]);
             updated = true;
 
             // Update tracking snapshot bus state
@@ -473,34 +509,130 @@ class AppController extends ChangeNotifier {
       token: token,
       userId: _userId!,
       onStudentStatusUpdated: _handleRealtimeStatusUpdate,
+      onBusLocationUpdated: _handleRealtimeLocationUpdate,
     );
     _reverbService!.connect();
-    developer.log('🔌 Reverb WebSocket initialized for user $_userId', name: 'REVERB');
+    
+    // اشتراك في قنوات الباصات للأبناء الموجودين حالياً
+    for (var student in _students) {
+      if (student.bus.id.isNotEmpty) {
+        _reverbService!.subscribe('private-bus.${student.bus.id}');
+      }
+    }
+    
+    developer.log('🔌 Reverb WebSocket initialized and bus channels subscribed', name: 'REVERB');
+  }
+
+  /// معالجة تحديث الموقع الفوري للحافلة
+  void _handleRealtimeLocationUpdate(Map<String, dynamic> data) {
+    final busId = data['bus_id']?.toString();
+    if (busId == null) return;
+
+    final lat = double.tryParse(data['latitude']?.toString() ?? '') ?? 0.0;
+    final lng = double.tryParse(data['longitude']?.toString() ?? '') ?? 0.0;
+    if (lat == 0.0 || lng == 0.0) return;
+
+    // تحديث تتبع جميع الطلاب المرتبطين بهذا الباص
+    bool updated = false;
+    for (var student in _students) {
+      if (student.bus.id == busId) {
+        final current = _tracking[student.id];
+        _tracking[student.id] = TrackingSnapshot(
+          lat: lat,
+          lng: lng,
+          speedKmh: double.tryParse(data['speed_kmh']?.toString() ?? '') ?? 0.0,
+          etaMinutes: int.tryParse(data['eta_minutes']?.toString() ?? '') ?? (current?.etaMinutes ?? 0),
+          distanceKm: current?.distanceKm ?? 0.0,
+          studentsOnBoard: int.tryParse(data['students_on_board']?.toString() ?? '') ?? (current?.studentsOnBoard ?? 0),
+          busState: _parseBusState(data['trip_status']?.toString()),
+          updatedAt: DateTime.now(),
+          routeDescription: current?.routeDescription ?? '',
+          driverName: current?.driverName,
+          driverImageUrl: current?.driverImageUrl,
+        );
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      developer.log('📍 Real-time location update for bus $busId', name: 'REVERB');
+      notifyListeners();
+    }
+  }
+
+  BusState _parseBusState(String? status) {
+    switch (status) {
+      case 'to_school':
+      case 'to_home':
+      case 'on_route':
+        return BusState.enRoute;
+      case 'at_school':
+        return BusState.atSchool;
+      default:
+        return BusState.atHome;
+    }
   }
 
   /// معالجة تحديث الحالة الفوري من WebSocket
   void _handleRealtimeStatusUpdate(Map<String, dynamic> data) {
     final studentId = data['student_id']?.toString();
-    final newStatusStr = data['new_status'] as String? ?? 'atHome';
-
     if (studentId == null) return;
+
+    final newStatusStr = data['new_status'] as String? ?? ''; // 'boarding' or 'alight'
+    final direction = data['direction'] as String? ?? 'to_school';
 
     final idx = _students.indexWhere((s) => s.id == studentId);
     if (idx == -1) return;
 
-    final newStatus = StudentStatus.values.firstWhere(
-      (e) => e.name == newStatusStr,
-      orElse: () => StudentStatus.atHome,
-    );
+    // تحويل حالة Reverb (boarding/alight) إلى حالات الـ 5-states المتعارف عليها في التطبيق
+    StudentStatus newStatus;
+    if (newStatusStr == 'boarding') {
+      newStatus = (direction == 'to_school') 
+          ? StudentStatus.onBusToSchool 
+          : StudentStatus.onBusToHome;
+    } else if (newStatusStr == 'alight') {
+      newStatus = (direction == 'to_school') 
+          ? StudentStatus.atSchool 
+          : StudentStatus.arrivedHome;
+    } else {
+      // Fallback for direct enum name matching if backend sends onBus/atHome etc.
+      newStatus = StudentStatus.values.firstWhere(
+        (e) => e.name == newStatusStr,
+        orElse: () => _students[idx].status,
+      );
+    }
 
     if (_students[idx].status != newStatus) {
-      _students[idx] = _students[idx].copyWith(status: newStatus);
+      final now = DateTime.now();
+      _students[idx] = _students[idx].copyWith(
+        status: newStatus,
+        waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
+        onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
+        atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
+        onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
+        arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
+      );
+      _persistTimestamps(_students[idx]);
       developer.log(
-        '🔔 Real-time update: ${_students[idx].name} → $newStatusStr',
+        '🔔 Real-time status update: ${_students[idx].name} ($newStatusStr + $direction) → $newStatus at $now',
         name: 'REVERB',
       );
       notifyListeners();
     }
+  }
+
+  // --- PERSISTENCE UTILS ---
+  DateTime? _parseTime(String? s) => s != null ? DateTime.tryParse(s) : null;
+
+  Future<void> _persistTimestamps(Student s) async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
+    final sid = s.id;
+    if (s.waitingAtHomeTime != null) await prefs.setString('ts_${sid}_waitingAtHome_$todayStr', s.waitingAtHomeTime!.toIso8601String());
+    if (s.onBusToSchoolTime != null) await prefs.setString('ts_${sid}_onBusToSchool_$todayStr', s.onBusToSchoolTime!.toIso8601String());
+    if (s.atSchoolTime != null) await prefs.setString('ts_${sid}_atSchool_$todayStr', s.atSchoolTime!.toIso8601String());
+    if (s.onBusToHomeTime != null) await prefs.setString('ts_${sid}_onBusToHome_$todayStr', s.onBusToHomeTime!.toIso8601String());
+    if (s.arrivedHomeTime != null) await prefs.setString('ts_${sid}_arrivedHome_$todayStr', s.arrivedHomeTime!.toIso8601String());
   }
 
   Future<void> completeOnboarding() async {

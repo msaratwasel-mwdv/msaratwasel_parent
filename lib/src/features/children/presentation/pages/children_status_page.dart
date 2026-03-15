@@ -155,7 +155,9 @@ class _ChildStatusCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                if (student.status == StudentStatus.onBus)
+                if (student.status == StudentStatus.onBus || 
+                    student.status == StudentStatus.onBusToSchool || 
+                    student.status == StudentStatus.onBusToHome)
                   IconButton(
                     onPressed: () {
                       controller.selectStudent(studentIndex);
@@ -254,12 +256,19 @@ class _ChildStatusCard extends StatelessWidget {
                     currentStep = 1;
                 }
 
+                String formatTime(int step, DateTime? time, bool reached, bool active) {
+                  if (time != null) return DateFormat('hh:mm a').format(time);
+                  if (active) return DateFormat('hh:mm a').format(DateTime.now());
+                  
+                  return '--:--';
+                }
+
                 return Row(
                   children: [
                     // Step 1: Waiting at home
                     _TimelineStep(
                       label: context.t('atHome'),
-                      time: currentStep >= 1 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      time: formatTime(1, student.waitingAtHomeTime, currentStep >= 1, currentStep == 1),
                       isActive: currentStep == 1,
                       isCompleted: currentStep > 1,
                       isDark: isDark,
@@ -270,7 +279,7 @@ class _ChildStatusCard extends StatelessWidget {
                     // Step 2: On bus to school
                     _TimelineStep(
                       label: context.t('onBus'),
-                      time: currentStep == 2 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      time: formatTime(2, student.onBusToSchoolTime, currentStep >= 2, currentStep == 2),
                       isActive: currentStep == 2,
                       isCompleted: currentStep > 2,
                       isDark: isDark,
@@ -281,7 +290,7 @@ class _ChildStatusCard extends StatelessWidget {
                     // Step 3: At school
                     _TimelineStep(
                       label: context.t('atSchool'),
-                      time: currentStep == 3 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      time: formatTime(3, student.atSchoolTime, currentStep >= 3, currentStep == 3),
                       isActive: currentStep == 3,
                       isCompleted: currentStep > 3,
                       isDark: isDark,
@@ -292,7 +301,7 @@ class _ChildStatusCard extends StatelessWidget {
                     // Step 4: On bus to home
                     _TimelineStep(
                       label: context.t('onBus'),
-                      time: currentStep == 4 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      time: formatTime(4, student.onBusToHomeTime, currentStep >= 4, currentStep == 4),
                       isActive: currentStep == 4,
                       isCompleted: currentStep > 4,
                       isDark: isDark,
@@ -303,9 +312,9 @@ class _ChildStatusCard extends StatelessWidget {
                     // Step 5: Arrived home
                     _TimelineStep(
                       label: context.t('atHome'),
-                      time: currentStep == 5 ? DateFormat('hh:mm a').format(DateTime.now()) : '--:--',
+                      time: formatTime(5, student.arrivedHomeTime, currentStep >= 5, currentStep == 5),
                       isActive: currentStep == 5,
-                      isCompleted: false,
+                      isCompleted: currentStep == 5, // Final step is green when active
                       isDark: isDark,
                       stepIcon: Icons.home_rounded,
                     ),

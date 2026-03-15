@@ -137,6 +137,11 @@ class Student {
     this.locationNote,
     this.schoolName,
     this.schoolLocation,
+    this.waitingAtHomeTime,
+    this.onBusToSchoolTime,
+    this.atSchoolTime,
+    this.onBusToHomeTime,
+    this.arrivedHomeTime,
   });
 
   final String id;
@@ -157,6 +162,13 @@ class Student {
   final String? locationNote;
   final String? schoolName;
   final String? schoolLocation;
+
+  // Timestamps for the 5-step cycle
+  final DateTime? waitingAtHomeTime;
+  final DateTime? onBusToSchoolTime;
+  final DateTime? atSchoolTime;
+  final DateTime? onBusToHomeTime;
+  final DateTime? arrivedHomeTime;
 
   /// إنشاء كائن Student من استجابة الـ API
   factory Student.fromJson(Map<String, dynamic> json) {
@@ -186,6 +198,12 @@ class Student {
       locationNote: json['location_note'] as String?,
       schoolName: json['school']?['name'] as String?,
       schoolLocation: json['school']?['location'] as String?,
+      // These will be populated by AppController when updates arrive
+      waitingAtHomeTime: null,
+      onBusToSchoolTime: null,
+      atSchoolTime: null,
+      onBusToHomeTime: null,
+      arrivedHomeTime: null,
     );
   }
 
@@ -227,6 +245,11 @@ class Student {
     String? locationNote,
     String? schoolName,
     String? schoolLocation,
+    DateTime? waitingAtHomeTime,
+    DateTime? onBusToSchoolTime,
+    DateTime? atSchoolTime,
+    DateTime? onBusToHomeTime,
+    DateTime? arrivedHomeTime,
   }) {
     return Student(
       id: id,
@@ -246,6 +269,11 @@ class Student {
       locationNote: locationNote ?? this.locationNote,
       schoolName: schoolName ?? this.schoolName,
       schoolLocation: schoolLocation ?? this.schoolLocation,
+      waitingAtHomeTime: waitingAtHomeTime ?? this.waitingAtHomeTime,
+      onBusToSchoolTime: onBusToSchoolTime ?? this.onBusToSchoolTime,
+      atSchoolTime: atSchoolTime ?? this.atSchoolTime,
+      onBusToHomeTime: onBusToHomeTime ?? this.onBusToHomeTime,
+      arrivedHomeTime: arrivedHomeTime ?? this.arrivedHomeTime,
     );
   }
 }

@@ -36,16 +36,15 @@ class _ContactsPageState extends State<ContactsPage> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final repository = GetIt.instance<ChatRepository>();
-      final results = await Future.wait([
-        repository.getContacts(),
-        repository.getConversations(),
+      final results = await Future.wait<dynamic>([
+        _repo.getContacts(),
+        _repo.getConversations(),
       ]);
 
       if (mounted) {
         setState(() {
           _contacts = results[0] as List<ChatContact>;
-          _conversations = results[1] as List<ChatConversation>; // Changed from List<Conversation> to List<ChatConversation> to match the field type.
+          _conversations = results[1] as List<ChatConversation>;
           _isLoading = false;
         });
       }
