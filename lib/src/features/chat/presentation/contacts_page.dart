@@ -1,11 +1,10 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
 import 'package:msaratwasel_user/src/features/chat/data/repositories/chat_repository.dart';
 import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 
@@ -19,7 +18,7 @@ class ContactsPage extends StatefulWidget {
 }
 
 class _ContactsPageState extends State<ContactsPage> {
-  final _repo = ChatRepository();
+  late final ChatRepository _repo;
 
   List<ChatContact> _contacts = [];
   List<ChatConversation> _conversations = [];
@@ -27,9 +26,12 @@ class _ContactsPageState extends State<ContactsPage> {
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isLoading && _contacts.isEmpty && _conversations.isEmpty && _error == null) {
+      _repo = ChatRepository(dio: AppScope.of(context).dio);
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -122,45 +124,32 @@ class _ContactsPageState extends State<ContactsPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isArabic ? 'المحادثات' : 'Messages',
-          style: TextStyle(
-            color: isDark ? Colors.white : AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        leading: Material(
-          color: Colors.transparent,
-          child: IconButton(
-            icon: Icon(
-              Icons.menu_rounded,
-              color: isDark ? Colors.white : AppColors.primary,
-            ),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildError(isArabic)
               : RefreshIndicator(
                   onRefresh: _loadData,
-                  child: ListView(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    children: [
-                      // ── Contacts Section ──
+                  child: CustomScrollView(
+                    slivers: [
+                      AppSliverHeader(
+                        title: isArabic ? 'المحادثات' : 'Messages',
+                        leading: Material(
+                          color: Colors.transparent,
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.menu_rounded,
+                              color: isDark ? Colors.white : AppColors.primary,
+                            ),
+                            onPressed: () => Scaffold.of(context).openDrawer(),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            // ── Contacts Section ──
                       if (_contacts.isNotEmpty) ...[
                         _SectionHeader(
                           title: isArabic ? 'جهات الاتصال' : 'Contacts',
@@ -189,9 +178,11 @@ class _ContactsPageState extends State<ContactsPage> {
                               onTap: () => _openExistingConversation(conv),
                             )),
                       ],
-                      // ── Empty State ──
-                      if (_contacts.isEmpty && _conversations.isEmpty)
-                        _buildEmpty(isArabic),
+                            if (_contacts.isEmpty && _conversations.isEmpty)
+                              _buildEmpty(isArabic),
+                          ]),
+                        ),
+                      ),
                     ],
                   ),
                 ),

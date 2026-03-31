@@ -2,8 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:msaratwasel_user/src/core/config/app_config.dart';
-import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 
@@ -40,16 +38,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     setState(() => _isLoading = true);
 
     try {
-      final token = await StorageService().readAccessToken();
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ));
-
-      final response = await dio.post('auth/change-password', data: {
+      final app = AppScope.of(context);
+      final response = await app.dio.post('auth/change-password', data: {
         'current_password': _currentCtrl.text,
         'new_password': _newCtrl.text,
         'new_password_confirmation': _confirmCtrl.text,

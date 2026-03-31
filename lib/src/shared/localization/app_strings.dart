@@ -158,6 +158,7 @@ class AppStrings {
       'noAbsenceHistory': 'لا يوجد سجل غياب',
       'noStudentsRegistered': 'لا يوجد أبناء مسجلون',
       'addStudentToStart': 'أضف طالباً للبدء في تتبع الرحلات',
+      'student': 'طالب',
       'greetingMorning': 'صباح الخير',
       'greetingAfternoon': 'مساء الخير',
       'greetingEvening': 'مساء الخير',
@@ -295,6 +296,10 @@ class AppStrings {
       'timeWaited': 'وقت الانتظار',
       'busPhotos': 'صور الحافلة',
       'pressAgainToExit': 'اضغط مرة أخرى للخروج',
+      'rejectionReason': 'سبب الرفض:',
+      'morningOnly': 'صباحي فقط',
+      'eveningOnly': 'مسائي فقط',
+      'fullDay': 'يوم كامل',
     },
     'en': {
       'appName': 'Msarat Wasel',
@@ -450,6 +455,7 @@ class AppStrings {
       'noAbsenceHistory': 'No absence history',
       'noStudentsRegistered': 'No students registered',
       'addStudentToStart': 'Add a student to start tracking',
+      'student': 'Student',
       'greetingMorning': 'Good Morning',
       'greetingAfternoon': 'Good Afternoon',
       'greetingEvening': 'Good Evening',
@@ -593,6 +599,10 @@ class AppStrings {
       'timeWaited': 'Time Waited',
       'busPhotos': 'Bus Photos',
       'pressAgainToExit': 'Press again to exit',
+      'rejectionReason': 'Rejection reason:',
+      'morningOnly': 'Morning only',
+      'eveningOnly': 'Evening only',
+      'fullDay': 'Full day',
     },
   };
 

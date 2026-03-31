@@ -1,35 +1,20 @@
 import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
 
 /// Repository that talks to the Laravel Chat API endpoints.
 class ChatRepository {
-  ChatRepository({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(
-    baseUrl: AppConfig.apiBaseUrl,
-    connectTimeout: AppConfig.defaultTimeout,
-    receiveTimeout: AppConfig.defaultTimeout,
-    headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
-  ));
+  ChatRepository({required Dio dio}) : _dio = dio;
 
   final Dio _dio;
-
-  // ─── Auth helper ──────────────────────────────────────────────────────
-  Future<Options> _authOptions() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    return Options(headers: {'Authorization': 'Bearer $token'});
-  }
 
   // ═══════════════════════════════════════════════════════════════════════
   //  1. Contacts — GET /api/chat/contacts
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatContact>> getContacts() async {
     try {
-      final response = await _dio.get('chat/contacts', options: await _authOptions());
+      final response = await _dio.get('chat/contacts');
       return (response.data['data'] as List)
           .map((json) => ChatContact.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -43,7 +28,7 @@ class ChatRepository {
   // ═══════════════════════════════════════════════════════════════════════
   Future<List<ChatConversation>> getConversations() async {
     try {
-      final response = await _dio.get('chat/conversations', options: await _authOptions());
+      final response = await _dio.get('chat/conversations');
       return (response.data['data'] as List)
           .map((json) => ChatConversation.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -60,7 +45,6 @@ class ChatRepository {
       final response = await _dio.post(
         'chat/conversations',
         data: {'receiver_id': receiverId},
-        options: await _authOptions(),
       );
       developer.log('💬 ChatRepo: conversation started with user $receiverId', name: 'CHAT');
       return ChatConversation.fromJson(
@@ -80,7 +64,6 @@ class ChatRepository {
       final response = await _dio.post(
         'chat/conversations/$conversationId/messages',
         data: {'body': body, 'type': type},
-        options: await _authOptions(),
       );
       developer.log('💬 ChatRepo: message sent to conv $conversationId', name: 'CHAT');
       return ChatMessage.fromJson(
@@ -99,7 +82,6 @@ class ChatRepository {
     try {
       final response = await _dio.get(
         'chat/conversations/$conversationId/messages',
-        options: await _authOptions(),
       );
       final data = response.data['data'] as List<dynamic>? ?? [];
       developer.log('💬 ChatRepo: got ${data.length} messages for conv $conversationId', name: 'CHAT');
@@ -119,7 +101,6 @@ class ChatRepository {
     try {
       await _dio.post(
         'chat/conversations/$conversationId/read',
-        options: await _authOptions(),
       );
       developer.log('💬 ChatRepo: conv $conversationId marked as read', name: 'CHAT');
     } catch (e, st) {

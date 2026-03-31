@@ -41,7 +41,12 @@ class ChildListPage extends StatelessWidget {
           radius: 26,
           backgroundColor: AppColors.primary.withAlpha(15),
           backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
-              ? CachedNetworkImageProvider(student.avatarUrl!)
+              ? CachedNetworkImageProvider(
+                  student.avatarUrl!,
+                  headers: AppScope.of(context).token.isNotEmpty
+                      ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                      : null,
+                )
               : null,
           child: student.avatarUrl == null || student.avatarUrl!.isEmpty
               ? Text(
@@ -60,7 +65,11 @@ class ChildListPage extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right, color: AppColors.primary),
         onTap: () {
-          // TODO: الانتقال لصفحة التفاصيل
+          Navigator.pushNamed(
+            context,
+            '/child-details',
+            arguments: student,
+          );
         },
       ),
     );

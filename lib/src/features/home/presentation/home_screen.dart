@@ -114,6 +114,7 @@ class _WelcomeHeader extends StatelessWidget {
       greeting = context.t('greetingEvening');
     }
 
+    final controller = AppScope.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -140,14 +141,19 @@ class _WelcomeHeader extends StatelessWidget {
             ),
             child: CircleAvatar(
               radius: 30,
-              backgroundImage: AppScope.of(context).userAvatarUrl.isNotEmpty
-                  ? CachedNetworkImageProvider(AppScope.of(context).userAvatarUrl)
+              backgroundImage: controller.userAvatarUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(
+                      controller.userAvatarUrl,
+                      headers: controller.token.isNotEmpty
+                          ? {'Authorization': 'Bearer ${controller.token}'}
+                          : null,
+                    )
                   : null,
               backgroundColor: Colors.white.withValues(alpha: 0.2),
-              child: AppScope.of(context).userAvatarUrl.isEmpty
+              child: controller.userAvatarUrl.isEmpty
                   ? Text(
-                      AppScope.of(context).userName.isNotEmpty
-                          ? AppScope.of(context).userName[0]
+                      controller.userName.isNotEmpty
+                          ? controller.userName[0]
                           : '?',
                       style: const TextStyle(
                         color: Colors.white,
@@ -173,7 +179,7 @@ class _WelcomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${context.t('welcomeUser')} ${AppScope.of(context).userName}',
+                  '${context.t('welcomeUser')} ${controller.userName}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -381,7 +387,12 @@ class _ChildQuickCard extends StatelessWidget {
                   radius: 24,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
-                      ? CachedNetworkImageProvider(student.avatarUrl!)
+                      ? CachedNetworkImageProvider(
+                          student.avatarUrl!,
+                          headers: AppScope.of(context).token.isNotEmpty
+                              ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                              : null,
+                        )
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(

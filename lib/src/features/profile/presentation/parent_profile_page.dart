@@ -5,10 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
@@ -48,27 +46,16 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
       _isUploadingAvatar = true;
     });
 
-    // Upload to backend
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      if (token != null) {
-        final dio = Dio(BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ));
-        final formData = FormData.fromMap({
-          'avatar': await MultipartFile.fromFile(file.path, filename: 'avatar.jpg'),
-        });
-        final response = await dio.post('parent/profile/avatar', data: formData);
-        if (response.statusCode == 200 && mounted) {
-          final imageUrl = response.data['image_url'] as String?;
-          if (imageUrl != null) {
-            AppScope.of(context).updateAvatarUrl(imageUrl);
-          }
+      final app = AppScope.of(context);
+      final formData = FormData.fromMap({
+        'avatar': await MultipartFile.fromFile(file.path, filename: 'avatar.jpg'),
+      });
+      final response = await app.dio.post('parent/profile/avatar', data: formData);
+      if (response.statusCode == 200 && mounted) {
+        final imageUrl = response.data['image_url'] as String?;
+        if (imageUrl != null) {
+          app.updateAvatarUrl(imageUrl);
         }
       }
     } catch (e) {
@@ -127,7 +114,12 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     final ImageProvider? avatarImage = hasLocalFile
         ? FileImage(_avatarFile!)
         : hasRemoteUrl
-            ? CachedNetworkImageProvider(controller.userAvatarUrl)
+            ? CachedNetworkImageProvider(
+                controller.userAvatarUrl,
+                headers: controller.token.isNotEmpty
+                    ? {'Authorization': 'Bearer ${controller.token}'}
+                    : null,
+              )
             : null;
 
     return CustomScrollView(
@@ -623,7 +615,14 @@ class _ChildQuickCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundImage: hasAvatar ? CachedNetworkImageProvider(avatarUrl!) : null,
+            backgroundImage: hasAvatar
+                ? CachedNetworkImageProvider(
+                    avatarUrl!,
+                    headers: AppScope.of(context).token.isNotEmpty
+                        ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                        : null,
+                  )
+                : null,
             backgroundColor: AppColors.primary.withValues(alpha: 0.15),
             child: !hasAvatar
                 ? Text(

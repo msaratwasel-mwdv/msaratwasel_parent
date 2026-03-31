@@ -39,7 +39,6 @@ class _RootShellState extends State<RootShell> {
   }
 
   DateTime? _lastPressedAt;
-  bool _canPopNow = false;
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +219,12 @@ class CustomDrawer extends StatelessWidget {
                               radius: 42,
                               backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                               backgroundImage: controller.userAvatarUrl.isNotEmpty
-                                  ? CachedNetworkImageProvider(controller.userAvatarUrl)
+                                  ? CachedNetworkImageProvider(
+                                      controller.userAvatarUrl,
+                                      headers: controller.token.isNotEmpty
+                                          ? {'Authorization': 'Bearer ${controller.token}'}
+                                          : null,
+                                    )
                                   : null,
                               child: controller.userAvatarUrl.isEmpty
                                   ? Text(

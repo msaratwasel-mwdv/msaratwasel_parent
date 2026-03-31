@@ -28,7 +28,7 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _repo = ChatRepository();
+  late final ChatRepository _repo;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
 
@@ -37,15 +37,26 @@ class _ChatPageState extends State<ChatPage> {
   bool _isSending = false;
   String? _error;
   Timer? _pollTimer;
+  bool _isInit = false;
+  bool _isPolling = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadMessages();
-    // Mark as read on open
-    _repo.markAsRead(widget.conversationId);
-    // Poll every 3 seconds for new messages
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollNewMessages());
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInit) {
+      _repo = ChatRepository(dio: AppScope.of(context).dio);
+      _loadMessages();
+      // Mark as read on open
+      _repo.markAsRead(widget.conversationId);
+      // Schedule polling for new messages
+      _schedulePoll();
+      _isInit = true;
+    }
+  }
+
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer(const Duration(seconds: 3), _pollNewMessages);
   }
 
   @override
@@ -77,6 +88,9 @@ class _ChatPageState extends State<ChatPage> {
 
   /// Silently fetch new messages without showing loading.
   Future<void> _pollNewMessages() async {
+    if (_isPolling) return;
+    _isPolling = true;
+
     try {
       final messages = await _repo.getMessages(widget.conversationId);
       if (!mounted) return;
@@ -87,6 +101,11 @@ class _ChatPageState extends State<ChatPage> {
       }
     } catch (_) {
       // Silently ignore poll errors
+    } finally {
+      if (mounted) {
+        _isPolling = false;
+        _schedulePoll();
+      }
     }
   }
 

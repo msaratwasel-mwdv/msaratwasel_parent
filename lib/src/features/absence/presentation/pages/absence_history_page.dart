@@ -5,6 +5,7 @@ import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_head
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class AbsenceHistoryPage extends StatefulWidget {
   const AbsenceHistoryPage({super.key});
@@ -33,16 +34,22 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
       body: CustomScrollView(
         slivers: [
           AppSliverHeader(
-            title: 'سجل الغياب',
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : AppColors.primary),
-              onPressed: () => AppScope.of(context).moveBack(),
+            title: context.t('absenceLog'),
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
             ),
           ),
           if (history.isEmpty)
-            const SliverFillRemaining(
+             SliverFillRemaining(
               child: Center(
-                child: Text('لا يوجد طلبات غياب سابقة'),
+                child: Text(context.t('noAbsenceHistory')),
               ),
             )
           else
@@ -52,7 +59,7 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final req = history[index];
-                    return _buildHistoryCard(req, isDark);
+                    return _buildHistoryCard(context, req, isDark);
                   },
                   childCount: history.length,
                 ),
@@ -63,7 +70,7 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
     );
   }
 
-  Widget _buildHistoryCard(AbsenceRequest req, bool isDark) {
+  Widget _buildHistoryCard(BuildContext context, AbsenceRequest req, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -86,13 +93,13 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                req.studentName ?? 'طالب',
+                req.studentName ?? context.t('student'),
                 style: GoogleFonts.cairo(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
-              _buildStatusBadge(req.status),
+              _buildStatusBadge(context, req.status),
             ],
           ),
           const SizedBox(height: 8),
@@ -108,7 +115,7 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
               const Icon(Icons.access_time, size: 14, color: Colors.grey),
               const SizedBox(width: 4),
               Text(
-                _getTypeLabel(req.type),
+                _getTypeLabel(context, req.type),
                 style: GoogleFonts.cairo(color: Colors.grey, fontSize: 13),
               ),
             ],
@@ -123,7 +130,7 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
           if (req.status == 'rejected' && req.rejectionReason != null) ...[
             const Divider(height: 24),
             Text(
-              'سبب الرفض:',
+              context.t('rejectionReason'),
               style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
             ),
             Text(
@@ -136,23 +143,23 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
     );
   }
 
-  Widget _buildStatusBadge(String? status) {
+  Widget _buildStatusBadge(BuildContext context, String? status) {
     Color color;
     String label;
 
     switch (status) {
       case 'approved':
         color = Colors.green;
-        label = 'مقبول';
+        label = context.t('statusApproved');
         break;
       case 'rejected':
         color = Colors.red;
-        label = 'مرفوض';
+        label = context.t('statusRejected');
         break;
       case 'pending':
       default:
         color = Colors.orange;
-        label = 'قيد الانتظار';
+        label = context.t('statusPending');
         break;
     }
 
@@ -174,14 +181,14 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
     );
   }
 
-  String _getTypeLabel(AbsenceType type) {
+  String _getTypeLabel(BuildContext context, AbsenceType type) {
     switch (type) {
       case AbsenceType.morning:
-        return 'صباحي فقط';
+        return context.t('morningOnly');
       case AbsenceType.returnOnly:
-        return 'مسائي فقط';
+        return context.t('eveningOnly');
       case AbsenceType.both:
-        return 'يوم كامل';
+        return context.t('fullDay');
     }
   }
 }

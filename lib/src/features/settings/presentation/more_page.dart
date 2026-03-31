@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
@@ -91,13 +92,23 @@ class _MorePageState extends State<MorePage> {
                   },
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      student.name[0],
-                      style: GoogleFonts.cairo(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                        ? CachedNetworkImageProvider(
+                            student.avatarUrl!,
+                            headers: controller.token.isNotEmpty
+                                ? {'Authorization': 'Bearer ${controller.token}'}
+                                : null,
+                          )
+                        : null,
+                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                        ? Text(
+                            student.name.isNotEmpty ? student.name[0] : '?',
+                            style: GoogleFonts.cairo(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
                   ),
                   title: Text(
                     student.name,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
@@ -111,16 +112,26 @@ class _ChildStatusCard extends StatelessWidget {
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: 22, // Slightly adjusted
+                    radius: 22,
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      student.name[0],
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                        ? CachedNetworkImageProvider(
+                            student.avatarUrl!,
+                            headers: controller.token.isNotEmpty
+                                ? {'Authorization': 'Bearer ${controller.token}'}
+                                : null,
+                          )
+                        : null,
+                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                        ? Text(
+                            student.name.isNotEmpty ? student.name[0] : '?',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),

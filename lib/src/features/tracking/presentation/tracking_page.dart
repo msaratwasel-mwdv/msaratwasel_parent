@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -162,22 +163,34 @@ class _TrackingMap extends StatefulWidget {
 
 class _TrackingMapState extends State<_TrackingMap> {
   final Map<String, BitmapDescriptor> _markers = {};
+  bool _markersLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMarkers();
+    // Don't call _loadMarkers here - context is not ready for inherited widgets
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_markersLoaded) {
+      _markersLoaded = true;
+      final token = AppScope.of(context).token;
+      _loadMarkers(token);
+    }
   }
 
   @override
   void didUpdateWidget(covariant _TrackingMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.students != widget.students) {
-      _loadMarkers();
+      final token = AppScope.of(context).token;
+      _loadMarkers(token);
     }
   }
 
-  Future<void> _loadMarkers() async {
+  Future<void> _loadMarkers(String token) async {
     final newMarkers = <String, BitmapDescriptor>{};
     for (final student in widget.students) {
       try {
@@ -185,6 +198,7 @@ class _TrackingMapState extends State<_TrackingMap> {
             await StudentMarkerWidget(
               name: student.name,
               imageUrl: student.avatarUrl,
+              authToken: token,
             ).toBitmapDescriptor(
               logicalSize: const Size(100, 100),
               imageSize: const Size(200, 200),
@@ -369,9 +383,22 @@ class _BottomDetailsCard extends StatelessWidget {
                   ),
                   child: CircleAvatar(
                     radius: 24,
-                    backgroundImage: NetworkImage(
-                      tracking.driverImageUrl ?? 'https://i.pravatar.cc/150?u=driver',
-                    ),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    backgroundImage: (tracking.driverImageUrl != null && tracking.driverImageUrl!.isNotEmpty)
+                        ? CachedNetworkImageProvider(
+                            tracking.driverImageUrl!,
+                            headers: AppScope.of(context).token.isNotEmpty
+                                ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                                : null,
+                          )
+                        : null,
+                    child: (tracking.driverImageUrl == null || tracking.driverImageUrl!.isEmpty)
+                        ? Icon(
+                            Icons.person_rounded,
+                            color: AppColors.primary,
+                            size: 28,
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),

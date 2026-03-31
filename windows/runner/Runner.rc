@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
+            VALUE "CompanyName", "com.msaratwasel" "\0"
             VALUE "FileDescription", "msaratwasel_user" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "msaratwasel_user" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 com.msaratwasel. All rights reserved." "\0"
             VALUE "OriginalFilename", "msaratwasel_user.exe" "\0"
             VALUE "ProductName", "msaratwasel_user" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

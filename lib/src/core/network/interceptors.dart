@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
@@ -23,13 +24,22 @@ class AuthInterceptor extends Interceptor {
 class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // TODO: plug preferred logger.
+    developer.log('🌐 DIO [REQ]: ${options.method} ${options.uri}', name: 'NETWORK');
+    if (options.data != null) {
+      developer.log('📦 DIO [BODY]: ${options.data}', name: 'NETWORK');
+    }
     super.onRequest(options, handler);
   }
 
   @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    developer.log('✅ DIO [RES]: ${response.statusCode} ${response.requestOptions.uri}', name: 'NETWORK');
+    super.onResponse(response, handler);
+  }
+
+  @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // TODO: plug preferred logger.
+    developer.log('❌ DIO [ERR]: ${err.response?.statusCode} ${err.requestOptions.uri}', name: 'NETWORK', error: err);
     super.onError(err, handler);
   }
 }

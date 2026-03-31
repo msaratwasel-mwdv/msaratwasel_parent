@@ -17,8 +17,8 @@ class ReverbService {
   bool _isDisposed = false;
   String? _lastSocketId; // حفظ آخر مُعرف سوكيت للمصادقة اللاحقة
 
-  final String _token;
   final int _userId;
+  final Dio _dio;
   final void Function(Map<String, dynamic> data) _onStudentStatusUpdated;
   final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
 
@@ -45,10 +45,11 @@ class ReverbService {
   ReverbService({
     required String token,
     required int userId,
+    required Dio dio,
     required void Function(Map<String, dynamic> data) onStudentStatusUpdated,
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
-  })  : _token = token,
-        _userId = userId,
+  })  : _userId = userId,
+        _dio = dio,
         _onStudentStatusUpdated = onStudentStatusUpdated,
         _onBusLocationUpdated = onBusLocationUpdated;
 
@@ -116,7 +117,7 @@ class ReverbService {
         case 'bus.location.updated':
           final data = _parseData(message['data']);
           if (_onBusLocationUpdated != null) {
-            _onBusLocationUpdated!(data);
+            _onBusLocationUpdated(data);
           }
           break;
 
@@ -173,15 +174,7 @@ class ReverbService {
 
   Future<Map<String, dynamic>> _authenticateChannel(String channelName, String socketId) async {
     try {
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Authorization': 'Bearer $_token',
-          'Accept': 'application/json',
-        },
-      ));
-
-      final response = await dio.post('broadcasting/auth', data: {
+      final response = await _dio.post('broadcasting/auth', data: {
         'socket_id': socketId,
         'channel_name': channelName,
       });

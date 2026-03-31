@@ -181,7 +181,12 @@ class _ChildCard extends StatelessWidget {
                       backgroundColor: Colors.white,
                       // Show real photo if available and not empty, else initials
                       backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
-                          ? CachedNetworkImageProvider(student.avatarUrl!)
+                          ? CachedNetworkImageProvider(
+                              student.avatarUrl!,
+                              headers: AppScope.of(context).token.isNotEmpty
+                                  ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                                  : null,
+                            )
                           : null,
                       child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
                           ? Text(
@@ -556,14 +561,24 @@ class _ChildDetailsSheet extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.white,
-                    child: Text(
-                      student.name[0],
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                        ? CachedNetworkImageProvider(
+                            student.avatarUrl!,
+                            headers: AppScope.of(context).token.isNotEmpty
+                                ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                                : null,
+                          )
+                        : null,
+                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                        ? Text(
+                            student.name.isNotEmpty ? student.name[0] : '?',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -627,7 +642,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                         isDark: isDark,
                       ),
                       _DetailRow(
-                        label: context.t('busPlate') ?? 'رقم اللوحة',
+                        label: context.t('busPlate'),
                         value: (student.bus.plate.isNotEmpty && student.bus.plate != '-') 
                             ? student.bus.plate 
                             : context.t('notSpecified'),
@@ -947,7 +962,12 @@ class _ContactInfoRow extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundImage: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
-                    ? NetworkImage(avatarUrl!)
+                    ? CachedNetworkImageProvider(
+                        avatarUrl!,
+                        headers: AppScope.of(context).token.isNotEmpty
+                            ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                            : null,
+                      )
                     : null,
                 backgroundColor: AppColors.primary.withAlpha(30),
                 child: (avatarUrl == null || avatarUrl!.trim().isEmpty)

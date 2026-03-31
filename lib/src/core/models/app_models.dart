@@ -189,7 +189,7 @@ class Student {
         json['suggested_direction'] as String?,
       ),
       suggestedDirection: json['suggested_direction'] as String?,
-      avatarUrl: json['image_url'] as String?,
+      avatarUrl: _fixImageUrl(json['image_url'] as String?),
       tripCount: json['trip_count'] as int? ?? 0,
       attendancePercentage: json['attendance_percentage'] as int? ?? 0,
       homeLocation: (json['home_lat'] != null && json['home_lng'] != null)
@@ -205,6 +205,16 @@ class Student {
       onBusToHomeTime: null,
       arrivedHomeTime: null,
     );
+  }
+
+  static String? _fixImageUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http')) return url;
+    // Remove leading slash if present
+    final path = url.startsWith('/') ? url.substring(1) : url;
+    // Assume storage path if it doesn't contain storage/
+    final fullPath = path.contains('storage/') ? path : 'storage/$path';
+    return 'https://srv1428362.hstgr.cloud/$fullPath';
   }
 
   /// Derives the 5-state trip cycle status from API status + direction

@@ -4,17 +4,20 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 // FCM token registration — see _registerFcmToken below
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
+import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
+import 'package:msaratwasel_user/src/features/language/data/repositories/language_repository_impl.dart';
+import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
+import 'package:msaratwasel_user/src/features/absence/data/repositories/absence_repository_impl.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/core/services/reverb_service.dart';
 import 'package:msaratwasel_user/src/features/notifications/data/repositories/notification_repository_impl.dart';
 import 'package:msaratwasel_user/src/core/services/notification_service.dart';
-import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
-import 'package:msaratwasel_user/src/features/absence/data/repositories/absence_repository_impl.dart';
 
 class AppController extends ChangeNotifier {
   AppController()
@@ -25,6 +28,54 @@ class AppController extends ChangeNotifier {
       _attendance = List.of(SampleData.attendance),
       _trips = List.of(SampleData.trips) {
     developer.log('🏗️ AppController: Instance created', name: 'STATE');
+    _initDio();
+  }
+
+  late final Dio dio;
+
+  void _initDio() {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: AppConfig.defaultTimeout,
+        receiveTimeout: AppConfig.defaultTimeout,
+        headers: {'Accept': 'application/json'},
+      ),
+    );
+
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (_token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $_token';
+          } else {
+            // Try to get from SharedPreferences if not in memory
+            final prefs = await SharedPreferences.getInstance();
+            final savedToken = prefs.getString('access_token');
+            if (savedToken != null) {
+              _token = savedToken;
+              options.headers['Authorization'] = 'Bearer $savedToken';
+            }
+          }
+          return handler.next(options);
+        },
+        onError: (e, handler) {
+          if (e.response?.statusCode == 401) {
+            final isBroadcasting = e.requestOptions.path.contains('broadcasting/auth');
+            if (isBroadcasting) {
+              developer.log('⚠️ Reverb Auth 401: Laravel broadcasting route unauthenticated / middleware issue.', name: 'AUTH');
+            } else {
+              developer.log('⚠️ API 401: Token expired or invalid', name: 'AUTH');
+              _isAuthenticated = false;
+              notifyListeners();
+            }
+          }
+          return handler.next(e);
+        },
+      ),
+    );
+
+    // Add logger if needed (already handled by Interceptor check in task.md)
   }
 
   Locale _locale = () {
@@ -58,14 +109,25 @@ class AppController extends ChangeNotifier {
   final Map<String, TrackingSnapshot> _tracking;
   final List<AppNotification> _notifications; // mutable — fed by FCM & API
   final List<MessageItem> _messages;
+  bool _hasNewMessages = false;
+
+  bool get hasNewMessages => _hasNewMessages;
+
+  void clearNewMessages() {
+    _hasNewMessages = false;
+    notifyListeners();
+  }
+
   final List<AttendanceEntry> _attendance;
   final List<TripEntry> _trips;
   List<AbsenceRequest> _absenceRequests = [];
   bool _isLoadingChildren = false;
   int? _userId;
   ReverbService? _reverbService;
+  String _token = '';
 
   Locale get locale => _locale;
+  String get token => _token;
   ThemeMode get themeMode => _themeMode;
   bool get isDark => _themeMode == ThemeMode.dark;
   int get navIndex => _navIndex;
@@ -81,13 +143,53 @@ class AppController extends ChangeNotifier {
   List<MessageItem> get messages => List.unmodifiable(_messages);
   List<AttendanceEntry> get attendance => List.unmodifiable(_attendance);
   List<TripEntry> get trips => List.unmodifiable(_trips);
-  List<AbsenceRequest> get absenceRequests => List.unmodifiable(_absenceRequests);
+  List<AbsenceRequest> get absenceRequests =>
+      List.unmodifiable(_absenceRequests);
 
   // User data getters
-  String get userName => _locale.languageCode == 'ar' ? _userName : (_userNameEn.isNotEmpty ? _userNameEn : _userName);
+  String get userName => _locale.languageCode == 'ar'
+      ? _userName
+      : (_userNameEn.isNotEmpty ? _userNameEn : _userName);
   String get userNameAr => _userName;
   String get userNameEn => _userNameEn;
   String get userAvatarUrl => _userAvatarUrl;
+
+  void updateLocale(Locale newLocale) async {
+    _locale = newLocale;
+    notifyListeners();
+    // Persist to storage
+    final repo = LanguageRepositoryImpl(storageService: StorageService());
+    await repo.setLocale(newLocale.languageCode);
+  }
+
+  Future<bool> submitAbsence({
+    required String studentId,
+    required String type,
+    required String reason,
+  }) async {
+    try {
+      final repo = AbsenceRepositoryImpl(dio: dio);
+
+      final absenceType = type == 'sick'
+          ? AbsenceType.morning
+          : AbsenceType.both; // simplified mapping for now
+
+      final request = AbsenceRequest(
+        studentIds: [studentId],
+        type: absenceType,
+        date: DateTime.now(),
+        note: reason,
+      );
+
+      await repo.submitAbsence(request);
+      loadChildrenFromApi();
+      return true;
+    } catch (e) {
+      print('❌ submitAbsence failed: $e');
+      return false;
+    }
+  }
+
   String get userPhone => _userPhone;
   String get userEmail => _userEmail;
   String get userNationalId => _userNationalId;
@@ -131,16 +233,10 @@ class AppController extends ChangeNotifier {
       }
       print('👶 loadChildrenFromApi: calling /parent/children...');
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ));
-
       final response = await dio.get('parent/children');
-      print('👶 Children API => ${response.statusCode} | body: ${response.data}');
+      print(
+        '👶 Children API => ${response.statusCode} | body: ${response.data}',
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> rawList = response.data['data'] as List<dynamic>;
@@ -156,41 +252,65 @@ class AppController extends ChangeNotifier {
         }
 
         // LOAD PERSISTED TIMESTAMPS FOR TODAY
-        final todayStr = "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
+        final todayStr =
+            "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
         for (int i = 0; i < _students.length; i++) {
           final sid = _students[i].id;
           _students[i] = _students[i].copyWith(
-            waitingAtHomeTime: _parseTime(prefs.getString('ts_${sid}_waitingAtHome_$todayStr')),
-            onBusToSchoolTime: _parseTime(prefs.getString('ts_${sid}_onBusToSchool_$todayStr')),
-            atSchoolTime: _parseTime(prefs.getString('ts_${sid}_atSchool_$todayStr')),
-            onBusToHomeTime: _parseTime(prefs.getString('ts_${sid}_onBusToHome_$todayStr')),
-            arrivedHomeTime: _parseTime(prefs.getString('ts_${sid}_arrivedHome_$todayStr')),
+            waitingAtHomeTime: _parseTime(
+              prefs.getString('ts_${sid}_waitingAtHome_$todayStr'),
+            ),
+            onBusToSchoolTime: _parseTime(
+              prefs.getString('ts_${sid}_onBusToSchool_$todayStr'),
+            ),
+            atSchoolTime: _parseTime(
+              prefs.getString('ts_${sid}_atSchool_$todayStr'),
+            ),
+            onBusToHomeTime: _parseTime(
+              prefs.getString('ts_${sid}_onBusToHome_$todayStr'),
+            ),
+            arrivedHomeTime: _parseTime(
+              prefs.getString('ts_${sid}_arrivedHome_$todayStr'),
+            ),
           );
         }
-            
+
         // Initialize tracking snapshots for real students
         for (final student in _students) {
-          final busData = (rawList.firstWhere((e) => e['id'].toString() == student.id) as Map<String, dynamic>)['bus'];
+          final busData =
+              (rawList.firstWhere((e) => e['id'].toString() == student.id)
+                  as Map<String, dynamic>)['bus'];
           final driverData = busData != null ? busData['driver'] : null;
 
           if (!_tracking.containsKey(student.id)) {
             _tracking[student.id] = TrackingSnapshot(
-              lat: 24.7136, 
+              lat: 24.7136,
               lng: 46.6753,
               speedKmh: 0,
               etaMinutes: 0,
               distanceKm: 0,
               studentsOnBoard: 0,
-              busState: (student.status == StudentStatus.onBus || student.status == StudentStatus.onBusToSchool || student.status == StudentStatus.onBusToHome) ? BusState.enRoute : 
-                        (student.status == StudentStatus.atSchool ? BusState.atSchool : BusState.atHome),
+              busState:
+                  (student.status == StudentStatus.onBus ||
+                      student.status == StudentStatus.onBusToSchool ||
+                      student.status == StudentStatus.onBusToHome)
+                  ? BusState.enRoute
+                  : (student.status == StudentStatus.atSchool
+                        ? BusState.atSchool
+                        : BusState.atHome),
               updatedAt: DateTime.now(),
-              routeDescription: (student.status == StudentStatus.onBus || student.status == StudentStatus.onBusToSchool || student.status == StudentStatus.onBusToHome) ? 'في الطريق' : 'لا توجد رحلة نشطة',
+              routeDescription:
+                  (student.status == StudentStatus.onBus ||
+                      student.status == StudentStatus.onBusToSchool ||
+                      student.status == StudentStatus.onBusToHome)
+                  ? 'في الطريق'
+                  : 'لا توجد رحلة نشطة',
               driverName: driverData?['name'] as String?,
               driverImageUrl: driverData?['image_url'] as String?,
             );
           }
         }
-        
+
         print('✅ Loaded ${_students.length} children and initialized tracking');
         notifyListeners();
       }
@@ -204,22 +324,46 @@ class AppController extends ChangeNotifier {
 
   Timer? _trackingTimer;
   int _pollCycleCount = 0;
+  bool _isTrackingPolling = false;
 
   void startTrackingPoll() {
     _trackingTimer?.cancel();
     _pollCycleCount = 0;
-    _trackingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (_isAuthenticated && _students.isNotEmpty) {
-        _fetchTrackingFromApi();
-        _pollCycleCount++;
-        // Polling as fallback only (every 60s) — primary updates via WebSocket
-        if (_pollCycleCount % 6 == 0) {
-          _refreshStudentStatuses();
-        }
+    _scheduleTrackingPoll(immediate: true);
+  }
+
+  void _scheduleTrackingPoll({bool immediate = false}) {
+    _trackingTimer?.cancel();
+    _trackingTimer = Timer(Duration(seconds: immediate ? 0 : 10), _runTrackingPollCycle);
+  }
+
+  Future<void> _runTrackingPollCycle() async {
+    // If not authenticated or no students, just wait for next cycle
+    if (!_isAuthenticated || _students.isEmpty) {
+      if (_trackingTimer != null) _scheduleTrackingPoll();
+      return;
+    }
+
+    if (_isTrackingPolling) return;
+    _isTrackingPolling = true;
+
+    try {
+      await _fetchTrackingFromApi();
+      _pollCycleCount++;
+      
+      // Polling as fallback only (every 60s) — primary updates via WebSocket
+      if (_pollCycleCount % 6 == 0) {
+        await _refreshStudentStatuses();
       }
-    });
-    // Immediate first fetch
-    _fetchTrackingFromApi();
+    } catch (e) {
+      print('❌ Tracking poll cycle failed: $e');
+    } finally {
+      _isTrackingPolling = false;
+      // Schedule next poll automatically if we haven't been stopped
+      if (_trackingTimer != null) {
+        _scheduleTrackingPoll();
+      }
+    }
   }
 
   void stopTrackingPoll() {
@@ -233,17 +377,19 @@ class AppController extends ChangeNotifier {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
 
       // We need to fetch tracking for each bus our students are on
       final busIds = _students.map((s) => s.bus.id).toSet();
-      
+
       bool updated = false;
       for (final busId in busIds) {
         try {
@@ -252,28 +398,29 @@ class AppController extends ChangeNotifier {
             final data = response.data;
             final lat = (data['latitude'] as num?)?.toDouble();
             final lng = (data['longitude'] as num?)?.toDouble();
-            
+
             if (lat != null && lng != null) {
               // Update all students on this bus
               for (final student in _students.where((s) => s.bus.id == busId)) {
                 final old = _tracking[student.id];
                 final driverData = data['driver'];
-                
+
                 // Calculate distance and ETA if home location is available
                 double distanceKm = old?.distanceKm ?? 0.0;
                 int etaMinutes = old?.etaMinutes ?? 0;
-                
+
                 if (student.homeLocation != null) {
                   distanceKm = _calculateDistance(
-                    lat, 
-                    lng, 
-                    student.homeLocation!.latitude, 
-                    student.homeLocation!.longitude
+                    lat,
+                    lng,
+                    student.homeLocation!.latitude,
+                    student.homeLocation!.longitude,
                   );
                   // Estimate ETA based on speed (min 15 km/h for calculation if moving)
                   double speed = (data['speed_kmh'] as num?)?.toDouble() ?? 0.0;
-                  if (speed < 15 && data['trip_status'] == 'on_route') speed = 25; 
-                  
+                  if (speed < 15 && data['trip_status'] == 'on_route')
+                    speed = 25;
+
                   if (speed > 0) {
                     etaMinutes = ((distanceKm / speed) * 60).round();
                   } else {
@@ -287,9 +434,12 @@ class AppController extends ChangeNotifier {
                   speedKmh: (data['speed_kmh'] as num?)?.toDouble() ?? 0.0,
                   etaMinutes: etaMinutes,
                   distanceKm: distanceKm,
-                  studentsOnBoard: (data['students_on_board'] as num?)?.toInt() ?? 0,
+                  studentsOnBoard:
+                      (data['students_on_board'] as num?)?.toInt() ?? 0,
                   busState: _mapTripStatusToBusState(data['trip_status']),
-                  updatedAt: DateTime.tryParse(data['last_update'] ?? '') ?? DateTime.now(),
+                  updatedAt:
+                      DateTime.tryParse(data['last_update'] ?? '') ??
+                      DateTime.now(),
                   routeDescription: old?.routeDescription ?? 'جاري التتبع',
                   driverName: driverData?['name'] as String?,
                   driverImageUrl: driverData?['image_url'] as String?,
@@ -297,7 +447,8 @@ class AppController extends ChangeNotifier {
               }
 
               // Update student statuses from bus polling response (real-time)
-              final studentStatuses = data['student_statuses'] as List<dynamic>?;
+              final studentStatuses =
+                  data['student_statuses'] as List<dynamic>?;
               if (studentStatuses != null) {
                 for (final ss in studentStatuses) {
                   final sid = ss['student_id'].toString();
@@ -312,11 +463,25 @@ class AppController extends ChangeNotifier {
                       final now = DateTime.now();
                       _students[idx] = _students[idx].copyWith(
                         status: newStatus,
-                        waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
-                        onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
-                        atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
-                        onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
-                        arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
+                        waitingAtHomeTime:
+                            (newStatus == StudentStatus.waitingAtHome)
+                            ? now
+                            : _students[idx].waitingAtHomeTime,
+                        onBusToSchoolTime:
+                            (newStatus == StudentStatus.onBusToSchool)
+                            ? now
+                            : _students[idx].onBusToSchoolTime,
+                        atSchoolTime: (newStatus == StudentStatus.atSchool)
+                            ? now
+                            : _students[idx].atSchoolTime,
+                        onBusToHomeTime:
+                            (newStatus == StudentStatus.onBusToHome)
+                            ? now
+                            : _students[idx].onBusToHomeTime,
+                        arrivedHomeTime:
+                            (newStatus == StudentStatus.arrivedHome)
+                            ? now
+                            : _students[idx].arrivedHomeTime,
                       );
                       _persistTimestamps(_students[idx]);
                     }
@@ -347,14 +512,6 @@ class AppController extends ChangeNotifier {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ));
-
       final response = await dio.get('parent/children');
       if (response.statusCode == 200) {
         final List<dynamic> rawList = response.data['data'] as List<dynamic>;
@@ -374,16 +531,27 @@ class AppController extends ChangeNotifier {
 
           // Update bus info (may change between morning/afternoon)
           final newStudent = Student.fromJson(raw as Map<String, dynamic>);
-          if (_students[idx].status != newStatus || _students[idx].bus.id != newStudent.bus.id) {
+          if (_students[idx].status != newStatus ||
+              _students[idx].bus.id != newStudent.bus.id) {
             final now = DateTime.now();
             _students[idx] = _students[idx].copyWith(
               status: newStatus,
               bus: newStudent.bus,
-              waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
-              onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
-              atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
-              onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
-              arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
+              waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome)
+                  ? now
+                  : _students[idx].waitingAtHomeTime,
+              onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool)
+                  ? now
+                  : _students[idx].onBusToSchoolTime,
+              atSchoolTime: (newStatus == StudentStatus.atSchool)
+                  ? now
+                  : _students[idx].atSchoolTime,
+              onBusToHomeTime: (newStatus == StudentStatus.onBusToHome)
+                  ? now
+                  : _students[idx].onBusToHomeTime,
+              arrivedHomeTime: (newStatus == StudentStatus.arrivedHome)
+                  ? now
+                  : _students[idx].arrivedHomeTime,
             );
             _persistTimestamps(_students[idx]);
             updated = true;
@@ -399,19 +567,26 @@ class AppController extends ChangeNotifier {
                 etaMinutes: old.etaMinutes,
                 distanceKm: old.distanceKm,
                 studentsOnBoard: old.studentsOnBoard,
-                busState: newStatus == StudentStatus.onBus ? BusState.enRoute :
-                          (newStatus == StudentStatus.atSchool ? BusState.atSchool : BusState.atHome),
+                busState: newStatus == StudentStatus.onBus
+                    ? BusState.enRoute
+                    : (newStatus == StudentStatus.atSchool
+                          ? BusState.atSchool
+                          : BusState.atHome),
                 updatedAt: old.updatedAt,
                 routeDescription: old.routeDescription,
                 driverName: driverData?['name'] as String? ?? old.driverName,
-                driverImageUrl: driverData?['image_url'] as String? ?? old.driverImageUrl,
+                driverImageUrl:
+                    driverData?['image_url'] as String? ?? old.driverImageUrl,
               );
             }
           }
         }
 
         if (updated) {
-          developer.log('🔄 Student statuses refreshed from API', name: 'TRACKING');
+          developer.log(
+            '🔄 Student statuses refreshed from API',
+            name: 'TRACKING',
+          );
           notifyListeners();
         }
       }
@@ -421,7 +596,9 @@ class AppController extends ChangeNotifier {
   }
 
   BusState _mapTripStatusToBusState(String? status) {
-    if (status == 'morning_ongoing' || status == 'afternoon_ongoing' || status == 'on_route') {
+    if (status == 'morning_ongoing' ||
+        status == 'afternoon_ongoing' ||
+        status == 'on_route') {
       return BusState.enRoute;
     }
     return BusState.atHome;
@@ -433,15 +610,16 @@ class AppController extends ChangeNotifier {
       await Future.delayed(const Duration(seconds: 4));
 
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 1. Check onboarding
       final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
       _shouldShowOnboarding = !hasSeen;
 
       // 2. Check Authentication
-      final token = prefs.getString('access_token');
+      final savedToken = prefs.getString('access_token');
       final savedName = prefs.getString('user_name') ?? '';
-      if (token != null && savedName.isNotEmpty) {
+      if (savedToken != null && savedName.isNotEmpty) {
+        _token = savedToken;
         _isAuthenticated = true;
         _userName = savedName;
         _userNameEn = prefs.getString('user_name_en') ?? savedName;
@@ -449,19 +627,21 @@ class AppController extends ChangeNotifier {
         _userEmail = prefs.getString('user_email') ?? '';
         _userNationalId = prefs.getString('user_national_id') ?? '';
         _userAvatarUrl = prefs.getString('user_avatar_url') ?? '';
-        developer.log('🔐 AppController: Token found → Auto Login ($savedName)', name: 'AUTH');
-        
+        developer.log(
+          '🔐 AppController: Token found → Auto Login ($savedName)',
+          name: 'AUTH',
+        );
+
         // Initialize FCM if already logged in
         final fcmToken = await NotificationService.init(
           onNotificationReceived: addNotification,
         );
-        
+
         // Re-register FCM token just in case it changed
         if (fcmToken != null) {
-          final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
-          await _registerFcmToken(dio: dio, token: token, fcmToken: fcmToken);
+          await _registerFcmToken(dio: dio, token: _token, fcmToken: fcmToken);
         }
-        
+
         // Load history + refresh profile from API
         loadNotificationsFromApi();
         loadChildrenFromApi();
@@ -470,17 +650,22 @@ class AppController extends ChangeNotifier {
         // استعادة WebSocket إذا كان المستخدم مسجل دخول
         _userId = prefs.getInt('user_id');
         if (_userId != null && _userId! > 0) {
-          _initReverb(token);
+          _initReverb(_token);
         }
       } else {
         // No valid session — force login
         _isAuthenticated = false;
         await prefs.remove('access_token');
-        developer.log('🔐 AppController: No saved session → Show Login', name: 'AUTH');
+        developer.log(
+          '🔐 AppController: No saved session → Show Login',
+          name: 'AUTH',
+        );
       }
 
       _bootCompleted = true;
-      print('🏁 AppController: Bootstrap completed. Onboarding needed: $_shouldShowOnboarding | Authenticated: $_isAuthenticated');
+      print(
+        '🏁 AppController: Bootstrap completed. Onboarding needed: $_shouldShowOnboarding | Authenticated: $_isAuthenticated',
+      );
     } catch (e, st) {
       developer.log(
         '❌ AppController: Bootstrap failed',
@@ -491,12 +676,21 @@ class AppController extends ChangeNotifier {
       // Fallback to allow app entry (or handle error state appropriately)
       _bootCompleted = true;
     } finally {
-      // Native splash is removed in SplashScreen to ensure continuity
       developer.log(
         '✨ AppController: Bootstrap sequence finished',
         name: 'BOOT',
       );
       notifyListeners();
+
+      // Remove the native splash screen smoothly after the first frame of the new route renders
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          // You will need to make sure FlutterNativeSplash is imported at the top of this file
+          FlutterNativeSplash.remove();
+        } catch (e) {
+          developer.log('AppController: Native splash already removed or error: $e');
+        }
+      });
     }
   }
 
@@ -508,19 +702,23 @@ class AppController extends ChangeNotifier {
     _reverbService = ReverbService(
       token: token,
       userId: _userId!,
+      dio: dio,
       onStudentStatusUpdated: _handleRealtimeStatusUpdate,
       onBusLocationUpdated: _handleRealtimeLocationUpdate,
     );
     _reverbService!.connect();
-    
+
     // اشتراك في قنوات الباصات للأبناء الموجودين حالياً
     for (var student in _students) {
       if (student.bus.id.isNotEmpty) {
         _reverbService!.subscribe('private-bus.${student.bus.id}');
       }
     }
-    
-    developer.log('🔌 Reverb WebSocket initialized and bus channels subscribed', name: 'REVERB');
+
+    developer.log(
+      '🔌 Reverb WebSocket initialized and bus channels subscribed',
+      name: 'REVERB',
+    );
   }
 
   /// معالجة تحديث الموقع الفوري للحافلة
@@ -541,9 +739,13 @@ class AppController extends ChangeNotifier {
           lat: lat,
           lng: lng,
           speedKmh: double.tryParse(data['speed_kmh']?.toString() ?? '') ?? 0.0,
-          etaMinutes: int.tryParse(data['eta_minutes']?.toString() ?? '') ?? (current?.etaMinutes ?? 0),
+          etaMinutes:
+              int.tryParse(data['eta_minutes']?.toString() ?? '') ??
+              (current?.etaMinutes ?? 0),
           distanceKm: current?.distanceKm ?? 0.0,
-          studentsOnBoard: int.tryParse(data['students_on_board']?.toString() ?? '') ?? (current?.studentsOnBoard ?? 0),
+          studentsOnBoard:
+              int.tryParse(data['students_on_board']?.toString() ?? '') ??
+              (current?.studentsOnBoard ?? 0),
           busState: _parseBusState(data['trip_status']?.toString()),
           updatedAt: DateTime.now(),
           routeDescription: current?.routeDescription ?? '',
@@ -555,7 +757,10 @@ class AppController extends ChangeNotifier {
     }
 
     if (updated) {
-      developer.log('📍 Real-time location update for bus $busId', name: 'REVERB');
+      developer.log(
+        '📍 Real-time location update for bus $busId',
+        name: 'REVERB',
+      );
       notifyListeners();
     }
   }
@@ -578,7 +783,8 @@ class AppController extends ChangeNotifier {
     final studentId = data['student_id']?.toString();
     if (studentId == null) return;
 
-    final newStatusStr = data['new_status'] as String? ?? ''; // 'boarding' or 'alight'
+    final newStatusStr =
+        data['new_status'] as String? ?? ''; // 'boarding' or 'alight'
     final direction = data['direction'] as String? ?? 'to_school';
 
     final idx = _students.indexWhere((s) => s.id == studentId);
@@ -587,12 +793,12 @@ class AppController extends ChangeNotifier {
     // تحويل حالة Reverb (boarding/alight) إلى حالات الـ 5-states المتعارف عليها في التطبيق
     StudentStatus newStatus;
     if (newStatusStr == 'boarding') {
-      newStatus = (direction == 'to_school') 
-          ? StudentStatus.onBusToSchool 
+      newStatus = (direction == 'to_school')
+          ? StudentStatus.onBusToSchool
           : StudentStatus.onBusToHome;
     } else if (newStatusStr == 'alight') {
-      newStatus = (direction == 'to_school') 
-          ? StudentStatus.atSchool 
+      newStatus = (direction == 'to_school')
+          ? StudentStatus.atSchool
           : StudentStatus.arrivedHome;
     } else {
       // Fallback for direct enum name matching if backend sends onBus/atHome etc.
@@ -606,11 +812,21 @@ class AppController extends ChangeNotifier {
       final now = DateTime.now();
       _students[idx] = _students[idx].copyWith(
         status: newStatus,
-        waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome) ? now : _students[idx].waitingAtHomeTime,
-        onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool) ? now : _students[idx].onBusToSchoolTime,
-        atSchoolTime: (newStatus == StudentStatus.atSchool) ? now : _students[idx].atSchoolTime,
-        onBusToHomeTime: (newStatus == StudentStatus.onBusToHome) ? now : _students[idx].onBusToHomeTime,
-        arrivedHomeTime: (newStatus == StudentStatus.arrivedHome) ? now : _students[idx].arrivedHomeTime,
+        waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome)
+            ? now
+            : _students[idx].waitingAtHomeTime,
+        onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool)
+            ? now
+            : _students[idx].onBusToSchoolTime,
+        atSchoolTime: (newStatus == StudentStatus.atSchool)
+            ? now
+            : _students[idx].atSchoolTime,
+        onBusToHomeTime: (newStatus == StudentStatus.onBusToHome)
+            ? now
+            : _students[idx].onBusToHomeTime,
+        arrivedHomeTime: (newStatus == StudentStatus.arrivedHome)
+            ? now
+            : _students[idx].arrivedHomeTime,
       );
       _persistTimestamps(_students[idx]);
       developer.log(
@@ -626,13 +842,34 @@ class AppController extends ChangeNotifier {
 
   Future<void> _persistTimestamps(Student s) async {
     final prefs = await SharedPreferences.getInstance();
-    final todayStr = "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
+    final todayStr =
+        "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
     final sid = s.id;
-    if (s.waitingAtHomeTime != null) await prefs.setString('ts_${sid}_waitingAtHome_$todayStr', s.waitingAtHomeTime!.toIso8601String());
-    if (s.onBusToSchoolTime != null) await prefs.setString('ts_${sid}_onBusToSchool_$todayStr', s.onBusToSchoolTime!.toIso8601String());
-    if (s.atSchoolTime != null) await prefs.setString('ts_${sid}_atSchool_$todayStr', s.atSchoolTime!.toIso8601String());
-    if (s.onBusToHomeTime != null) await prefs.setString('ts_${sid}_onBusToHome_$todayStr', s.onBusToHomeTime!.toIso8601String());
-    if (s.arrivedHomeTime != null) await prefs.setString('ts_${sid}_arrivedHome_$todayStr', s.arrivedHomeTime!.toIso8601String());
+    if (s.waitingAtHomeTime != null)
+      await prefs.setString(
+        'ts_${sid}_waitingAtHome_$todayStr',
+        s.waitingAtHomeTime!.toIso8601String(),
+      );
+    if (s.onBusToSchoolTime != null)
+      await prefs.setString(
+        'ts_${sid}_onBusToSchool_$todayStr',
+        s.onBusToSchoolTime!.toIso8601String(),
+      );
+    if (s.atSchoolTime != null)
+      await prefs.setString(
+        'ts_${sid}_atSchool_$todayStr',
+        s.atSchoolTime!.toIso8601String(),
+      );
+    if (s.onBusToHomeTime != null)
+      await prefs.setString(
+        'ts_${sid}_onBusToHome_$todayStr',
+        s.onBusToHomeTime!.toIso8601String(),
+      );
+    if (s.arrivedHomeTime != null)
+      await prefs.setString(
+        'ts_${sid}_arrivedHome_$todayStr',
+        s.arrivedHomeTime!.toIso8601String(),
+      );
   }
 
   Future<void> completeOnboarding() async {
@@ -666,26 +903,28 @@ class AppController extends ChangeNotifier {
         'device_name': 'device_1',
         'app_context': 'parent',
       };
-      
-      developer.log('🔐 LOGIN URL  => ${AppConfig.apiBaseUrl}/api/auth/login', name: 'AUTH');
+
+      developer.log(
+        '🔐 LOGIN URL  => ${AppConfig.apiBaseUrl}/api/auth/login',
+        name: 'AUTH',
+      );
       developer.log('🔐 LOGIN BODY => $loginData', name: 'AUTH');
-      
+
       final formData = FormData.fromMap(loginData);
 
       final response = await dio.post(
-        '/auth/login', 
+        '/auth/login',
         data: formData,
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-          },
-        ),
+        options: Options(headers: {'Accept': 'application/json'}),
       );
       developer.log('🔐 LOGIN STATUS => ${response.statusCode}', name: 'AUTH');
       developer.log('🔐 LOGIN DATA   => ${response.data}', name: 'AUTH');
 
       final token = response.data['token'] as String?;
       if (token == null) return false;
+
+      // ✅ تعيين التوكن في الذاكرة حتى يستخدمه الـ Interceptor
+      _token = token;
 
       // استخراج بيانات المستخدم الكاملة من استجابة الـ API
       final userData = response.data['data']?['user'] ?? response.data['user'];
@@ -702,7 +941,10 @@ class AppController extends ChangeNotifier {
       _userEmail = email;
       _userNationalId = nationalId;
       _userAvatarUrl = imageUrl;
-      developer.log('👤 Logged in as: $name | Phone: $phone | Email: $email', name: 'AUTH');
+      developer.log(
+        '👤 Logged in as: $name | Phone: $phone | Email: $email',
+        name: 'AUTH',
+      );
 
       // حفظ جميع البيانات محلياً
       final prefs = await SharedPreferences.getInstance();
@@ -783,13 +1025,15 @@ class AppController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       if (token != null) {
-        final dio = Dio(BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ));
+        final dio = Dio(
+          BaseOptions(
+            baseUrl: AppConfig.apiBaseUrl,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          ),
+        );
         await dio.post('auth/logout');
         developer.log('✅ Logged out from backend', name: 'AUTH');
       }
@@ -825,13 +1069,15 @@ class AppController extends ChangeNotifier {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
 
       final response = await dio.get('parent/profile');
       if (response.statusCode == 200) {
@@ -904,8 +1150,12 @@ class AppController extends ChangeNotifier {
   void addNotification(AppNotification notification) {
     // إشعارات الشات منفصلة عن الإشعارات العامة (لا تظهر في قائمة التنبيهات)
     if (notification.type == NotificationType.chat) {
-      developer.log('💬 FCM: Chat notification received — skipping list addition', name: 'NOTIFICATION');
-      // TODO: يمكنك تحديث حالة الشات هنا أو طلب تحديث المحادثات
+      developer.log(
+        '💬 FCM: Chat notification received — skipping list addition',
+        name: 'NOTIFICATION',
+      );
+      _hasNewMessages = true;
+      notifyListeners();
       return;
     }
 
@@ -919,12 +1169,14 @@ class AppController extends ChangeNotifier {
           newStatus = StudentStatus.onBus;
         } else if (notification.type == NotificationType.checkOut) {
           final direction = notification.data['direction']?.toString();
-          newStatus = (direction == 'to_school') ? StudentStatus.atSchool : StudentStatus.atHome;
+          newStatus = (direction == 'to_school')
+              ? StudentStatus.atSchool
+              : StudentStatus.atHome;
         }
 
         if (newStatus != null) {
           _students[index] = _students[index].copyWith(status: newStatus);
-          
+
           // Update tracking snapshot to reflect the new state
           final oldTracking = _tracking[studentId];
           _tracking[studentId] = TrackingSnapshot(
@@ -933,13 +1185,22 @@ class AppController extends ChangeNotifier {
             speedKmh: newStatus == StudentStatus.onBus ? 35 : 0,
             etaMinutes: newStatus == StudentStatus.onBus ? 12 : 0,
             distanceKm: newStatus == StudentStatus.onBus ? 4.5 : 0,
-            studentsOnBoard: (oldTracking?.studentsOnBoard ?? 0) + (newStatus == StudentStatus.onBus ? 1 : -1),
-            busState: newStatus == StudentStatus.onBus ? BusState.enRoute : (newStatus == StudentStatus.atHome ? BusState.atHome : BusState.atSchool),
+            studentsOnBoard:
+                (oldTracking?.studentsOnBoard ?? 0) +
+                (newStatus == StudentStatus.onBus ? 1 : -1),
+            busState: newStatus == StudentStatus.onBus
+                ? BusState.enRoute
+                : (newStatus == StudentStatus.atHome
+                      ? BusState.atHome
+                      : BusState.atSchool),
             updatedAt: DateTime.now(),
             routeDescription: notification.body,
           );
-          
-          developer.log('🔄 FCM: Student $studentId status and tracking updated', name: 'NOTIFICATION');
+
+          developer.log(
+            '🔄 FCM: Student $studentId status and tracking updated',
+            name: 'NOTIFICATION',
+          );
         }
       }
     }
@@ -961,9 +1222,12 @@ class AppController extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       if (token == null) {
-        developer.log('⚠️ AppController: no token found to load notifications', name: 'NOTIFICATION');
+        developer.log(
+          '⚠️ AppController: no token found to load notifications',
+          name: 'NOTIFICATION',
+        );
         return;
       }
 
@@ -980,7 +1244,9 @@ class AppController extends ChangeNotifier {
       final fetched = await repo.fetchNotifications();
 
       // تصفية إشعارات الشات حتى لا تظهر في القائمة العامة
-      final filteredFetched = fetched.where((n) => n.type != NotificationType.chat).toList();
+      final filteredFetched = fetched
+          .where((n) => n.type != NotificationType.chat)
+          .toList();
 
       // Prepend fetched items, keeping any push-delivered ones already present
       final existingIds = _notifications.map((n) => n.id).toSet();
@@ -989,7 +1255,9 @@ class AppController extends ChangeNotifier {
       _notifications.sort((a, b) => b.time.compareTo(a.time));
 
       notifyListeners();
-      print('📋 AppController: loaded ${filteredFetched.length} notifications from API (filtered chat)');
+      print(
+        '📋 AppController: loaded ${filteredFetched.length} notifications from API (filtered chat)',
+      );
     } catch (e, st) {
       developer.log(
         '⚠️ AppController: failed to load notifications from API',
@@ -1007,17 +1275,25 @@ class AppController extends ChangeNotifier {
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {'Authorization': 'Bearer $token'},
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
 
       final repo = AbsenceRepositoryImpl(dio: dio);
       _absenceRequests = await repo.fetchHistory();
       notifyListeners();
-      developer.log('📋 AppController: loaded ${_absenceRequests.length} absence requests', name: 'ABSENCE');
+      developer.log(
+        '📋 AppController: loaded ${_absenceRequests.length} absence requests',
+        name: 'ABSENCE',
+      );
     } catch (e) {
-      developer.log('⚠️ AppController: failed to load absence requests', name: 'ABSENCE');
+      developer.log(
+        '⚠️ AppController: failed to load absence requests',
+        name: 'ABSENCE',
+      );
     }
   }
 
@@ -1032,10 +1308,12 @@ class AppController extends ChangeNotifier {
       final token = prefs.getString('access_token');
       if (token == null) return false;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {'Authorization': 'Bearer $token'},
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
 
       final repo = AbsenceRepositoryImpl(dio: dio);
       final request = AbsenceRequest(
@@ -1046,7 +1324,7 @@ class AppController extends ChangeNotifier {
       );
 
       await repo.submitAbsence(request);
-      
+
       // Refresh list
       await loadAbsenceRequestsFromApi();
       return true;
@@ -1055,10 +1333,16 @@ class AppController extends ChangeNotifier {
       if (e.response?.data != null && e.response?.data['message'] != null) {
         message = e.response?.data['message'];
       }
-      developer.log('❌ AppController: submitAbsenceRequest failed: $message', name: 'ABSENCE');
+      developer.log(
+        '❌ AppController: submitAbsenceRequest failed: $message',
+        name: 'ABSENCE',
+      );
       throw message;
     } catch (e) {
-      developer.log('❌ AppController: submitAbsenceRequest failed: $e', name: 'ABSENCE');
+      developer.log(
+        '❌ AppController: submitAbsenceRequest failed: $e',
+        name: 'ABSENCE',
+      );
       rethrow;
     }
   }
@@ -1117,11 +1401,20 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double p = 0.017453292519943295;
-    final a = 0.5 -
+    final a =
+        0.5 -
         math.cos((lat2 - lat1) * p) / 2 +
-        math.cos(lat1 * p) * math.cos(lat2 * p) * (1 - math.cos((lon2 - lon1) * p)) / 2;
+        math.cos(lat1 * p) *
+            math.cos(lat2 * p) *
+            (1 - math.cos((lon2 - lon1) * p)) /
+            2;
     return 12742 * math.asin(math.sqrt(a));
   }
 }

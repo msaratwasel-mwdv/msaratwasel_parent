@@ -6,7 +6,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/auth/presentation/login_screen.dart';
 import 'package:msaratwasel_user/src/features/dashboard/presentation/root_shell.dart';
-import 'package:msaratwasel_user/src/features/splash/presentation/splash_screen.dart';
 import 'package:msaratwasel_user/src/features/onboarding/presentation/onboarding_page.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_theme.dart';
 
@@ -87,7 +86,9 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
 
   Widget _buildHome() {
     if (!_controller.isBootCompleted) {
-      return SplashScreen(controller: _controller);
+      // Return empty while booting; Native splash will cover this seamlessly
+      // until `isBootCompleted` becomes true and `FlutterNativeSplash.remove()` is called.
+      return const Scaffold(backgroundColor: Color(0xFF062A5A));
     }
 
     if (_controller.shouldShowOnboarding) {

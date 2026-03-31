@@ -61,7 +61,16 @@
 		<string>نحتاج معرفة موقعك لتحديد موقع المنزل وعرض الحافلات القريبة</string>
 		<key>NSLocationAlwaysUsageDescription</key>
 		<string>نحتاج معرفة موقعك لتحديد موقع المنزل وعرض الحافلات القريبة</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+			<string>remote-notification</string>
+		</array>
+		<key>FirebaseAppDelegateProxyEnabled</key>
+		<true/>
 		<key>UIStatusBarHidden</key>
+		<true/>
+		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
 	</dict>
 </plist>

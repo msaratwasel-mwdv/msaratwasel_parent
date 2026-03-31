@@ -116,7 +116,7 @@ class DashboardPage extends StatelessWidget {
                         isArabic: isArabic,
                         studentName: students.isNotEmpty
                             ? students.first.name
-                            : 'Student', // TODO: Localize if needed, but it's a name
+                            : context.t('student'), 
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _ActivityCard(
@@ -603,7 +603,12 @@ class _StudentCard extends StatelessWidget {
                   radius: 28,
                   backgroundColor: AppColors.primary.withAlpha(18),
                   backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
-                      ? CachedNetworkImageProvider(student.avatarUrl!)
+                      ? CachedNetworkImageProvider(
+                          student.avatarUrl!,
+                          headers: AppScope.of(context).token.isNotEmpty
+                              ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                              : null,
+                        )
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(

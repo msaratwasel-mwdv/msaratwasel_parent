@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:video_player/video_player.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,49 +12,36 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  late VideoPlayerController _videoController;
-
   @override
   void initState() {
     super.initState();
-    _playVideo();
+    _handleSplash();
   }
 
-  void _playVideo() async {
-    _videoController = VideoPlayerController.asset('assets/video/splash.MOV');
-
-    await _videoController.initialize();
-    await _videoController.setVolume(0);
+  void _handleSplash() async {
+    // Keep the splash screen for just a short moment to transition smoothly
+    await Future.delayed(const Duration(milliseconds: 1500));
 
     if (mounted) {
-      setState(() {});
-      await _videoController.play();
       FlutterNativeSplash.remove();
+      // Inform the controller we are done, assuming it waits for splash?
+      // Actually standard logic is just to remove native splash, 
+      // the controller itself handles routing via isBootCompleted.
+      // So this screen will unmount automatically when isBootCompleted.
     }
   }
 
   @override
-  void dispose() {
-    _videoController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Return a sleek centered logo with navy blue background
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: _videoController.value.isInitialized
-          ? SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _videoController.value.size.width,
-                  height: _videoController.value.size.height,
-                  child: VideoPlayer(_videoController),
-                ),
-              ),
-            )
-          : const SizedBox.shrink(),
+      backgroundColor: const Color(0xFF062A5A),
+      body: Center(
+        child: Image.asset(
+          'assets/images/iconApp.png',
+          width: 150,
+        ),
+      ),
     );
   }
 }

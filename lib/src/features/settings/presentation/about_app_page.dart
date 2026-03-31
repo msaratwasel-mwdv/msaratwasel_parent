@@ -33,7 +33,7 @@ class AboutAppPage extends StatelessWidget {
                       height: 120,
                       width: 120,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primary.withValues(alpha: 0.2),
@@ -43,9 +43,10 @@ class AboutAppPage extends StatelessWidget {
                         ],
                       ),
                       // Assuming app icon asset exists, otherwise fallback to icon
-                      child: ClipOval(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
                         child: Image.asset(
-                          'assets/icons/msarticon/icon.png',
+                          'assets/images/iconApp.png',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(

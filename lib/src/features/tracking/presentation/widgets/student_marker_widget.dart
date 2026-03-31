@@ -7,11 +7,13 @@ class StudentMarkerWidget extends StatelessWidget {
     required this.name,
     this.imageUrl,
     this.color = Colors.white,
+    this.authToken,
   });
 
   final String name;
   final String? imageUrl;
   final Color color;
+  final String? authToken;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,7 @@ class StudentMarkerWidget extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 50, // Slightly reduced size to look sharp
+          width: 50,
           height: 50,
           decoration: BoxDecoration(
             color: color,
@@ -49,6 +51,9 @@ class StudentMarkerWidget extends StatelessWidget {
       return Image.network(
         imageUrl!,
         fit: BoxFit.cover,
+        headers: (authToken != null && authToken!.isNotEmpty)
+            ? {'Authorization': 'Bearer $authToken'}
+            : null,
         errorBuilder: (_, __, ___) => _buildInitials(),
       );
     }

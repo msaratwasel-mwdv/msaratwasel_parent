@@ -279,13 +279,16 @@ class _LoginHeader extends StatelessWidget {
         Hero(
           tag: 'logo',
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: .15),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white.withValues(alpha: .2)),
             ),
-            child: Image.asset('assets/icons/msarticon/icon.png', height: 90),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset('assets/images/iconApp.png', height: 90),
+            ),
           ),
         ),
         const SizedBox(height: 16),

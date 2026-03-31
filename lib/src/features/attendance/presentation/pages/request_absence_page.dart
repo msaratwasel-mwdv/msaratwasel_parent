@@ -121,13 +121,10 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               color: Colors.transparent,
               child: IconButton(
                 icon: Icon(
-                  Icons.arrow_back_ios_new_rounded,
+                  Icons.menu_rounded,
                   color: isDark ? Colors.white : AppColors.primary,
                 ),
-                onPressed: () {
-                  // Navigate back to the previous index in AppController history
-                  AppScope.of(context).moveBack();
-                },
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
           ),

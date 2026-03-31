@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:msaratwasel_user/src/app/app.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'dart:developer' as developer;
-
 import 'package:flutter/foundation.dart';
+import 'firebase_options.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // Handle Flutter errors
   FlutterError.onError = (details) {
@@ -24,11 +26,21 @@ void main() async {
 
   try {
     print('🚀 MsaratWasel: Application starting...');
-    final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-    FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
     // 1. تهيئة Firebase — ضروري لـ FCM
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    developer.log('🔥 Firebase initialized successfully', name: 'APP_START');
+
+    // Print FCM Token for debugging as requested by the user
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      print("FCM TOKEN: $fcmToken");
+      developer.log("FCM TOKEN: $fcmToken", name: 'FCM');
+    } catch (e) {
+      developer.log("Error getting FCM Token: $e", name: 'FCM');
+    }
 
     // 2. إنشاء AppController (سيتولى تهيئة FCM بعد تسجيل الدخول)
     final controller = AppController();
@@ -37,6 +49,18 @@ void main() async {
     runApp(MsaratWaselApp(controller: controller));
     developer.log('🚀 MsaratWasel: runApp called', name: 'APP_START');
   } catch (e, stack) {
-    developer.log('Error during initialization: $e', name: 'ERROR', stackTrace: stack);
+    developer.log('CRITICAL Error during initialization: $e', name: 'ERROR', stackTrace: stack);
+    
+    // Ensure splash is removed even on error to avoid hang
+    FlutterNativeSplash.remove();
+    
+    // Fallback runApp to stop splash hang
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Text('Error starting app: $e'),
+        ),
+      ),
+    ));
   }
 }

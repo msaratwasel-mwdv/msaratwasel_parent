@@ -73,13 +73,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    // TODO: Navigate to reset password or home
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Correct Code'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    // Navigate to dashboard/home after successful OTP
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/root', (route) => false);
+    }
   }
 
   void _resendCode() {
