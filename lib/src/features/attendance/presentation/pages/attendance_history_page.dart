@@ -275,7 +275,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                     focusedDay: _focusedDay,
                                     locale: locale.languageCode,
                                     startingDayOfWeek: StartingDayOfWeek.sunday,
-                                    weekendDays: const [],
+                                    weekendDays: const [DateTime.friday, DateTime.saturday],
                                     calendarFormat: CalendarFormat.month,
                                     availableCalendarFormats: {
                                       CalendarFormat.month: isArabic
@@ -300,6 +300,9 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                       // We don't need to hide weekends manually anymore since they are clipped off-screen
                                       defaultBuilder:
                                           (context, day, focusedDay) {
+                                            if (day.weekday == DateTime.friday || day.weekday == DateTime.saturday) {
+                                              return _buildDateCell(day, isDark: isDark);
+                                            }
                                             return _buildDateCell(
                                               day,
                                               isDark: isDark,
@@ -322,6 +325,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                           },
                                       prioritizedBuilder:
                                           (context, day, focusedDay) {
+                                            final isWeekend = day.weekday == DateTime.friday || day.weekday == DateTime.saturday;
                                             final normalizedDay = DateTime(
                                               day.year,
                                               day.month,
@@ -378,6 +382,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
     bool isToday = false,
     bool isSelected = false,
   }) {
+    final isWeekend = day.weekday == DateTime.friday || day.weekday == DateTime.saturday;
     return Container(
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
