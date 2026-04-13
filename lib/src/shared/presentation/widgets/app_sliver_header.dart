@@ -41,20 +41,8 @@ class AppSliverHeader extends StatelessWidget {
           color: isDark ? Colors.white : AppColors.primary,
         ),
       );
-    } else if (!isHome) {
-      // A tab that is not Home -> Show Back Arrow to move between tabs
-      activeLeading = Material(
-        color: Colors.transparent,
-        child: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: isDark ? Colors.white : AppColors.primary,
-          ),
-          onPressed: () => controller.moveBack(),
-        ),
-      );
     } else {
-      // Home tab -> Show Menu
+      // Any tab (home or not) -> Show Menu (hamburger icon)
       activeLeading = Material(
         color: Colors.transparent,
         child: IconButton(
