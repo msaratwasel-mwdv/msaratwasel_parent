@@ -22,6 +22,7 @@ class DashboardPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final isArabic = controller.locale.languageCode == 'ar';
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         final unread = controller.notifications.where((n) => !n.read).length;
         final latest = controller.notifications.isNotEmpty
             ? controller.notifications.first
@@ -33,6 +34,8 @@ class DashboardPage extends StatelessWidget {
             await controller.loadChildrenFromApi();
             await controller.loadNotificationsFromApi();
           },
+          color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [

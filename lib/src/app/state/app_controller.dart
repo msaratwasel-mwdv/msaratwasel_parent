@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/core/data/sample_data.dart';
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/features/language/data/repositories/language_repository_impl.dart';
 import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:msaratwasel_user/src/features/absence/data/repositories/absence_repository_impl.dart';
@@ -27,11 +28,12 @@ class AppController extends ChangeNotifier {
       _messages = SampleData.messages,
       _attendance = List.of(SampleData.attendance),
       _trips = List.of(SampleData.trips) {
-    developer.log('🏗️ AppController: Instance created', name: 'STATE');
+    AppLogger.i('🏗️ AppController: Instance created');
     _initDio();
   }
 
   late final Dio dio;
+  final StorageService _storage = StorageService();
 
   void _initDio() {
     dio = Dio(
@@ -49,10 +51,9 @@ class AppController extends ChangeNotifier {
           if (_token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $_token';
           } else {
-            // Try to get from SharedPreferences if not in memory
-            final prefs = await SharedPreferences.getInstance();
-            final savedToken = prefs.getString('access_token');
-            if (savedToken != null) {
+            // Try to get from secure storage if not in memory
+            final savedToken = await _storage.readAccessToken();
+            if (savedToken != null && savedToken.isNotEmpty) {
               _token = savedToken;
               options.headers['Authorization'] = 'Bearer $savedToken';
             }
@@ -63,9 +64,9 @@ class AppController extends ChangeNotifier {
           if (e.response?.statusCode == 401) {
             final isBroadcasting = e.requestOptions.path.contains('broadcasting/auth');
             if (isBroadcasting) {
-              developer.log('⚠️ Reverb Auth 401: Laravel broadcasting route unauthenticated / middleware issue.', name: 'AUTH');
+              AppLogger.w('⚠️ Reverb Auth 401: Laravel broadcasting route unauthenticated / middleware issue.');
             } else {
-              developer.log('⚠️ API 401: Token expired or invalid', name: 'AUTH');
+              AppLogger.w('⚠️ API 401: Token expired or invalid');
               _isAuthenticated = false;
               notifyListeners();
             }
@@ -185,7 +186,7 @@ class AppController extends ChangeNotifier {
       loadChildrenFromApi();
       return true;
     } catch (e) {
-      print('❌ submitAbsence failed: $e');
+      AppLogger.d('❌ submitAbsence failed: $e');
       return false;
     }
   }
@@ -225,13 +226,13 @@ class AppController extends ChangeNotifier {
     if (_isLoadingChildren) return;
     try {
       _isLoadingChildren = true;
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) {
-        print('⚠️ loadChildrenFromApi: token is NULL — skipping');
+        AppLogger.d('⚠️ loadChildrenFromApi: token is NULL — skipping');
         return;
       }
-      print('👶 loadChildrenFromApi: calling /parent/children...');
+      AppLogger.d('👶 loadChildrenFromApi: calling /parent/children...');
 
       final response = await dio.get('parent/children');
       print(
@@ -311,11 +312,11 @@ class AppController extends ChangeNotifier {
           }
         }
 
-        print('✅ Loaded ${_students.length} children and initialized tracking');
+        AppLogger.d('✅ Loaded ${_students.length} children and initialized tracking');
         notifyListeners();
       }
     } catch (e, st) {
-      print('❌ loadChildrenFromApi failed: $e');
+      AppLogger.d('❌ loadChildrenFromApi failed: $e');
       print(st);
     } finally {
       _isLoadingChildren = false;
@@ -356,7 +357,7 @@ class AppController extends ChangeNotifier {
         await _refreshStudentStatuses();
       }
     } catch (e) {
-      print('❌ Tracking poll cycle failed: $e');
+      AppLogger.d('❌ Tracking poll cycle failed: $e');
     } finally {
       _isTrackingPolling = false;
       // Schedule next poll automatically if we haven't been stopped
@@ -373,8 +374,8 @@ class AppController extends ChangeNotifier {
 
   Future<void> _fetchTrackingFromApi() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) return;
 
       final dio = Dio(
@@ -492,7 +493,7 @@ class AppController extends ChangeNotifier {
             }
           }
         } catch (e) {
-          print('Failed to fetch tracking for bus $busId: $e');
+          AppLogger.d('Failed to fetch tracking for bus $busId: $e');
         }
       }
 
@@ -500,7 +501,7 @@ class AppController extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Error in _fetchTrackingFromApi: $e');
+      AppLogger.d('Error in _fetchTrackingFromApi: $e');
     }
   }
 
@@ -508,8 +509,8 @@ class AppController extends ChangeNotifier {
   /// and bus updates (morning→afternoon switch) from the backend.
   Future<void> _refreshStudentStatuses() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) return;
 
       final response = await dio.get('parent/children');
@@ -591,7 +592,7 @@ class AppController extends ChangeNotifier {
         }
       }
     } catch (e) {
-      developer.log('⚠️ _refreshStudentStatuses failed: $e', name: 'TRACKING');
+      AppLogger.d('⚠️ _refreshStudentStatuses failed: $e');
     }
   }
 
@@ -606,17 +607,15 @@ class AppController extends ChangeNotifier {
 
   Future<void> bootstrap() async {
     try {
-      // Simulate loading configuration, cached session, etc.
-      await Future.delayed(const Duration(seconds: 4));
-
-      final prefs = await SharedPreferences.getInstance();
+      // Initialize configuration, cached session, etc.
+      final prefs = await _storage.prefs;
 
       // 1. Check onboarding
       final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
       _shouldShowOnboarding = !hasSeen;
 
       // 2. Check Authentication
-      final savedToken = prefs.getString('access_token');
+      final savedToken = await _storage.readAccessToken();
       final savedName = prefs.getString('user_name') ?? '';
       if (savedToken != null && savedName.isNotEmpty) {
         _token = savedToken;
@@ -655,7 +654,7 @@ class AppController extends ChangeNotifier {
       } else {
         // No valid session — force login
         _isAuthenticated = false;
-        await prefs.remove('access_token');
+        await _storage.deleteAccessToken();
         developer.log(
           '🔐 AppController: No saved session → Show Login',
           name: 'AUTH',
@@ -688,7 +687,7 @@ class AppController extends ChangeNotifier {
           // You will need to make sure FlutterNativeSplash is imported at the top of this file
           FlutterNativeSplash.remove();
         } catch (e) {
-          developer.log('AppController: Native splash already removed or error: $e');
+          AppLogger.d('AppController: Native splash already removed or error: $e');
         }
       });
     }
@@ -841,7 +840,7 @@ class AppController extends ChangeNotifier {
   DateTime? _parseTime(String? s) => s != null ? DateTime.tryParse(s) : null;
 
   Future<void> _persistTimestamps(Student s) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _storage.prefs;
     final todayStr =
         "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
     final sid = s.id;
@@ -873,7 +872,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _storage.prefs;
     await prefs.setBool('has_seen_onboarding', true);
     _shouldShowOnboarding = false;
     notifyListeners();
@@ -908,7 +907,7 @@ class AppController extends ChangeNotifier {
         '🔐 LOGIN URL  => ${AppConfig.apiBaseUrl}/api/auth/login',
         name: 'AUTH',
       );
-      developer.log('🔐 LOGIN BODY => $loginData', name: 'AUTH');
+      AppLogger.d('🔐 LOGIN BODY => $loginData');
 
       final formData = FormData.fromMap(loginData);
 
@@ -917,8 +916,8 @@ class AppController extends ChangeNotifier {
         data: formData,
         options: Options(headers: {'Accept': 'application/json'}),
       );
-      developer.log('🔐 LOGIN STATUS => ${response.statusCode}', name: 'AUTH');
-      developer.log('🔐 LOGIN DATA   => ${response.data}', name: 'AUTH');
+      AppLogger.d('🔐 LOGIN STATUS => ${response.statusCode}');
+      AppLogger.d('🔐 LOGIN DATA   => ${response.data}');
 
       final token = response.data['token'] as String?;
       if (token == null) return false;
@@ -947,8 +946,8 @@ class AppController extends ChangeNotifier {
       );
 
       // حفظ جميع البيانات محلياً
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('access_token', token);
+      final prefs = await _storage.prefs;
+      await _storage.saveAccessToken(token);
       await prefs.setString('user_name', name);
       await prefs.setString('user_name_en', nameEn);
       await prefs.setString('user_phone', phone);
@@ -984,11 +983,11 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return true;
     } on DioException catch (e, st) {
-      print('=== LOGIN DIO EXCEPTION ===');
-      print('Status: ${e.response?.statusCode}');
-      print('Data: ${e.response?.data}');
-      print('Message: ${e.message}');
-      print('===========================');
+      AppLogger.d('=== LOGIN DIO EXCEPTION ===');
+      AppLogger.d('Status: ${e.response?.statusCode}');
+      AppLogger.d('Data: ${e.response?.data}');
+      AppLogger.d('Message: ${e.message}');
+      AppLogger.d('===========================');
       developer.log(
         '❌ LOGIN ERROR => ${e.response?.statusCode} | ${e.response?.data}',
         name: 'AUTH',
@@ -997,7 +996,7 @@ class AppController extends ChangeNotifier {
       );
       return false;
     } catch (e) {
-      developer.log('❌ LOGIN UNEXPECTED => $e', name: 'AUTH');
+      AppLogger.d('❌ LOGIN UNEXPECTED => $e');
       return false;
     }
   }
@@ -1014,16 +1013,16 @@ class AppController extends ChangeNotifier {
         data: {'fcm_token': fcmToken},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      developer.log('✅ FCM: token registered → $fcmToken', name: 'FCM');
+      AppLogger.d('✅ FCM: token registered → $fcmToken');
     } catch (e) {
-      developer.log('⚠️ FCM: failed to register token: $e', name: 'FCM');
+      AppLogger.d('⚠️ FCM: failed to register token: $e');
     }
   }
 
   Future<void> logout() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token != null) {
         final dio = Dio(
           BaseOptions(
@@ -1035,14 +1034,14 @@ class AppController extends ChangeNotifier {
           ),
         );
         await dio.post('auth/logout');
-        developer.log('✅ Logged out from backend', name: 'AUTH');
+        AppLogger.d('✅ Logged out from backend');
       }
     } catch (e) {
-      developer.log('⚠️ Logout API call failed: $e', name: 'AUTH');
+      AppLogger.d('⚠️ Logout API call failed: $e');
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
+    final prefs = await _storage.prefs;
+    await _storage.deleteAccessToken();
     await prefs.remove('user_name');
     await prefs.remove('user_name_en');
     await prefs.remove('user_phone');
@@ -1065,8 +1064,8 @@ class AppController extends ChangeNotifier {
   /// تحميل بيانات الملف الشخصي من API
   Future<void> loadProfileFromApi() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) return;
 
       final dio = Dio(
@@ -1098,17 +1097,17 @@ class AppController extends ChangeNotifier {
         await prefs.setString('user_avatar_url', _userAvatarUrl);
 
         notifyListeners();
-        developer.log('✅ Profile loaded from API', name: 'PROFILE');
+        AppLogger.d('✅ Profile loaded from API');
       }
     } catch (e) {
-      developer.log('⚠️ loadProfileFromApi failed: $e', name: 'PROFILE');
+      AppLogger.d('⚠️ loadProfileFromApi failed: $e');
     }
   }
 
   /// تحديث الصورة الشخصية
   void updateAvatarUrl(String url) {
     _userAvatarUrl = url;
-    SharedPreferences.getInstance().then((prefs) {
+    _storage.prefs.then((prefs) {
       prefs.setString('user_avatar_url', url);
     });
     notifyListeners();
@@ -1220,8 +1219,8 @@ class AppController extends ChangeNotifier {
   /// Fetches the notification history from the Laravel API on app boot.
   Future<void> loadNotificationsFromApi() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
 
       if (token == null) {
         developer.log(
@@ -1271,8 +1270,8 @@ class AppController extends ChangeNotifier {
 
   Future<void> loadAbsenceRequestsFromApi() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) return;
 
       final dio = Dio(
@@ -1304,8 +1303,8 @@ class AppController extends ChangeNotifier {
     String? reason,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final prefs = await _storage.prefs;
+      final token = await _storage.readAccessToken();
       if (token == null) return false;
 
       final dio = Dio(

@@ -114,13 +114,18 @@ class ChildSelector extends StatelessWidget {
                         backgroundColor: isSelected
                             ? selectedAvatarBg
                             : Colors.transparent,
-                        child: Icon(
-                          Icons.person,
-                          color: isSelected
-                              ? selectedIconColor
-                              : (isDark ? Colors.white70 : Colors.grey[600]),
-                          size: 20,
-                        ),
+                        backgroundImage: child.avatarUrl != null
+                            ? NetworkImage(child.avatarUrl!)
+                            : null,
+                        child: child.avatarUrl == null
+                            ? Icon(
+                                Icons.person,
+                                color: isSelected
+                                    ? selectedIconColor
+                                    : (isDark ? Colors.white70 : Colors.grey[600]),
+                                size: 20,
+                              )
+                            : null,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),

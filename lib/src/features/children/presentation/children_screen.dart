@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
-
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
@@ -26,9 +24,10 @@ class ChildrenScreen extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () => controller.loadChildrenFromApi(),
-      color: AppColors.primary,
+      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
         // Navigation Bar
         AppSliverHeader(

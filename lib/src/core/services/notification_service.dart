@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -64,7 +65,7 @@ class NotificationService {
     );
 
     // ── 2. تهيئة الإشعارات المحلية (لعرض الإشعار في الـ Foreground) ─────────
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -125,7 +126,9 @@ class NotificationService {
               androidChannel.id,
               androidChannel.name,
               channelDescription: androidChannel.description,
-              icon: '@mipmap/ic_launcher',
+              icon: '@drawable/ic_notification',
+              largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'),
+              color: const Color(0xFF062A5A),
               importance: Importance.max,
               priority: Priority.high,
             ),

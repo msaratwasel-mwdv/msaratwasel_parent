@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:msaratwasel_user/src/app/app.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -32,15 +31,6 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     developer.log('🔥 Firebase initialized successfully', name: 'APP_START');
-
-    // Print FCM Token for debugging as requested by the user
-    try {
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      print("FCM TOKEN: $fcmToken");
-      developer.log("FCM TOKEN: $fcmToken", name: 'FCM');
-    } catch (e) {
-      developer.log("Error getting FCM Token: $e", name: 'FCM');
-    }
 
     // 2. إنشاء AppController (سيتولى تهيئة FCM بعد تسجيل الدخول)
     final controller = AppController();

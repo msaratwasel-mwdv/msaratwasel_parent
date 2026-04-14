@@ -19,8 +19,15 @@ class ChildrenStatusPage extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = controller.locale.languageCode == 'ar';
 
-    return CustomScrollView(
-      slivers: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.loadChildrenFromApi();
+      },
+      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
         AppSliverHeader(
           title: context.t('childrenStatus'),
           leading: Material(
@@ -53,7 +60,7 @@ class ChildrenStatusPage extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 

@@ -31,8 +31,15 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
 
     return Scaffold(
       backgroundColor: isDark ? null : const Color(0xFFF8F9FD),
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await controller.loadAbsenceRequestsFromApi();
+        },
+        color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           AppSliverHeader(
             title: context.t('absenceLog'),
             leading: Material(
@@ -67,7 +74,7 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
             ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildHistoryCard(BuildContext context, AbsenceRequest req, bool isDark) {

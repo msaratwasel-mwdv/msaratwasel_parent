@@ -82,8 +82,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await controller.loadNotificationsFromApi();
+        },
+        color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           CupertinoSliverNavigationBar(
             largeTitle: Text(
               context.t('notifications'),
@@ -221,7 +228,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildFilterChip(BuildContext context, _Filter filter, String label) {

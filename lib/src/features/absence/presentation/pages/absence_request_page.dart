@@ -41,7 +41,22 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
             const SizedBox(height: AppSpacing.sm),
             DropdownButtonFormField<String>(
               initialValue: _selectedStudentId,
-              items: controller.students.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+              items: controller.students.map((s) => DropdownMenuItem(
+                value: s.id,
+                child: Row(
+                  children: [
+                    if (s.avatarUrl != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0, left: 8.0),
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundImage: NetworkImage(s.avatarUrl!),
+                        ),
+                      ),
+                    Text(s.name),
+                  ],
+                ),
+              )).toList(),
               onChanged: (val) => setState(() => _selectedStudentId = val),
               decoration: InputDecoration(
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

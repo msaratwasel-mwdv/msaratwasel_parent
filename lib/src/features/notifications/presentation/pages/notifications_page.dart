@@ -13,62 +13,78 @@ class NotificationsPage extends StatelessWidget {
     final controller = context.watch<AppController>();
     final notifications = controller.notifications;
     final isArabic = controller.locale.languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(context.t('notifications')),
         centerTitle: true,
       ),
-      body: notifications.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.notifications_none, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications yet',
-                    style: TextStyle(color: AppColors.textSecondary),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await controller.loadNotificationsFromApi();
+        },
+        color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        child: notifications.isEmpty
+            ? CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.notifications_none, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications yet',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
+              )
+            : ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                itemCount: notifications.length,
+                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: AppColors.border.withValues(alpha: 0.1)),
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        child: const Icon(Icons.notifications, color: AppColors.primary),
+                      ),
+                      title: Text(
+                        notification.title,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(notification.body),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${notification.time.hour}:${notification.time.minute.toString().padLeft(2, '0')}',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: notifications.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, index) {
-                final notification = notifications[index];
-                return Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppColors.border.withValues(alpha: 0.1)),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                      child: const Icon(Icons.notifications, color: AppColors.primary),
-                    ),
-                    title: Text(
-                      notification.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(notification.body),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${notification.time.hour}:${notification.time.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+      ),
     );
   }
 }

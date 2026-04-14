@@ -194,14 +194,17 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     return Column(
       children: [
         for (var student in students) ...[
-          _studentCard(textTheme, student.name, student.id, isDark),
+          _studentCard(textTheme, student, isDark),
           const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
   }
 
-  Widget _studentCard(TextTheme textTheme, String name, String id, bool isDark) {
+  Widget _studentCard(TextTheme textTheme, dynamic student, bool isDark) {
+    final String id = student.id;
+    final String name = student.name;
+    final String? avatarUrl = student.avatarUrl;
     final bool selected = selectedStudentId == id;
 
     return InkWell(
@@ -246,13 +249,18 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
                   : (isDark
                         ? Colors.white.withValues(alpha: 0.08)
                         : Colors.grey[100]),
-              child: Icon(
-                Icons.person_rounded,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.blueGrey),
-                size: 20,
-              ),
+              backgroundImage: avatarUrl != null
+                  ? NetworkImage(avatarUrl)
+                  : null,
+              child: avatarUrl == null
+                  ? Icon(
+                      Icons.person_rounded,
+                      color: selected
+                          ? Colors.white
+                          : (isDark ? Colors.white70 : Colors.blueGrey),
+                      size: 20,
+                    )
+                  : null,
             ),
             const SizedBox(width: AppSpacing.md),
             Text(

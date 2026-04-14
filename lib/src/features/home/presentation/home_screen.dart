@@ -20,8 +20,16 @@ class HomeScreen extends StatelessWidget {
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return CustomScrollView(
-      slivers: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.loadChildrenFromApi();
+        await controller.loadNotificationsFromApi();
+      },
+      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
         // Navigation Bar
         // Navigation Bar
         AppSliverHeader(
@@ -94,7 +102,7 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 
