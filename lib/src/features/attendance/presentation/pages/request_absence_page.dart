@@ -53,8 +53,8 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
       final type = selectedAbsenceType == 0 
           ? AbsenceType.both 
           : selectedAbsenceType == 1 
-              ? AbsenceType.morning 
-              : AbsenceType.returnOnly;
+              ? AbsenceType.returnOnly // عودة فقط (Return Only)
+              : AbsenceType.morning;   // ذهاب فقط (Go Only)
 
       final bool success = await controller.submitAbsenceRequest(
         studentIds: [selectedStudentId!],

@@ -5,7 +5,7 @@ class AppConfig {
   static const bool isLocal = true;
 
   // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
-  static const String _localUrl = 'http://10.11.5.139:8001/api/';
+  static const String _localUrl = 'http://10.60.17.139:8001/api/';
 
   // رابط الاستضافة
   static const String _productionUrl = 'https://srv1428362.hstgr.cloud/api/';
