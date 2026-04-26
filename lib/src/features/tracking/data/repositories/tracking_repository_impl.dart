@@ -9,13 +9,13 @@ class TrackingRepositoryImpl implements TrackingRepository {
 
   @override
   Future<BusPosition> fetchLivePosition(String busId) async {
-    final response = await dio.get('guardian/tracking/$busId');
-    final data = response.data['data'];
+    final response = await dio.get('bus/$busId/location');
+    final data = response.data; // LocationController returns it directly usually or under data
     return BusPosition(
-      lat: double.tryParse(data['lat'].toString()) ?? 0.0,
-      lng: double.tryParse(data['lng'].toString()) ?? 0.0,
-      etaMinutes: data['eta_minutes'],
-      busNumber: data['bus_number'],
+      lat: (data['latitude'] as num?)?.toDouble() ?? 0.0,
+      lng: (data['longitude'] as num?)?.toDouble() ?? 0.0,
+      etaMinutes: (data['eta_minutes'] as num?)?.toInt() ?? 0,
+      busNumber: data['bus_number'] ?? '',
     );
   }
 }

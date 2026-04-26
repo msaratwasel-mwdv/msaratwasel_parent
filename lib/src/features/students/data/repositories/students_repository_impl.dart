@@ -9,35 +9,44 @@ class StudentsRepositoryImpl implements StudentsRepository {
 
   @override
   Future<List<Student>> fetchStudents() async {
-    final response = await dio.get('guardian/students');
+    final response = await dio.get('parent/children');
     final List<dynamic> data = response.data['data'];
     return data.map((json) => _mapToStudent(json)).toList();
   }
 
   @override
   Future<Student> fetchStudent(String id) async {
-    final response = await dio.get('guardian/students/$id');
-    return _mapToStudent(response.data['data']);
+    // ParentController returns all children in one call.
+    // We can filter locally or if there was a detail endpoint we'd use it.
+    final response = await dio.get('parent/children');
+    final List<dynamic> data = response.data['data'];
+    final studentJson = data.firstWhere((e) => e['id'].toString() == id);
+    return _mapToStudent(studentJson);
   }
 
   @override
   Future<void> addStudent(Student student) async {
-    await dio.post('guardian/students/link', data: {
-      'civil_id': student.id, // Assuming linking happens by ID
+    // Placeholder for linking logic if needed in the future
+    await dio.post('parent/children/link', data: {
+      'national_id': student.id,
     });
   }
 
   Student _mapToStudent(Map<String, dynamic> json) {
-    String? avatarUrl = json['avatar_url'];
+    String? avatarUrl = json['image_url'];
     if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-      avatarUrl = 'https://srv1428362.hstgr.cloud/storage/$avatarUrl';
+      avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
     }
 
     return Student(
       id: json['id'].toString(),
       name: json['name'] ?? '',
       grade: json['grade'] ?? '',
-      busNumber: json['bus']?['number'] ?? '-',
+      schoolId: json['school']?['id']?.toString() ?? '',
+      bus: json['bus'] != null 
+          ? BusInfo.fromJson(json['bus']) 
+          : const BusInfo(id: '', number: '-', plate: '-'),
+      status: StudentStatus.waitingAtHome, // Default
       avatarUrl: avatarUrl,
     );
   }

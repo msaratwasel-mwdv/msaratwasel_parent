@@ -9,21 +9,21 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
   @override
   Future<List<ChildSummary>> fetchChildrenSummary() async {
-    final response = await dio.get('guardian/dashboard');
+    final response = await dio.get('parent/children');
     final List<dynamic> data = response.data['data'];
     return data.map((json) {
-      String? avatarUrl = json['image_url'] ?? json['avatar_url'];
+      String? avatarUrl = json['image_url'];
       if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-        avatarUrl = 'https://srv1428362.hstgr.cloud/storage/$avatarUrl';
+        avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
       }
 
       return ChildSummary(
         id: json['id'].toString(),
         name: json['name'] ?? '',
-        status: json['status_label'] ?? json['status'] ?? '',
-        busStatus: json['bus_status_label'] ?? json['bus_status'] ?? '',
-        etaMinutes: json['eta_minutes'],
-        recentNotification: json['latest_notification']?['body'],
+        status: json['status'] ?? '',
+        busStatus: json['bus']?['trip_status'] ?? '',
+        etaMinutes: 0, // Calculated elsewhere or if provided by API
+        recentNotification: null,
         avatarUrl: avatarUrl,
       );
     }).toList();

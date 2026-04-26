@@ -28,20 +28,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
 
   Future<void> _handleSubmit() async {
     if (selectedStudentId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('الرجاء اختيار طالب')),
-        );
-      }
-      return;
-    }
-
-    if (selectedDate == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t('selectDate'))),
-        );
-      }
+      _showErrorSnackBar(context.t('chooseStudent'));
       return;
     }
 
@@ -53,130 +40,129 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
       final type = selectedAbsenceType == 0 
           ? AbsenceType.both 
           : selectedAbsenceType == 1 
-              ? AbsenceType.returnOnly // عودة فقط (Return Only)
-              : AbsenceType.morning;   // ذهاب فقط (Go Only)
+              ? AbsenceType.returnOnly 
+              : AbsenceType.morning;
 
       final bool success = await controller.submitAbsenceRequest(
         studentIds: [selectedStudentId!],
         type: type,
-        date: selectedDate!,
+        date: selectedDate ?? DateTime.now(),
         reason: _reasonController.text.trim(),
       );
 
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال طلب الغياب بنجاح'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        // Ensure UI stays stable, wait before closing
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted) {
-          AppScope.of(context).moveBack();
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فشل إرسال الطلب، الرجاء المحاولة مرة أخرى'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSuccessSnackBar(context.t('absenceRequestSuccess') ?? 'تم إرسال طلب الغياب بنجاح');
+        await Future.delayed(const Duration(milliseconds: 1000));
+        if (mounted) controller.moveBack();
       }
     } catch (e) {
-      debugPrint('ABSENCE_SUBMIT_ERROR: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().contains('Exception') ? 'حدث خطأ غير متوقع' : e.toString()),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
           AppSliverHeader(
             title: context.t('requestAbsence'),
-            leading: Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: Icon(
-                  Icons.menu_rounded,
-                  color: isDark ? Colors.white : AppColors.primary,
-                ),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: isDark ? Colors.white : Colors.black87),
+              onPressed: () => AppScope.of(context).moveBack(),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    context.t('chooseStudent'),
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+                  _buildSectionLabel(context.t('chooseStudent')),
+                  const SizedBox(height: 12),
                   _studentSelector(context, textTheme, isDark),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    context.t('absenceType'),
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+                  
+                  const SizedBox(height: 30),
+                  _buildSectionLabel(context.t('absenceType')),
+                  const SizedBox(height: 12),
                   _absenceTypeRow(textTheme, isDark),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    context.t('selectDate'),
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+
+                  const SizedBox(height: 30),
+                  _buildSectionLabel(context.t('selectDate')),
+                  const SizedBox(height: 12),
                   _modernDatePicker(textTheme, isDark),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    context.t('absenceReason'),
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+
+                  const SizedBox(height: 30),
+                  _buildSectionLabel(context.t('absenceReason')),
+                  const SizedBox(height: 12),
                   _modernReasonField(textTheme, isDark),
-                  const SizedBox(height: AppSpacing.xxl),
+
+                  const SizedBox(height: 40),
                   _submitButton(textTheme),
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 40),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: AppColors.primary.withValues(alpha: 0.8),
+        letterSpacing: 0.5,
       ),
     );
   }
@@ -191,9 +177,18 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     // Default to first student if not set
     selectedStudentId ??= students.first.id;
 
+    final displayStudents = students.toList();
+    if (selectedStudentId != null) {
+      final index = displayStudents.indexWhere((s) => s.id == selectedStudentId);
+      if (index != -1 && index != displayStudents.length - 1) {
+        final selected = displayStudents.removeAt(index);
+        displayStudents.add(selected);
+      }
+    }
+
     return Column(
       children: [
-        for (var student in students) ...[
+        for (var student in displayStudents) ...[
           _studentCard(textTheme, student, isDark),
           const SizedBox(height: AppSpacing.md),
         ],

@@ -136,8 +136,12 @@ class _TrackingPageState extends State<TrackingPage> {
                   child: _BottomDetailsCard(
                     tracking: trackingData,
                     isArabic: isArabic,
-                    busNumber:
-                        controller.currentStudent?.bus.number ?? 'N/A',
+                    busNumber: trackingData.busNumber ??
+                        controller.currentStudent?.bus.number ??
+                        'N/A',
+                    plateNumber: trackingData.plateNumber ??
+                        controller.currentStudent?.bus.plate ??
+                        'N/A',
                     isOpen: detailsVisible,
                     onToggle: () =>
                         setState(() => detailsVisible = !detailsVisible),
@@ -313,6 +317,7 @@ class _BottomDetailsCard extends StatelessWidget {
     required this.tracking,
     required this.isArabic,
     required this.busNumber,
+    required this.plateNumber,
     required this.isOpen,
     required this.onToggle,
   });
@@ -320,6 +325,7 @@ class _BottomDetailsCard extends StatelessWidget {
   final TrackingSnapshot tracking;
   final bool isArabic;
   final String busNumber;
+  final String plateNumber;
   final bool isOpen;
   final VoidCallback onToggle;
 
@@ -426,7 +432,7 @@ class _BottomDetailsCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${context.t('busNumber')} $busNumber',
+                          '${context.t('busNumber')} $busNumber • $plateNumber',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: isDark
                                 ? Colors.white70

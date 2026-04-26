@@ -45,8 +45,8 @@ class _ContactsPageState extends State<ContactsPage> {
 
       if (mounted) {
         setState(() {
-          _contacts = results[0] as List<ChatContact>;
-          _conversations = results[1] as List<ChatConversation>;
+          _contacts = (results[0] as List<ChatContact>).where((c) => c.role != 'field_supervisor').toList();
+          _conversations = (results[1] as List<ChatConversation>).where((c) => !c.participants.any((p) => p.role == 'field_supervisor')).toList();
           _isLoading = false;
         });
       }

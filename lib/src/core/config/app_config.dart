@@ -5,10 +5,10 @@ class AppConfig {
   static const bool isLocal = true;
 
   // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
-  static const String _localUrl = 'http://10.60.17.139:8001/api/';
+  static const String _localUrl = 'http://192.168.8.188:8001/api/';
 
   // رابط الاستضافة
-  static const String _productionUrl = 'https://srv1428362.hstgr.cloud/api/';
+  static const String _productionUrl = 'https://masaratwasal.com/api/';
 
   // ─── Base URL ────────────────────────────────────────────────────────────
   static String get apiBaseUrl => isLocal ? _localUrl : _productionUrl;

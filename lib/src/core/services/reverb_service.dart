@@ -32,8 +32,8 @@ class ReverbService {
     return uri.host;
   }
 
-  // نستخدم المنفذ 8082 كما حددت في إعدادات السيرفر
-  static const int _reverbPort = 8082;
+  // نستخدم المنفذ 8080 كما حددت في إعدادات السيرفر
+  static const int _reverbPort = 8080;
   
   // نضبط البروتوكول ليكون ws وفقاً لإعداداتك في الاستضافة (REVERB_SCHEME=http)
   static const bool _forceNonSecure = true; 

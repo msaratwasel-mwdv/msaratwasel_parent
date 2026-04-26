@@ -9,29 +9,28 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<Profile> fetchProfile() async {
-    final response = await dio.get('profile');
+    final response = await dio.get('parent/profile');
     final data = response.data['data'];
     
-    String? avatarUrl = data['avatar_url'] ?? data['image_url'];
+    String? avatarUrl = data['image_url'] ?? data['avatar_url'];
     if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-      avatarUrl = 'https://srv1428362.hstgr.cloud/storage/$avatarUrl';
+      avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
     }
 
     return Profile(
       name: data['name'] ?? '',
       phone: data['phone'] ?? '',
       email: data['email'],
-      languageCode: data['language'],
+      languageCode: 'ar', // Default or from local storage if not in API
       avatarUrl: avatarUrl,
     );
   }
 
   @override
   Future<void> updateProfile(Profile profile) async {
-    await dio.put('profile', data: {
-      'name': profile.name,
+    await dio.post('parent/profile/update', data: {
+      'phone': profile.phone,
       'email': profile.email,
-      'language': profile.languageCode,
     });
   }
 }

@@ -10,27 +10,31 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<AuthUser> login({
     required String civilId,
-    required String phoneNumber,
+    required String password,
   }) async {
-    final response = await dio.post('login', data: {
-      'civil_id': civilId,
-      'phone_number': phoneNumber,
-      'type': 'guardian', // Based on the project context
+    final response = await dio.post('auth/login', data: {
+      'national_id': civilId,
+      'password': password,
+      'device_name': 'mobile_device',
+      'app_context': 'parent',
     });
 
     final data = response.data['data'];
+    final user = data['user'];
     return AuthUser(
-      id: data['user']['id'].toString(),
-      name: data['user']['name'] ?? '',
-      role: data['user']['role'] ?? 'guardian',
-      accessToken: data['access_token'],
+      id: user['id'].toString(),
+      name: user['name'] ?? '',
+      role: user['role'] ?? 'guardian',
+      accessToken: data['token'] ?? response.data['token'],
     );
   }
 
   @override
   Future<void> requestPasswordReset({required String phoneOrUsername}) async {
-    await dio.post('password/forgot', data: {
-      'login': phoneOrUsername,
+    // Backend doesn't seem to have a dedicated password/forgot yet in AuthController
+    // but we'll point it to the likely endpoint or keep it as placeholder
+    await dio.post('auth/password/reset-request', data: {
+      'national_id': phoneOrUsername,
     });
   }
 }

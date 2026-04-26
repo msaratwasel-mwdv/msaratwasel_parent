@@ -21,6 +21,15 @@ class ChildSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final displayChildren = children.toList();
+    if (selectedChild != null) {
+      final index = displayChildren.indexWhere((c) => c.id == selectedChild!.id);
+      if (index != -1 && index != displayChildren.length - 1) {
+        final child = displayChildren.removeAt(index);
+        displayChildren.add(child);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -39,11 +48,11 @@ class ChildSelector extends StatelessWidget {
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: children.length,
+          itemCount: displayChildren.length,
           separatorBuilder: (context, index) =>
               const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
-            final child = children[index];
+            final child = displayChildren[index];
             final isSelected = selectedChild != null && child.id == selectedChild!.id;
 
             // Unified Selected Style (Light/Tinted style matching RequestAbsencePage)

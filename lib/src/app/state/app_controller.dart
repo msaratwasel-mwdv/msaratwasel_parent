@@ -163,31 +163,39 @@ class AppController extends ChangeNotifier {
     await repo.setLocale(newLocale.languageCode);
   }
 
-  Future<bool> submitAbsence({
+  Future<({bool success, String? message})> submitAbsence({
     required String studentId,
-    required String type,
+    required String period,
     required String reason,
+    required String note,
   }) async {
     try {
       final repo = AbsenceRepositoryImpl(dio: dio);
 
-      final absenceType = type == 'sick'
+      // Period mapping: full_day, morning, afternoon
+      final absenceType = period == 'morning'
           ? AbsenceType.morning
-          : AbsenceType.both; // simplified mapping for now
+          : (period == 'afternoon' ? AbsenceType.returnOnly : AbsenceType.both);
 
       final request = AbsenceRequest(
         studentIds: [studentId],
         type: absenceType,
         date: DateTime.now(),
-        note: reason,
+        note: '$reason: $note',
       );
 
       await repo.submitAbsence(request);
       loadChildrenFromApi();
-      return true;
+      return (success: true, message: null);
+    } on DioException catch (e) {
+      String? errorMessage;
+      if (e.response?.data is Map) {
+        errorMessage = e.response?.data['message'];
+      }
+      return (success: false, message: errorMessage);
     } catch (e) {
       AppLogger.d('❌ submitAbsence failed: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 
@@ -417,16 +425,8 @@ class AppController extends ChangeNotifier {
                     student.homeLocation!.latitude,
                     student.homeLocation!.longitude,
                   );
-                  // Estimate ETA based on speed (min 15 km/h for calculation if moving)
-                  double speed = (data['speed_kmh'] as num?)?.toDouble() ?? 0.0;
-                  if (speed < 15 && data['trip_status'] == 'on_route')
-                    speed = 25;
-
-                  if (speed > 0) {
-                    etaMinutes = ((distanceKm / speed) * 60).round();
-                  } else {
-                    etaMinutes = 0;
-                  }
+                  // Estimate ETA based on a fixed speed of 60 km/h (1 min per km)
+                  etaMinutes = distanceKm.ceil();
                 }
 
                 _tracking[student.id] = TrackingSnapshot(
@@ -444,6 +444,9 @@ class AppController extends ChangeNotifier {
                   routeDescription: old?.routeDescription ?? 'جاري التتبع',
                   driverName: driverData?['name'] as String?,
                   driverImageUrl: driverData?['image_url'] as String?,
+                  tripType: data['trip_type']?.toString() ?? old?.tripType,
+                  busNumber: data['bus_number']?.toString() ?? student.bus.number,
+                  plateNumber: data['plate_number']?.toString() ?? student.bus.plate,
                 );
               }
 
@@ -578,6 +581,9 @@ class AppController extends ChangeNotifier {
                 driverName: driverData?['name'] as String? ?? old.driverName,
                 driverImageUrl:
                     driverData?['image_url'] as String? ?? old.driverImageUrl,
+                tripType: old.tripType,
+                busNumber: old.busNumber,
+                plateNumber: old.plateNumber,
               );
             }
           }
@@ -750,6 +756,9 @@ class AppController extends ChangeNotifier {
           routeDescription: current?.routeDescription ?? '',
           driverName: current?.driverName,
           driverImageUrl: current?.driverImageUrl,
+          tripType: data['trip_type']?.toString() ?? current?.tripType,
+          busNumber: data['bus_number']?.toString() ?? current?.busNumber,
+          plateNumber: data['plate_number']?.toString() ?? current?.plateNumber,
         );
         updated = true;
       }
@@ -912,7 +921,7 @@ class AppController extends ChangeNotifier {
       final formData = FormData.fromMap(loginData);
 
       final response = await dio.post(
-        '/auth/login',
+        'auth/login',
         data: formData,
         options: Options(headers: {'Accept': 'application/json'}),
       );
@@ -1303,16 +1312,8 @@ class AppController extends ChangeNotifier {
     String? reason,
   }) async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
       if (token == null) return false;
-
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
 
       final repo = AbsenceRepositoryImpl(dio: dio);
       final request = AbsenceRequest(
@@ -1323,25 +1324,20 @@ class AppController extends ChangeNotifier {
       );
 
       await repo.submitAbsence(request);
-
-      // Refresh list
+      
+      // Refresh local state
+      await loadChildrenFromApi();
       await loadAbsenceRequestsFromApi();
       return true;
     } on DioException catch (e) {
       String message = 'فشل إرسال الطلب';
-      if (e.response?.data != null && e.response?.data['message'] != null) {
-        message = e.response?.data['message'];
+      if (e.response?.data is Map) {
+        message = e.response?.data['message'] ?? message;
       }
-      developer.log(
-        '❌ AppController: submitAbsenceRequest failed: $message',
-        name: 'ABSENCE',
-      );
+      developer.log('❌ ABSENCE_SUBMIT_ERROR: $message', name: 'ABSENCE');
       throw message;
     } catch (e) {
-      developer.log(
-        '❌ AppController: submitAbsenceRequest failed: $e',
-        name: 'ABSENCE',
-      );
+      developer.log('❌ ABSENCE_SUBMIT_ERROR: $e', name: 'ABSENCE');
       rethrow;
     }
   }

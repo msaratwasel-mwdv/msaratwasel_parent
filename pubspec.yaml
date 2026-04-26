@@ -183,3 +183,6 @@ flutter_native_splash:
   ios: true
   web: false
   fullscreen: true
+
+dependency_overrides:
+  sqflite_android: 2.4.1

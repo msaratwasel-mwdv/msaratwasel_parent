@@ -1,4 +1,5 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../config/app_config.dart';
 
 enum StudentStatus {
   // 5 distinct trip-cycle states
@@ -214,7 +215,10 @@ class Student {
     final path = url.startsWith('/') ? url.substring(1) : url;
     // Assume storage path if it doesn't contain storage/
     final fullPath = path.contains('storage/') ? path : 'storage/$path';
-    return 'https://srv1428362.hstgr.cloud/$fullPath';
+    
+    // Use the base URL from AppConfig instead of a hardcoded one
+    final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api/', '');
+    return '$baseUrl/$fullPath';
   }
 
   /// Derives the 5-state trip cycle status from API status + direction
@@ -302,6 +306,9 @@ class TrackingSnapshot {
     required this.routeDescription,
     this.driverName,
     this.driverImageUrl,
+    this.tripType,
+    this.busNumber,
+    this.plateNumber,
   });
 
   final double lat;
@@ -315,6 +322,9 @@ class TrackingSnapshot {
   final String routeDescription;
   final String? driverName;
   final String? driverImageUrl;
+  final String? tripType;
+  final String? busNumber;
+  final String? plateNumber;
 }
 
 class AppNotification {
