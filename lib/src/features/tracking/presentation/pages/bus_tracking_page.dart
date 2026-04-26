@@ -26,15 +26,22 @@ class BusTrackingPage extends StatelessWidget {
               target: tracking != null ? LatLng(tracking.lat, tracking.lng) : const LatLng(24.7136, 46.6753),
               zoom: 14,
             ),
-            markers: tracking != null
-                ? {
-                    Marker(
-                      markerId: const MarkerId('bus'),
-                      position: LatLng(tracking.lat, tracking.lng),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                    ),
-                  }
-                : {},
+            markers: {
+              if (tracking != null)
+                Marker(
+                  markerId: const MarkerId('bus'),
+                  position: LatLng(tracking.lat, tracking.lng),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                  infoWindow: const InfoWindow(title: 'الحافلة'),
+                ),
+              if (controller.currentStudent?.homeLocation != null)
+                Marker(
+                  markerId: const MarkerId('home'),
+                  position: controller.currentStudent!.homeLocation!,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: const InfoWindow(title: 'موقع المنزل'),
+                ),
+            },
           ),
           if (tracking != null)
             Positioned(
@@ -51,7 +58,30 @@ class BusTrackingPage extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (tracking.tripType != null)
+                    if (controller.currentStudent?.homeLocation == null)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_off_rounded, color: Colors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'يرجى تحديد موقع المنزل في الملف الشخصي لعرض الوقت والمسافة المتبقية بدقة.',
+                                style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (tracking.tripType != null)
                       Container(
                         margin: const EdgeInsets.only(bottom: AppSpacing.md),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

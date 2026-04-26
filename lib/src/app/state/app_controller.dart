@@ -740,14 +740,32 @@ class AppController extends ChangeNotifier {
     for (var student in _students) {
       if (student.bus.id == busId) {
         final current = _tracking[student.id];
+        
+        // Calculate distance and ETA if home location is available
+        double distanceKm = current?.distanceKm ?? 0.0;
+        int etaMinutes = current?.etaMinutes ?? 0;
+
+        if (student.homeLocation != null) {
+          distanceKm = _calculateDistance(
+            lat,
+            lng,
+            student.homeLocation!.latitude,
+            student.homeLocation!.longitude,
+          );
+          // Estimate ETA based on a fixed speed of 40 km/h in city (approx 1.5 min per km)
+          // Or just use the 1 min per km (60km/h) as a baseline
+          etaMinutes = distanceKm.ceil();
+        } else {
+          // Fallback to WebSocket data if available
+          etaMinutes = int.tryParse(data['eta_minutes']?.toString() ?? '') ?? etaMinutes;
+        }
+
         _tracking[student.id] = TrackingSnapshot(
           lat: lat,
           lng: lng,
           speedKmh: double.tryParse(data['speed_kmh']?.toString() ?? '') ?? 0.0,
-          etaMinutes:
-              int.tryParse(data['eta_minutes']?.toString() ?? '') ??
-              (current?.etaMinutes ?? 0),
-          distanceKm: current?.distanceKm ?? 0.0,
+          etaMinutes: etaMinutes,
+          distanceKm: distanceKm,
           studentsOnBoard:
               int.tryParse(data['students_on_board']?.toString() ?? '') ??
               (current?.studentsOnBoard ?? 0),
