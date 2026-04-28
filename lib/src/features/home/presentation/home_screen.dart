@@ -186,12 +186,17 @@ class _WelcomeHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '${context.t('welcomeUser')} ${controller.userName}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    '${context.t('welcomeUser')} ${controller.userName}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
                   ),
                 ),
                 const SizedBox(height: 2),

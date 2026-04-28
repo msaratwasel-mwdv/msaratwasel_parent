@@ -239,11 +239,16 @@ class _WelcomeHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            '${context.t('welcomeUser')} ${studentName.split(' ').first}',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              '${context.t('welcomeUser')} ${studentName.split(' ').first}',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
+              maxLines: 1,
             ),
           ),
         ],
