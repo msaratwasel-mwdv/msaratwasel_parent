@@ -3,7 +3,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-import 'package:provider/provider.dart';
+
 
 class ChildDetailPage extends StatelessWidget {
   const ChildDetailPage({super.key, required this.studentId});
@@ -12,7 +12,7 @@ class ChildDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<AppController>();
+    final controller = AppScope.of(context);
     final student = controller.students.firstWhere((s) => s.id == studentId);
 
     return Scaffold(

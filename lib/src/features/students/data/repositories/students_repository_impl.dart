@@ -42,11 +42,7 @@ class StudentsRepositoryImpl implements StudentsRepository {
       id: json['id'].toString(),
       name: json['name'] ?? '',
       grade: json['grade'] ?? '',
-      schoolId: json['school']?['id']?.toString() ?? '',
-      bus: json['bus'] != null 
-          ? BusInfo.fromJson(json['bus']) 
-          : const BusInfo(id: '', number: '-', plate: '-'),
-      status: StudentStatus.waitingAtHome, // Default
+      busNumber: json['bus']?['number']?.toString() ?? '-',
       avatarUrl: avatarUrl,
     );
   }

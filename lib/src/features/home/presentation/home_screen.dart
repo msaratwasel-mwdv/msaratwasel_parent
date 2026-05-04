@@ -1,16 +1,120 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _checkedLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkStudentLocations();
+    });
+  }
+
+  void _checkStudentLocations() {
+    if (!mounted) return;
+    final controller = AppScope.of(context);
+    
+    // Skip if already checked in this session or still loading
+    if (_checkedLocation || controller.isLoadingChildren) return;
+
+    final studentsMissingLocation = controller.students.where((s) => !s.hasLocation).toList();
+
+    if (studentsMissingLocation.isNotEmpty) {
+      _showLocationEnforcementDialog();
+    }
+    _checkedLocation = true;
+  }
+
+  void _showLocationEnforcementDialog() {
+    final isArabic = AppScope.of(context).locale.languageCode == 'ar';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Force the user to interact
+      builder: (context) => PopScope(
+        canPop: false, // Prevent back button
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_off_rounded, color: AppColors.error),
+              const SizedBox(width: 10),
+              Text(
+                isArabic ? 'تحديد موقع المنزل' : 'Set Home Location',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            isArabic 
+              ? 'يرجى تحديد موقع المنزل على الخريطة لضمان وصول الحافلة بدقة لابنائك. لا يمكن بدء تتبع الرحلات بدون تحديد الموقع.'
+              : 'Please set your home location on the map to ensure accurate bus routing for your children. Tracking cannot begin without a valid location.',
+            style: const TextStyle(fontSize: 15),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LocationPickerScreen(),
+                  ),
+                );
+
+                if (result != null && mounted) {
+                  LatLng? location;
+                  if (result is LatLng) {
+                    location = result;
+                  } else if (result is Map) {
+                    location = result['location'] as LatLng?;
+                  }
+
+                  if (location != null) {
+                    final success = await AppScope.of(context).updateHomeLocationApi(location);
+                    if (success && mounted) {
+                      Navigator.pop(context);
+                    } else if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isArabic ? 'فشل تحديث الموقع' : 'Failed to update location'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(isArabic ? 'تحديد الآن' : 'Set Now'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +124,16 @@ class HomeScreen extends StatelessWidget {
     final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Trigger check again if students list changes (e.g. after refresh)
+    if (!_checkedLocation && students.isNotEmpty) {
+       WidgetsBinding.instance.addPostFrameCallback((_) => _checkStudentLocations());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
         await controller.loadChildrenFromApi();
         await controller.loadNotificationsFromApi();
+        _checkedLocation = false; // Re-check after refresh
       },
       color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,

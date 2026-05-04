@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
 
-import 'package:msaratwasel_user/src/core/data/sample_data.dart';
+
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
 class AppState {
@@ -30,12 +30,12 @@ class AppState {
       isBootCompleted: false,
       navIndex: 0,
       selectedStudentIndex: 0,
-      students: List.unmodifiable(SampleData.students),
-      tracking: Map.unmodifiable(SampleData.tracking),
-      notifications: List.unmodifiable(SampleData.notifications()),
-      messages: List.unmodifiable(SampleData.messages),
-      attendance: List.unmodifiable(SampleData.attendance),
-      trips: List.unmodifiable(SampleData.trips),
+      students: const [],
+      tracking: const {},
+      notifications: const [],
+      messages: const [],
+      attendance: const [],
+      trips: const [],
     );
   }
 

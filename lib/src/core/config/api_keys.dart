@@ -21,7 +21,7 @@ class ApiKeys {
   /// 4. Create an API key with appropriate restrictions
   static const String googleMaps = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
-    defaultValue: 'AIzaSyA4Njj1ohfXqbPbNOb3HOainiexMR5WFs0',
+    defaultValue: 'AIzaSyA2ZcFQqhauhU3l-Rj36fbRYomIO7L-ahs',
   );
 
   /// Firebase API Key (if needed separately)

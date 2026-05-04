@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:provider/provider.dart';
+
 
 class LanguageSelectorPage extends StatelessWidget {
   const LanguageSelectorPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<AppController>();
+    final controller = AppScope.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('اختر اللغة | Choose Language')),

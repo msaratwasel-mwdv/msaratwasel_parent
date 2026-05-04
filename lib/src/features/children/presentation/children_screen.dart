@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
@@ -9,6 +10,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:msaratwasel_user/src/shared/widgets/address_display.dart';
 
 class ChildrenScreen extends StatelessWidget {
   const ChildrenScreen({super.key});
@@ -677,17 +679,25 @@ class _ChildDetailsSheet extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  student.homeLocation != null
+                                  student.hasLocation
                                       ? '${student.homeLocation!.latitude.toStringAsFixed(4)}, ${student.homeLocation!.longitude.toStringAsFixed(4)}'
-                                      : context.t('notAvailable'),
+                                      : (isArabic ? 'الموقع غير محدد' : 'Location not set'),
+                                  textDirection: TextDirection.ltr,
                                   style: TextStyle(
-                                    color: isDark
-                                        ? Colors.white
-                                        : AppColors.textPrimary,
+                                    color: !student.hasLocation
+                                        ? AppColors.error
+                                        : (isDark ? Colors.white : AppColors.textPrimary),
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
+                                if (student.hasLocation) ...[
+                                  const SizedBox(height: 8),
+                                  AddressDisplay(
+                                    lat: student.homeLocation!.latitude,
+                                    lng: student.homeLocation!.longitude,
+                                  ),
+                                ],
                                 if (student.locationNote != null &&
                                     student.locationNote!.isNotEmpty) ...[
                                   const SizedBox(height: 4),
@@ -705,30 +715,71 @@ class _ChildDetailsSheet extends StatelessWidget {
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.map_rounded, size: 22),
-                            color: isDark ? Colors.white : AppColors.primary,
-                            onPressed: () {
-                              if (student.homeLocation == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(context.t('noHomeLocation')),
-                                    backgroundColor: AppColors.error,
+                          if (!student.hasLocation)
+                             TextButton.icon(
+                              onPressed: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const LocationPickerScreen(),
                                   ),
                                 );
-                                return;
-                              }
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => LocationPickerScreen(
-                                    initialLocation: student.homeLocation,
-                                    isReadOnly: true,
+
+                                if (result != null && context.mounted) {
+                                  LatLng? location;
+                                  if (result is LatLng) {
+                                    location = result;
+                                  } else if (result is Map) {
+                                    location = result['location'] as LatLng?;
+                                  }
+
+                                  if (location != null) {
+                                    final success = await AppScope.of(context).updateHomeLocationApi(
+                                      location,
+                                      studentId: student.id,
+                                      address: result is Map ? result['label'] as String? : null,
+                                    );
+                                    if (success && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isArabic ? 'تم تحديث الموقع بنجاح' : 'Location updated successfully'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isArabic ? 'فشل تحديث الموقع' : 'Failed to update location'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+                              label: Text(isArabic ? 'تحديد الآن' : 'Set Now'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                            )
+                          else
+                            IconButton(
+                              icon: const Icon(Icons.map_rounded, size: 22),
+                              color: isDark ? Colors.white : AppColors.primary,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LocationPickerScreen(
+                                      initialLocation: student.homeLocation,
+                                      isReadOnly: true,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                );
+                              },
+                            ),
                         ],
                       ),
                     ],
@@ -756,7 +807,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Mock Location
+                      // School Location from API
                       Row(
                         children: [
                           Icon(

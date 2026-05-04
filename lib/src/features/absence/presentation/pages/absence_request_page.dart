@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
-import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-import 'package:provider/provider.dart';
+
 
 class AbsenceRequestPage extends StatefulWidget {
   const AbsenceRequestPage({super.key});
@@ -12,8 +11,17 @@ class AbsenceRequestPage extends StatefulWidget {
 }
 
 class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
+  String? _selectedStudentId;
+  String _absenceType = 'sick';
   String _absencePeriod = 'full_day'; // full_day, morning, afternoon
   bool _isSubmitting = false;
+  final TextEditingController _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, String>> _reasons = [
     {'id': 'sick', 'label_ar': 'مرضي', 'label_en': 'Sick'},
@@ -29,7 +37,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<AppController>();
+    final controller = AppScope.of(context);
     final isArabic = controller.locale.languageCode == 'ar';
     final theme = Theme.of(context);
 
@@ -58,7 +66,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: DropdownButtonHideUnderline(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedStudentId,
+                  initialValue: _selectedStudentId,
                   hint: Text(isArabic ? 'اختر الطالب' : 'Select Student'),
                   items: controller.students.map((s) => DropdownMenuItem(
                     value: s.id,
@@ -79,7 +87,13 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
                             : null,
                         ),
                         const SizedBox(width: 12),
-                        Text(s.name, style: const TextStyle(fontSize: 15)),
+                        Expanded(
+                          child: Text(
+                            s.name, 
+                            style: const TextStyle(fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   )).toList(),
@@ -207,7 +221,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
   }
 
   Future<void> _handleSubmit() async {
-    final controller = context.read<AppController>();
+    final controller = AppScope.of(context);
     final isArabic = controller.locale.languageCode == 'ar';
 
     setState(() => _isSubmitting = true);

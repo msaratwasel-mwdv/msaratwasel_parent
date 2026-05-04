@@ -8,8 +8,8 @@ class LoginUseCase {
 
   Future<AuthUser> call({
     required String civilId,
-    required String phoneNumber,
+    required String password,
   }) {
-    return _repo.login(civilId: civilId, phoneNumber: phoneNumber);
+    return _repo.login(civilId: civilId, password: password);
   }
 }

@@ -53,7 +53,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
       if (!mounted) return;
 
       if (success) {
-        _showSuccessSnackBar(context.t('absenceRequestSuccess') ?? 'تم إرسال طلب الغياب بنجاح');
+        _showSuccessSnackBar(context.t('absenceRequestSuccess'));
         await Future.delayed(const Duration(milliseconds: 1000));
         if (mounted) controller.moveBack();
       }
@@ -258,16 +258,20 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
                   : null,
             ),
             const SizedBox(width: AppSpacing.md),
-            Text(
-              name,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                color: selected
-                    ? (isDark ? Colors.white : AppColors.primary)
-                    : (isDark ? Colors.white : AppColors.textPrimary),
+            Expanded(
+              child: Text(
+                name,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                  color: selected
+                      ? (isDark ? Colors.white : AppColors.primary)
+                      : (isDark ? Colors.white : AppColors.textPrimary),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.md),
             if (selected)
               Icon(
                 Icons.check_circle_rounded,
@@ -432,18 +436,22 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               size: 22,
             ),
             const SizedBox(width: AppSpacing.md),
-            Text(
-              selectedDate != null
-                  ? "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}"
-                  : context.t('selectDate'),
-              style: textTheme.bodyLarge?.copyWith(
-                color: selectedDate != null
-                    ? (isDark ? Colors.white : Colors.black87)
-                    : (isDark ? Colors.white70 : AppColors.textSecondary),
-                fontWeight: FontWeight.w500,
+            Expanded(
+              child: Text(
+                selectedDate != null
+                    ? "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}"
+                    : context.t('selectDate'),
+                style: textTheme.bodyLarge?.copyWith(
+                  color: selectedDate != null
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.white70 : AppColors.textSecondary),
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.md),
             Icon(
               Icons.keyboard_arrow_down_rounded,
               color: isDark ? Colors.white70 : AppColors.textSecondary,

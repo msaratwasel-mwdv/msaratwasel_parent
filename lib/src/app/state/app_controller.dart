@@ -6,10 +6,10 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 // FCM token registration — see _registerFcmToken below
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
-import 'package:msaratwasel_user/src/core/data/sample_data.dart';
+
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/features/language/data/repositories/language_repository_impl.dart';
@@ -23,11 +23,11 @@ import 'package:msaratwasel_user/src/core/services/notification_service.dart';
 class AppController extends ChangeNotifier {
   AppController()
     : _students = [],
-      _tracking = Map.of(SampleData.tracking),
+      _tracking = {},
       _notifications = [],
-      _messages = SampleData.messages,
-      _attendance = List.of(SampleData.attendance),
-      _trips = List.of(SampleData.trips) {
+      _messages = [],
+      _attendance = [],
+      _trips = [] {
     AppLogger.i('🏗️ AppController: Instance created');
     _initDio();
   }
@@ -204,8 +204,8 @@ class AppController extends ChangeNotifier {
   String get userNationalId => _userNationalId;
   bool get isLoadingChildren => _isLoadingChildren;
 
-  TrackingSnapshot trackingForStudent(String studentId) {
-    return _tracking[studentId] ?? _tracking.values.first;
+  TrackingSnapshot? trackingForStudent(String studentId) {
+    return _tracking[studentId];
   }
 
   void setNavIndex(int index) {
@@ -284,41 +284,9 @@ class AppController extends ChangeNotifier {
           );
         }
 
-        // Initialize tracking snapshots for real students
-        for (final student in _students) {
-          final busData =
-              (rawList.firstWhere((e) => e['id'].toString() == student.id)
-                  as Map<String, dynamic>)['bus'];
-          final driverData = busData != null ? busData['driver'] : null;
-
-          if (!_tracking.containsKey(student.id)) {
-            _tracking[student.id] = TrackingSnapshot(
-              lat: 24.7136,
-              lng: 46.6753,
-              speedKmh: 0,
-              etaMinutes: 0,
-              distanceKm: 0,
-              studentsOnBoard: 0,
-              busState:
-                  (student.status == StudentStatus.onBus ||
-                      student.status == StudentStatus.onBusToSchool ||
-                      student.status == StudentStatus.onBusToHome)
-                  ? BusState.enRoute
-                  : (student.status == StudentStatus.atSchool
-                        ? BusState.atSchool
-                        : BusState.atHome),
-              updatedAt: DateTime.now(),
-              routeDescription:
-                  (student.status == StudentStatus.onBus ||
-                      student.status == StudentStatus.onBusToSchool ||
-                      student.status == StudentStatus.onBusToHome)
-                  ? 'في الطريق'
-                  : 'لا توجد رحلة نشطة',
-              driverName: driverData?['name'] as String?,
-              driverImageUrl: driverData?['image_url'] as String?,
-            );
-          }
-        }
+        // NOTE: Do NOT initialize tracking snapshots with fallback coordinates.
+        // Tracking entries are only created when real bus location data arrives
+        // from the API polling (_fetchTrackingFromApi) or WebSocket (_handleRealtimeLocationUpdate).
 
         AppLogger.d('✅ Loaded ${_students.length} children and initialized tracking');
         notifyListeners();
@@ -382,7 +350,6 @@ class AppController extends ChangeNotifier {
 
   Future<void> _fetchTrackingFromApi() async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
       if (token == null) return;
 
@@ -447,6 +414,14 @@ class AppController extends ChangeNotifier {
                   tripType: data['trip_type']?.toString() ?? old?.tripType,
                   busNumber: data['bus_number']?.toString() ?? student.bus.number,
                   plateNumber: data['plate_number']?.toString() ?? student.bus.plate,
+                  polylinePoints: (student.homeLocation != null)
+                      ? await _getPolyline(
+                          lat,
+                          lng,
+                          student.homeLocation!.latitude,
+                          student.homeLocation!.longitude,
+                        )
+                      : [],
                 );
               }
 
@@ -512,7 +487,6 @@ class AppController extends ChangeNotifier {
   /// and bus updates (morning→afternoon switch) from the backend.
   Future<void> _refreshStudentStatuses() async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
       if (token == null) return;
 
@@ -584,6 +558,7 @@ class AppController extends ChangeNotifier {
                 tripType: old.tripType,
                 busNumber: old.busNumber,
                 plateNumber: old.plateNumber,
+                polylinePoints: old.polylinePoints,
               );
             }
           }
@@ -760,6 +735,8 @@ class AppController extends ChangeNotifier {
           etaMinutes = int.tryParse(data['eta_minutes']?.toString() ?? '') ?? etaMinutes;
         }
 
+        final driverData = data['driver'];
+
         _tracking[student.id] = TrackingSnapshot(
           lat: lat,
           lng: lng,
@@ -772,11 +749,12 @@ class AppController extends ChangeNotifier {
           busState: _parseBusState(data['trip_status']?.toString()),
           updatedAt: DateTime.now(),
           routeDescription: current?.routeDescription ?? '',
-          driverName: current?.driverName,
-          driverImageUrl: current?.driverImageUrl,
+          driverName: driverData?['name'] as String? ?? current?.driverName,
+          driverImageUrl: driverData?['image_url'] as String? ?? current?.driverImageUrl,
           tripType: data['trip_type']?.toString() ?? current?.tripType,
           busNumber: data['bus_number']?.toString() ?? current?.busNumber,
           plateNumber: data['plate_number']?.toString() ?? current?.plateNumber,
+          polylinePoints: current?.polylinePoints ?? [],
         );
         updated = true;
       }
@@ -1048,7 +1026,6 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
       if (token != null) {
         final dio = Dio(
@@ -1203,25 +1180,32 @@ class AppController extends ChangeNotifier {
         if (newStatus != null) {
           _students[index] = _students[index].copyWith(status: newStatus);
 
-          // Update tracking snapshot to reflect the new state
+          // Update tracking snapshot ONLY if a real one already exists.
+          // Do NOT inject fake coordinates, speed, ETA, or distance.
           final oldTracking = _tracking[studentId];
-          _tracking[studentId] = TrackingSnapshot(
-            lat: oldTracking?.lat ?? 24.7136,
-            lng: oldTracking?.lng ?? 46.6753,
-            speedKmh: newStatus == StudentStatus.onBus ? 35 : 0,
-            etaMinutes: newStatus == StudentStatus.onBus ? 12 : 0,
-            distanceKm: newStatus == StudentStatus.onBus ? 4.5 : 0,
-            studentsOnBoard:
-                (oldTracking?.studentsOnBoard ?? 0) +
-                (newStatus == StudentStatus.onBus ? 1 : -1),
-            busState: newStatus == StudentStatus.onBus
-                ? BusState.enRoute
-                : (newStatus == StudentStatus.atHome
-                      ? BusState.atHome
-                      : BusState.atSchool),
-            updatedAt: DateTime.now(),
-            routeDescription: notification.body,
-          );
+          if (oldTracking != null) {
+            _tracking[studentId] = TrackingSnapshot(
+              lat: oldTracking.lat,
+              lng: oldTracking.lng,
+              speedKmh: oldTracking.speedKmh,
+              etaMinutes: oldTracking.etaMinutes,
+              distanceKm: oldTracking.distanceKm,
+              studentsOnBoard: oldTracking.studentsOnBoard,
+              busState: newStatus == StudentStatus.onBus
+                  ? BusState.enRoute
+                  : (newStatus == StudentStatus.atHome
+                        ? BusState.atHome
+                        : BusState.atSchool),
+              updatedAt: DateTime.now(),
+              routeDescription: notification.body,
+              driverName: oldTracking.driverName,
+              driverImageUrl: oldTracking.driverImageUrl,
+              tripType: oldTracking.tripType,
+              busNumber: oldTracking.busNumber,
+              plateNumber: oldTracking.plateNumber,
+              polylinePoints: oldTracking.polylinePoints,
+            );
+          }
 
           developer.log(
             '🔄 FCM: Student $studentId status and tracking updated',
@@ -1246,7 +1230,6 @@ class AppController extends ChangeNotifier {
   /// Fetches the notification history from the Laravel API on app boot.
   Future<void> loadNotificationsFromApi() async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
 
       if (token == null) {
@@ -1297,7 +1280,6 @@ class AppController extends ChangeNotifier {
 
   Future<void> loadAbsenceRequestsFromApi() async {
     try {
-      final prefs = await _storage.prefs;
       final token = await _storage.readAccessToken();
       if (token == null) return;
 
@@ -1414,6 +1396,42 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Updates the home location in the backend (for the guardian or a specific student).
+  Future<bool> updateHomeLocationApi(LatLng location, {String? studentId, String? address}) async {
+    try {
+      final token = await _storage.readAccessToken();
+      if (token == null) return false;
+
+      final endpoint = studentId != null ? 'parent/student/location/update' : 'parent/location/update';
+      final payload = {
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+        if (studentId != null) 'student_id': studentId,
+        if (address != null) 'address': address,
+      };
+
+      final response = await dio.post(
+        endpoint,
+        data: payload,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      // Debug feedback requested by user
+      print('Update response: ${response.data}');
+
+      if (response.statusCode == 200) {
+        // Refresh local data to ensure everything is in sync
+        await loadChildrenFromApi();
+        await loadProfileFromApi();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      developer.log('❌ UPDATE_LOCATION_ERROR: $e', name: 'LOCATION');
+      return false;
+    }
+  }
+
   double _calculateDistance(
     double lat1,
     double lon1,
@@ -1428,7 +1446,34 @@ class AppController extends ChangeNotifier {
             math.cos(lat2 * p) *
             (1 - math.cos((lon2 - lon1) * p)) /
             2;
-    return 12742 * math.asin(math.sqrt(a));
+     return 12742 * math.asin(math.sqrt(a));
+  }
+
+  Future<List<LatLng>> _getPolyline(
+    double sourceLat,
+    double sourceLng,
+    double destLat,
+    double destLng,
+  ) async {
+    try {
+      PolylinePoints polylinePoints = PolylinePoints(apiKey: AppConfig.googleMapsApiKey);
+      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+        request: PolylineRequest(
+          origin: PointLatLng(sourceLat, sourceLng),
+          destination: PointLatLng(destLat, destLng),
+          mode: TravelMode.driving,
+        ),
+      );
+
+      if (result.points.isNotEmpty) {
+        return result.points
+            .map((point) => LatLng(point.latitude, point.longitude))
+            .toList();
+      }
+    } catch (e) {
+      AppLogger.d('❌ Polyline fetch error: $e');
+    }
+    return [];
   }
 }
 

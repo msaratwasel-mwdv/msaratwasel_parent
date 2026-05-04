@@ -163,6 +163,9 @@ class Student {
   final String? locationNote;
   final String? schoolName;
   final String? schoolLocation;
+  
+  /// Returns true if the student has a valid home location (non-null and non-zero)
+  bool get hasLocation => homeLocation != null && homeLocation!.latitude != 0 && homeLocation!.longitude != 0;
 
   // Timestamps for the 5-step cycle
   final DateTime? waitingAtHomeTime;
@@ -194,7 +197,10 @@ class Student {
       tripCount: json['trip_count'] as int? ?? 0,
       attendancePercentage: json['attendance_percentage'] as int? ?? 0,
       homeLocation: (json['home_lat'] != null && json['home_lng'] != null)
-          ? LatLng(double.parse(json['home_lat'].toString()), double.parse(json['home_lng'].toString()))
+          ? LatLng(
+              double.tryParse(json['home_lat'].toString()) ?? 0.0,
+              double.tryParse(json['home_lng'].toString()) ?? 0.0,
+            )
           : null,
       locationNote: json['location_note'] as String?,
       schoolName: json['school']?['name'] as String?,
@@ -309,6 +315,7 @@ class TrackingSnapshot {
     this.tripType,
     this.busNumber,
     this.plateNumber,
+    this.polylinePoints = const [],
   });
 
   final double lat;
@@ -325,6 +332,7 @@ class TrackingSnapshot {
   final String? tripType;
   final String? busNumber;
   final String? plateNumber;
+  final List<LatLng> polylinePoints;
 }
 
 class AppNotification {

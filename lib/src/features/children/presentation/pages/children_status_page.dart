@@ -225,7 +225,7 @@ class _ChildStatusCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '5 ${context.t('minutesSuffix')}', // Mock Data
+                  '--',
                   style: TextStyle(
                     color: isDark ? Colors.white : AppColors.textPrimary,
                     fontWeight: FontWeight.w700,

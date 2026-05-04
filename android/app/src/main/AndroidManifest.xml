@@ -23,7 +23,7 @@
         <!-- Google Maps API key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="@string/google_maps_key" />
+            android:value="AIzaSyA2ZcFQqhauhU3l-Rj36fbRYomIO7L-ahs" />
 
         <!-- FCM Default Notification Channel -->
         <meta-data

@@ -24,10 +24,9 @@ class AppSliverHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Get navigation state
-    final controller = AppScope.of(context);
+    // Get navigation state - register dependency for rebuilds
+    AppScope.of(context);
     final canPop = ModalRoute.of(context)?.canPop ?? false;
-    final isHome = controller.navIndex == 0;
 
     // Decide what leading widget to show
     Widget? activeLeading;

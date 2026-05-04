@@ -12,6 +12,7 @@ import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
 import 'package:msaratwasel_user/src/features/tracking/presentation/widgets/student_marker_widget.dart';
 import 'package:widget_to_marker/widget_to_marker.dart';
+import 'package:msaratwasel_user/src/shared/widgets/address_display.dart';
 
 class TrackingPage extends StatefulWidget {
   const TrackingPage({super.key});
@@ -126,25 +127,32 @@ class _TrackingPageState extends State<TrackingPage> {
               // Card aligns to bottom
               Align(
                 alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xl,
-                    0,
-                    AppSpacing.xl,
-                    AppSpacing.xl,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.45,
                   ),
-                  child: _BottomDetailsCard(
-                    tracking: trackingData,
-                    isArabic: isArabic,
-                    busNumber: trackingData.busNumber ??
-                        controller.currentStudent?.bus.number ??
-                        'N/A',
-                    plateNumber: trackingData.plateNumber ??
-                        controller.currentStudent?.bus.plate ??
-                        'N/A',
-                    isOpen: detailsVisible,
-                    onToggle: () =>
-                        setState(() => detailsVisible = !detailsVisible),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        0,
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                      ),
+                      child: _BottomDetailsCard(
+                        tracking: trackingData,
+                        isArabic: isArabic,
+                        busNumber: trackingData.busNumber ??
+                            controller.currentStudent?.bus.number ??
+                            'N/A',
+                        plateNumber: trackingData.plateNumber ??
+                            controller.currentStudent?.bus.plate ??
+                            'N/A',
+                        isOpen: detailsVisible,
+                        onToggle: () =>
+                            setState(() => detailsVisible = !detailsVisible),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -237,9 +245,12 @@ class _TrackingMapState extends State<_TrackingMap> {
       final student = widget.students[i];
       final tracking = controller.trackingForStudent(student.id);
 
+      // Skip students without real backend tracking data.
+      // Do NOT show a bus marker unless location comes from backend.
+      if (tracking == null) continue;
+
       // Offset logic:
       // If multiple students are on the same bus (same lat/lng), apply a small offset.
-      // We can use a simple deterministic offset based on index.
       // 0.00005 degrees is roughly 5 meters.
       final double offset = (i % 2 == 0 ? 1 : -1) * (i * 0.00005);
       final position = LatLng(tracking.lat + offset, tracking.lng + offset);
@@ -262,9 +273,11 @@ class _TrackingMapState extends State<_TrackingMap> {
     }
 
     final primaryTracking = controller.currentTracking;
+    // Muscat coordinates used ONLY as initial map camera center for UI rendering.
+    // This is NOT injected into tracking state or used as bus location.
     final primaryPos = primaryTracking != null
         ? LatLng(primaryTracking.lat, primaryTracking.lng)
-        : const LatLng(24.7136, 46.6753); // Riyadh default fallback
+        : const LatLng(23.5880, 58.3829); // Muscat — camera center only
 
     return Stack(
       children: [
@@ -272,6 +285,19 @@ class _TrackingMapState extends State<_TrackingMap> {
           initialCameraPosition: CameraPosition(target: primaryPos, zoom: 15),
           onCameraMove: (pos) => {}, // Logic to track if user is manual
           markers: markers,
+          polylines: {
+            if (primaryTracking != null &&
+                primaryTracking.polylinePoints.isNotEmpty)
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: primaryTracking.polylinePoints,
+                color: AppColors.primary,
+                width: 4,
+                jointType: JointType.round,
+                startCap: Cap.roundCap,
+                endCap: Cap.roundCap,
+              ),
+          },
           myLocationEnabled: true,
           myLocationButtonEnabled: false, // Disable default button
           zoomControlsEnabled: false,
@@ -518,6 +544,8 @@ class _BottomDetailsCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  AddressDisplay(lat: tracking.lat, lng: tracking.lng),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     '${context.t('updated')} ${date_utils.timeAgo(tracking.updatedAt, locale: isArabic ? 'ar' : 'en')}',

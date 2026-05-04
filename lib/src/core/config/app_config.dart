@@ -10,6 +10,8 @@ class AppConfig {
   // رابط الاستضافة
   static const String _productionUrl = 'https://masaratwasal.com/api/';
 
+  static const String googleMapsApiKey = 'AIzaSyAbfF78GQP30cJOgdSDnc_vM77oXWZSBQM';
+  
   // ─── Base URL ────────────────────────────────────────────────────────────
   static String get apiBaseUrl => isLocal ? _localUrl : _productionUrl;
 

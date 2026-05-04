@@ -576,7 +576,7 @@ class _StudentCard extends StatelessWidget {
   });
 
   final Student student;
-  final TrackingSnapshot tracking;
+  final TrackingSnapshot? tracking;
   final bool isArabic;
   final VoidCallback onTrack;
 
@@ -584,9 +584,9 @@ class _StudentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canTrack =
-        tracking.busState == BusState.enRoute && tracking.etaMinutes > 0;
+        tracking != null && tracking!.busState == BusState.enRoute && tracking!.etaMinutes > 0;
     final etaText = canTrack
-        ? '${tracking.etaMinutes} ${context.t('minutesSuffix')}'
+        ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
         : context.t('notAvailable');
     final statusText = Labels.studentStatus(student.status, arabic: isArabic);
     final statusColors = _statusChipColors(student.status);
@@ -707,7 +707,7 @@ class _StudentCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    Labels.busState(tracking.busState, arabic: isArabic),
+                    Labels.busState(tracking?.busState ?? BusState.atHome, arabic: isArabic),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

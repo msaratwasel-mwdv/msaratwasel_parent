@@ -325,7 +325,6 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                           },
                                       prioritizedBuilder:
                                           (context, day, focusedDay) {
-                                            final isWeekend = day.weekday == DateTime.friday || day.weekday == DateTime.saturday;
                                             final normalizedDay = DateTime(
                                               day.year,
                                               day.month,
@@ -382,7 +381,6 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
     bool isToday = false,
     bool isSelected = false,
   }) {
-    final isWeekend = day.weekday == DateTime.friday || day.weekday == DateTime.saturday;
     return Container(
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(

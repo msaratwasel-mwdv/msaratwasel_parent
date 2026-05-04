@@ -70,24 +70,32 @@ class _MorePageState extends State<MorePage> {
                     );
 
                     if (result != null && context.mounted) {
+                      LatLng? location;
                       if (result is Map) {
-                        final location = result['location'] as LatLng;
-                        final note = result['note'] as String?;
-                        controller.updateStudentLocation(
-                          student.id,
-                          location,
-                          note: note,
-                        );
+                        location = result['location'] as LatLng?;
                       } else if (result is LatLng) {
-                        controller.updateStudentLocation(student.id, result);
+                        location = result;
                       }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(context.t('locationUpdated')),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      if (location != null) {
+                        final success = await controller.updateHomeLocationApi(location);
+                        
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.t('locationUpdated')),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(AppScope.of(context).locale.languageCode == 'ar' ? 'فشل التحديث' : 'Update failed'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                   leading: CircleAvatar(
