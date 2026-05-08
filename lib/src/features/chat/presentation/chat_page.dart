@@ -7,8 +7,10 @@ import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart'
 import 'package:msaratwasel_user/src/features/chat/data/repositories/chat_repository.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-import 'package:msaratwasel_user/src/shared/utils/date_utils.dart' as date_utils;
+import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
+    as date_utils;
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 /// Real-time chat page connected to the Laravel Chat API.
 class ChatPage extends StatefulWidget {
@@ -77,7 +79,12 @@ class _ChatPageState extends State<ChatPage> {
         _error = null;
       });
     } catch (e, st) {
-      developer.log('❌ ChatPage: load messages failed', name: 'CHAT', error: e, stackTrace: st);
+      developer.log(
+        '❌ ChatPage: load messages failed',
+        name: 'CHAT',
+        error: e,
+        stackTrace: st,
+      );
       if (!mounted) return;
       setState(() {
         _error = e.toString();
@@ -130,9 +137,9 @@ class _ChatPageState extends State<ChatPage> {
       developer.log('❌ ChatPage: send message failed', name: 'CHAT', error: e);
       if (!mounted) return;
       setState(() => _isSending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل إرسال الرسالة: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${context.t('failedToSendMessage')}: $e')));
     }
   }
 
@@ -143,9 +150,7 @@ class _ChatPageState extends State<ChatPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final isDriver = widget.contactRole == 'driver';
-    final roleLabel = isArabic
-        ? (isDriver ? 'سائق' : 'مشرفة')
-        : (isDriver ? 'Driver' : 'Supervisor');
+    final roleLabel = isDriver ? context.t('driver') : context.t('supervisor');
 
     return Scaffold(
       appBar: AppBar(
@@ -190,152 +195,156 @@ class _ChatPageState extends State<ChatPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildError(isArabic)
-              : Column(
-                  children: [
-                    // ── Messages List ──
-                    Expanded(
-                      child: _messages.isEmpty
-                          ? _buildEmpty(isArabic)
-                          : RefreshIndicator(
-                              onRefresh: _loadMessages,
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                reverse: true,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.lg,
-                                  vertical: AppSpacing.lg,
-                                ),
-                                itemCount: _messages.length,
-                                itemBuilder: (context, index) {
-                                  final msg = _messages[index];
-                                  final previous = index + 1 < _messages.length
-                                      ? _messages[index + 1]
-                                      : null;
-                                  final showDate = previous == null ||
-                                      msg.createdAt.day != previous.createdAt.day ||
-                                      msg.createdAt.month != previous.createdAt.month ||
-                                      msg.createdAt.year != previous.createdAt.year;
-
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (showDate)
-                                        _DateSeparator(
-                                          date: msg.createdAt,
-                                          isArabic: isArabic,
-                                        ),
-                                      _MessageBubble(
-                                        message: msg,
-                                        isArabic: isArabic,
-                                        isDark: isDark,
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
+          ? _buildError(context)
+          : Column(
+              children: [
+                // ── Messages List ──
+                Expanded(
+                  child: _messages.isEmpty
+                      ? _buildEmpty(context)
+                      : RefreshIndicator(
+                          onRefresh: _loadMessages,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            reverse: true,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.lg,
                             ),
-                    ),
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) {
+                              final msg = _messages[index];
+                              final previous = index + 1 < _messages.length
+                                  ? _messages[index + 1]
+                                  : null;
+                              final showDate =
+                                  previous == null ||
+                                  msg.createdAt.day != previous.createdAt.day ||
+                                  msg.createdAt.month !=
+                                      previous.createdAt.month ||
+                                  msg.createdAt.year != previous.createdAt.year;
 
-                    // ── Input Bar ──
-                    Container(
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.lg,
-                        right: AppSpacing.lg,
-                        bottom: MediaQuery.of(context).padding.bottom + AppSpacing.md,
-                        top: AppSpacing.md,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        border: Border(
-                          top: BorderSide(color: Theme.of(context).dividerColor),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(10),
-                            blurRadius: 8,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _textController,
-                              minLines: 1,
-                              maxLines: 4,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                hintText: isArabic
-                                    ? 'اكتب رسالتك…'
-                                    : 'Type your message…',
-                              ),
-                              onSubmitted: (_) => _sendMessage(),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          SizedBox(
-                            height: 48,
-                            width: 48,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: AppColors.brandGradient,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withAlpha(90),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (showDate)
+                                    _DateSeparator(
+                                      date: msg.createdAt,
+                                    ),
+                                  _MessageBubble(
+                                    message: msg,
+                                    isArabic: isArabic,
+                                    isDark: isDark,
                                   ),
                                 ],
-                              ),
-                              child: _isSending
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(14),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : IconButton(
-                                      onPressed: _sendMessage,
-                                      icon: const Icon(
-                                        Icons.send_rounded,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                            ),
+                              );
+                            },
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
                 ),
+
+                // ── Input Bar ──
+                Container(
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    bottom:
+                        MediaQuery.of(context).padding.bottom + AppSpacing.md,
+                    top: AppSpacing.md,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    border: Border(
+                      top: BorderSide(color: Theme.of(context).dividerColor),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(10),
+                        blurRadius: 8,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          minLines: 1,
+                          maxLines: 4,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: context.t('typeMessage'),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      SizedBox(
+                        height: 48,
+                        width: 48,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: AppColors.brandGradient,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withAlpha(90),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: _isSending
+                              ? const Padding(
+                                  padding: EdgeInsets.all(14),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : IconButton(
+                                  onPressed: _sendMessage,
+                                  icon: const Icon(
+                                    Icons.send_rounded,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
-  Widget _buildError(bool isArabic) {
+  Widget _buildError(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.textSecondary),
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 56,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(height: AppSpacing.md),
-          Text(isArabic ? 'فشل تحميل الرسائل' : 'Failed to load messages'),
+          Text(context.t('failedToLoadMessages')),
           const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
             onPressed: _loadMessages,
             icon: const Icon(Icons.refresh_rounded),
-            label: Text(isArabic ? 'إعادة المحاولة' : 'Retry'),
+            label: Text(context.t('retry')),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmpty(bool isArabic) {
+  Widget _buildEmpty(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -347,15 +356,15 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            isArabic ? 'لا توجد رسائل بعد' : 'No messages yet',
+            context.t('noMessages'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            isArabic ? 'ابدأ المراسلة الآن' : 'Start chatting now',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            context.t('startChattingNow'),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -366,23 +375,25 @@ class _ChatPageState extends State<ChatPage> {
 // ─── Date Separator ─────────────────────────────────────────────────────
 
 class _DateSeparator extends StatelessWidget {
-  const _DateSeparator({required this.date, required this.isArabic});
+  const _DateSeparator({required this.date});
 
   final DateTime date;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final locale = Localizations.localeOf(context).languageCode;
     String label;
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      label = isArabic ? 'اليوم' : 'Today';
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
+      label = context.t('today');
     } else if (date.year == now.year &&
         date.month == now.month &&
         date.day == now.day - 1) {
-      label = isArabic ? 'أمس' : 'Yesterday';
+      label = context.t('yesterday');
     } else {
-      label = date_utils.formatDate(date, locale: isArabic ? 'ar' : 'en');
+      label = date_utils.formatDate(date, locale: locale);
     }
 
     return Padding(
@@ -399,9 +410,9 @@ class _DateSeparator extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: AppColors.textPrimary),
           ),
         ),
       ),
@@ -429,8 +440,8 @@ class _MessageBubble extends StatelessWidget {
     final bubbleColor = isMine
         ? const Color(0xFF1E508E)
         : (isDark
-            ? const Color(0xFF334155)
-            : Colors.white.withValues(alpha: 0.85));
+              ? const Color(0xFF334155)
+              : Colors.white.withValues(alpha: 0.85));
     final textColor = isMine
         ? Colors.white
         : (isDark ? Colors.white : AppColors.textPrimary);
@@ -487,7 +498,8 @@ class _MessageBubble extends StatelessWidget {
                     if (!isMine)
                       Text(
                         message.sender.name,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w700,
                             ),
@@ -496,9 +508,9 @@ class _MessageBubble extends StatelessWidget {
                     if (message.body.isNotEmpty)
                       Text(
                         message.body,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: textColor,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: textColor),
                       ),
                     const SizedBox(height: AppSpacing.xs),
                     Row(
@@ -507,15 +519,22 @@ class _MessageBubble extends StatelessWidget {
                         Text(
                           date_utils.formatTime(
                             message.createdAt,
-                            locale: isArabic ? 'ar' : 'en',
+                            locale: Localizations.localeOf(context).languageCode,
                           ),
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: isMine ? Colors.white70 : AppColors.textSecondary,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: isMine
+                                    ? Colors.white70
+                                    : AppColors.textSecondary,
                               ),
                         ),
                         if (isMine) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.done_all_rounded, size: 14, color: Colors.white70),
+                          const Icon(
+                            Icons.done_all_rounded,
+                            size: 14,
+                            color: Colors.white70,
+                          ),
                         ],
                       ],
                     ),

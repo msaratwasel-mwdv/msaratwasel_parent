@@ -10,7 +10,8 @@ class TrackingRepositoryImpl implements TrackingRepository {
   @override
   Future<BusPosition> fetchLivePosition(String busId) async {
     final response = await dio.get('bus/$busId/location');
-    final data = response.data; // LocationController returns it directly usually or under data
+    final data = response
+        .data; // LocationController returns it directly usually or under data
     return BusPosition(
       lat: (data['latitude'] as num?)?.toDouble() ?? 0.0,
       lng: (data['longitude'] as num?)?.toDouble() ?? 0.0,

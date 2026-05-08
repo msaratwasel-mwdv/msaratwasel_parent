@@ -3,7 +3,8 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -12,7 +13,6 @@ class NotificationsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final notifications = controller.notifications;
-    final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -24,7 +24,9 @@ class NotificationsPage extends StatelessWidget {
         onRefresh: () async {
           await controller.loadNotificationsFromApi();
         },
-        color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+        color: isDark
+            ? Theme.of(context).colorScheme.secondary
+            : AppColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         child: notifications.isEmpty
             ? CustomScrollView(
@@ -35,10 +37,16 @@ class NotificationsPage extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.notifications_none, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                          Icon(
+                            Icons.notifications_none,
+                            size: 64,
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
                           const SizedBox(height: AppSpacing.md),
                           Text(
-                            isArabic ? 'لا توجد إشعارات حالياً' : 'No notifications yet',
+                            context.t('noNotifications'),
                             style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ],
@@ -51,19 +59,65 @@ class NotificationsPage extends StatelessWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.md),
                 itemCount: notifications.length,
-                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: AppSpacing.md),
                 itemBuilder: (context, index) {
                   final notification = notifications[index];
                   return Card(
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: AppColors.border.withValues(alpha: 0.1)),
+                      side: BorderSide(
+                        color: AppColors.border.withValues(alpha: 0.1),
+                      ),
                     ),
                     child: ListTile(
+                      onTap: () {
+                        controller.markNotificationsRead([notification.id]);
+
+                        if (notification.type ==
+                                NotificationType.supervisorMessage ||
+                            notification.type == NotificationType.chat) {
+                          final rawId =
+                              notification.data['conversation_id'] ??
+                              notification.data['id'];
+
+                          final convId = int.tryParse(rawId?.toString() ?? '');
+
+                          if (convId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatPage(
+                                  conversationId: convId,
+                                  contactName:
+                                      notification.data['sender_name']
+                                          ?.toString() ??
+                                      (notification.type ==
+                                              NotificationType.supervisorMessage
+                                          ? context.t('supervisor')
+                                          : context.t('chat')),
+                                  contactRole:
+                                      notification.data['sender_role']
+                                          ?.toString() ??
+                                      (notification.type ==
+                                              NotificationType.supervisorMessage
+                                          ? 'supervisor'
+                                          : ''),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
                       leading: CircleAvatar(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        child: const Icon(Icons.notifications, color: AppColors.primary),
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.1,
+                        ),
+                        child: const Icon(
+                          Icons.notifications,
+                          color: AppColors.primary,
+                        ),
                       ),
                       title: Text(
                         notification.title,
@@ -75,8 +129,11 @@ class NotificationsPage extends StatelessWidget {
                           Text(notification.body),
                           const SizedBox(height: 4),
                           Text(
-                            '${notification.time.hour}:${notification.time.minute.toString().padLeft(2, '0')}',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            '${notification.time.hour == 0 ? 12 : (notification.time.hour > 12 ? notification.time.hour - 12 : notification.time.hour)}:${notification.time.minute.toString().padLeft(2, '0')} ${notification.time.hour >= 12 ? context.t('pm') : context.t('am')}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
                       ),

@@ -23,7 +23,9 @@ class ChildSelector extends StatelessWidget {
 
     final displayChildren = children.toList();
     if (selectedChild != null) {
-      final index = displayChildren.indexWhere((c) => c.id == selectedChild!.id);
+      final index = displayChildren.indexWhere(
+        (c) => c.id == selectedChild!.id,
+      );
       if (index != -1 && index != displayChildren.length - 1) {
         final child = displayChildren.removeAt(index);
         displayChildren.add(child);
@@ -53,7 +55,8 @@ class ChildSelector extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
             final child = displayChildren[index];
-            final isSelected = selectedChild != null && child.id == selectedChild!.id;
+            final isSelected =
+                selectedChild != null && child.id == selectedChild!.id;
 
             // Unified Selected Style (Light/Tinted style matching RequestAbsencePage)
             // Background: Primary with low opacity (Higher opacity in dark mode for visibility)
@@ -131,7 +134,9 @@ class ChildSelector extends StatelessWidget {
                                 Icons.person,
                                 color: isSelected
                                     ? selectedIconColor
-                                    : (isDark ? Colors.white70 : Colors.grey[600]),
+                                    : (isDark
+                                          ? Colors.white70
+                                          : Colors.grey[600]),
                                 size: 20,
                               )
                             : null,

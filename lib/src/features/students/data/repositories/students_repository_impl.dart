@@ -27,9 +27,7 @@ class StudentsRepositoryImpl implements StudentsRepository {
   @override
   Future<void> addStudent(Student student) async {
     // Placeholder for linking logic if needed in the future
-    await dio.post('parent/children/link', data: {
-      'national_id': student.id,
-    });
+    await dio.post('parent/children/link', data: {'national_id': student.id});
   }
 
   Student _mapToStudent(Map<String, dynamic> json) {

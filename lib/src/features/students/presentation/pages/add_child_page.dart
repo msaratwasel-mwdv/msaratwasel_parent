@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class AddChildPage extends StatelessWidget {
   const AddChildPage({super.key});
@@ -6,7 +7,7 @@ class AddChildPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('إضافة ابن')),
+      appBar: AppBar(title: Text(context.t('addChild'))),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

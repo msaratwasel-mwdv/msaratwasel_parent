@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
@@ -49,9 +50,15 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     try {
       final app = AppScope.of(context);
       final formData = FormData.fromMap({
-        'avatar': await MultipartFile.fromFile(file.path, filename: 'avatar.jpg'),
+        'avatar': await MultipartFile.fromFile(
+          file.path,
+          filename: 'avatar.jpg',
+        ),
       });
-      final response = await app.dio.post('parent/profile/avatar', data: formData);
+      final response = await app.dio.post(
+        'parent/profile/avatar',
+        data: formData,
+      );
       if (response.statusCode == 200 && mounted) {
         final imageUrl = response.data['image_url'] as String?;
         if (imageUrl != null) {
@@ -66,7 +73,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   }
 
   void _showPhotoOptions() {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -78,7 +84,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_rounded),
-              title: Text(isArabic ? "التقاط صورة" : "Take a photo"),
+              title: Text(context.t('takePhoto')),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.camera);
@@ -86,9 +92,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_rounded),
-              title: Text(
-                isArabic ? "اختيار من المعرض" : "Choose from gallery",
-              ),
+              title: Text(context.t('chooseFromGallery')),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.gallery);
@@ -104,7 +108,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
@@ -114,13 +117,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     final ImageProvider? avatarImage = hasLocalFile
         ? FileImage(_avatarFile!)
         : hasRemoteUrl
-            ? CachedNetworkImageProvider(
-                controller.userAvatarUrl,
-                headers: controller.token.isNotEmpty
-                    ? {'Authorization': 'Bearer ${controller.token}'}
-                    : null,
-              )
-            : null;
+        ? CachedNetworkImageProvider(
+            controller.userAvatarUrl,
+            headers: controller.token.isNotEmpty
+                ? {'Authorization': 'Bearer ${controller.token}'}
+                : null,
+          )
+        : null;
 
     return CustomScrollView(
       slivers: [
@@ -132,7 +135,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               ? Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text(
-                    isArabic ? "الملف الشخصي" : "Profile",
+                    context.t('profile'),
                     style: TextStyle(
                       height: 1.2,
                       color: isDark ? Colors.white : AppColors.textPrimary,
@@ -141,7 +144,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   ),
                 )
               : Text(
-                  isArabic ? "الملف الشخصي" : "Profile",
+                  context.t('profile'),
                   style: TextStyle(
                     color: isDark ? Colors.white : AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -182,10 +185,11 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               // Profile Header
               _ProfileHeader(
                 name: controller.userName,
-                isArabic: isArabic,
                 isDark: isDark,
                 avatar: avatarImage,
-                nameInitial: controller.userName.isNotEmpty ? controller.userName[0] : '?',
+                nameInitial: controller.userName.isNotEmpty
+                    ? controller.userName[0]
+                    : '?',
                 onChangePhoto: _showPhotoOptions,
                 isUploading: _isUploadingAvatar,
               ),
@@ -194,7 +198,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
               // Personal Information Section
               _SectionTitle(
-                title: isArabic ? "المعلومات الشخصية" : "Personal Information",
+                title: context.t('personalInfo'),
                 icon: Icons.person_outline,
                 isDark: isDark,
               ),
@@ -202,30 +206,30 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
               _InfoCard(
                 icon: Icons.badge_outlined,
-                label: isArabic ? "الرقم المدني" : "Civil ID",
+                label: context.t('civilId'),
                 value: controller.userNationalId.isNotEmpty
                     ? controller.userNationalId
-                    : (isArabic ? 'غير محدد' : 'Not specified'),
+                    : context.t('notSpecified'),
                 isDark: isDark,
               ),
               const SizedBox(height: AppSpacing.sm),
 
               _InfoCard(
                 icon: Icons.phone_outlined,
-                label: isArabic ? "رقم الهاتف" : "Phone Number",
+                label: context.t('phoneNumber'),
                 value: controller.userPhone.isNotEmpty
                     ? controller.userPhone
-                    : (isArabic ? 'غير محدد' : 'Not specified'),
+                    : context.t('notSpecified'),
                 isDark: isDark,
               ),
               const SizedBox(height: AppSpacing.sm),
 
               _InfoCard(
                 icon: Icons.email_outlined,
-                label: isArabic ? "البريد الإلكتروني" : "Email",
+                label: context.t('email'),
                 value: controller.userEmail.isNotEmpty
                     ? controller.userEmail
-                    : (isArabic ? 'غير محدد' : 'Not specified'),
+                    : context.t('notSpecified'),
                 isDark: isDark,
               ),
 
@@ -233,7 +237,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
 
               // Children Section
               _SectionTitle(
-                title: isArabic ? "الأبناء" : "Children",
+                title: context.t('chooseStudent'),
                 icon: Icons.family_restroom_rounded,
                 isDark: isDark,
                 action: TextButton.icon(
@@ -243,7 +247,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                     controller.setNavIndex(1);
                   },
                   icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: Text(isArabic ? "عرض الكل" : "View All"),
+                  label: Text(context.t('viewAll')),
                   style: TextButton.styleFrom(
                     foregroundColor: isDark
                         ? Colors.blue.shade200
@@ -268,31 +272,34 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   ),
                   child: Center(
                     child: Text(
-                      isArabic ? 'لا يوجد أبناء مسجلون' : 'No children registered',
+                      context.t('noStudentsRegistered'),
                       style: TextStyle(
-                        color: isDark ? Colors.white54 : AppColors.textSecondary,
+                        color: isDark
+                            ? Colors.white54
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),
                 )
               else
-                ...controller.students.map((student) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _ChildQuickCard(
-                    name: student.name,
-                    grade: student.grade,
-                    avatarUrl: student.avatarUrl,
-                    isDark: isDark,
-                    isArabic: isArabic,
+                ...controller.students.map(
+                  (student) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _ChildQuickCard(
+                      name: student.name,
+                      grade: student.grade,
+                      avatarUrl: student.avatarUrl,
+                      isDark: isDark,
+                    ),
                   ),
-                )),
+                ),
 
               const SizedBox(height: AppSpacing.xl),
 
               // Change Password Button
               _ProfileActionButton(
                 icon: Icons.lock_reset_rounded,
-                label: isArabic ? "تغيير كلمة السر" : "Change Password",
+                label: context.t('changePassword'),
                 color: AppColors.primary,
                 isDark: isDark,
                 isHorizontal: true,
@@ -310,7 +317,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               // Logout Button
               _ProfileActionButton(
                 icon: Icons.logout_rounded,
-                label: isArabic ? "تسجيل الخروج" : "Logout",
+                label: context.t('logout'),
                 color: AppColors.error,
                 isDark: isDark,
                 isHorizontal: true,
@@ -318,16 +325,12 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text(isArabic ? "تسجيل الخروج" : "Logout"),
-                      content: Text(
-                        isArabic
-                            ? "هل أنت متأكد من تسجيل الخروج؟"
-                            : "Are you sure you want to logout?",
-                      ),
+                      title: Text(context.t('logout')),
+                      content: Text(context.t('logoutConfirmationRequest')),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text(isArabic ? "إلغاء" : "Cancel"),
+                          child: Text(context.t('cancel')),
                         ),
                         TextButton(
                           onPressed: () async {
@@ -336,7 +339,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                             await controller.logout();
                           },
                           child: Text(
-                            isArabic ? "تسجيل الخروج" : "Logout",
+                            context.t('logout'),
                             style: const TextStyle(color: Colors.red),
                           ),
                         ),
@@ -354,13 +357,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
         ),
       ],
     );
+
   }
 }
 
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.name,
-    required this.isArabic,
     required this.isDark,
     required this.avatar,
     required this.nameInitial,
@@ -369,7 +372,6 @@ class _ProfileHeader extends StatelessWidget {
   });
 
   final String name;
-  final bool isArabic;
   final bool isDark;
   final ImageProvider? avatar;
   final String nameInitial;
@@ -419,8 +421,11 @@ class _ProfileHeader extends StatelessWidget {
                           ),
                         )
                       : (isUploading
-                          ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                          : null),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              )
+                            : null),
                 ),
               ),
               Material(
@@ -462,7 +467,7 @@ class _ProfileHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              isArabic ? "ولي الأمر" : "Parent",
+              context.t('parent'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
@@ -587,7 +592,6 @@ class _ChildQuickCard extends StatelessWidget {
     required this.name,
     required this.grade,
     required this.isDark,
-    required this.isArabic,
     this.avatarUrl,
   });
 
@@ -595,7 +599,6 @@ class _ChildQuickCard extends StatelessWidget {
   final String grade;
   final String? avatarUrl;
   final bool isDark;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
@@ -619,7 +622,10 @@ class _ChildQuickCard extends StatelessWidget {
                 ? CachedNetworkImageProvider(
                     avatarUrl!,
                     headers: AppScope.of(context).token.isNotEmpty
-                        ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                        ? {
+                            'Authorization':
+                                'Bearer ${AppScope.of(context).token}',
+                          }
                         : null,
                   )
                 : null,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class OfflineBannerWrapper extends StatefulWidget {
   final Widget child;
@@ -49,8 +50,7 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    
+
     return Stack(
       children: [
         widget.child,
@@ -64,7 +64,10 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.redAccent.shade700,
                     boxShadow: [
@@ -72,16 +75,20 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
                         color: Colors.black26,
                         blurRadius: 4,
                         offset: const Offset(0, 2),
-                      )
+                      ),
                     ],
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20.sp),
+                      Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.white,
+                        size: 20.sp,
+                      ),
                       SizedBox(width: 8.w),
                       Text(
-                        isArabic ? 'لا يوجد اتصال بالإنترنت' : 'No Internet Connection',
+                        context.t('noInternetConnection'),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14.sp,

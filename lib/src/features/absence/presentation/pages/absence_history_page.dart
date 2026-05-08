@@ -35,49 +35,51 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
         onRefresh: () async {
           await controller.loadAbsenceRequestsFromApi();
         },
-        color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+        color: isDark
+            ? Theme.of(context).colorScheme.secondary
+            : AppColors.primary,
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-          AppSliverHeader(
-            title: context.t('absenceLog'),
-            leading: Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: Icon(
-                  Icons.menu_rounded,
-                  color: isDark ? Colors.white : AppColors.primary,
+            AppSliverHeader(
+              title: context.t('absenceLog'),
+              leading: Material(
+                color: Colors.transparent,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.menu_rounded,
+                    color: isDark ? Colors.white : AppColors.primary,
+                  ),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-          ),
-          if (history.isEmpty)
-             SliverFillRemaining(
-              child: Center(
-                child: Text(context.t('noAbsenceHistory')),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
+            if (history.isEmpty)
+              SliverFillRemaining(
+                child: Center(child: Text(context.t('noAbsenceHistory'))),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
                     final req = history[index];
                     return _buildHistoryCard(context, req, isDark);
-                  },
-                  childCount: history.length,
+                  }, childCount: history.length),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 
-  Widget _buildHistoryCard(BuildContext context, AbsenceRequest req, bool isDark) {
+  Widget _buildHistoryCard(
+    BuildContext context,
+    AbsenceRequest req,
+    bool isDark,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -129,16 +131,17 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
           ),
           if (req.note != null && req.note!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
-              req.note!,
-              style: GoogleFonts.cairo(fontSize: 14),
-            ),
+            Text(req.note!, style: GoogleFonts.cairo(fontSize: 14)),
           ],
           if (req.status == 'rejected' && req.rejectionReason != null) ...[
             const Divider(height: 24),
             Text(
               context.t('rejectionReason'),
-              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+              style: GoogleFonts.cairo(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+                fontSize: 13,
+              ),
             ),
             Text(
               req.rejectionReason!,

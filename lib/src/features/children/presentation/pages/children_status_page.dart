@@ -4,7 +4,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
-import 'package:msaratwasel_user/src/features/tracking/presentation/tracking_page.dart';
+import 'package:msaratwasel_user/src/features/tracking/presentation/pages/bus_tracking_page.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:intl/intl.dart';
@@ -23,44 +23,47 @@ class ChildrenStatusPage extends StatelessWidget {
       onRefresh: () async {
         await controller.loadChildrenFromApi();
       },
-      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+      color: isDark
+          ? Theme.of(context).colorScheme.secondary
+          : AppColors.primary,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-        AppSliverHeader(
-          title: context.t('childrenStatus'),
-          leading: Material(
-            color: Colors.transparent,
-            child: IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: isDark ? Colors.white : AppColors.primary,
+          AppSliverHeader(
+            title: context.t('childrenStatus'),
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final student = students[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                child: _ChildStatusCard(
-                  student: student,
-                  studentIndex: index,
-                  isDark: isDark,
-                  isArabic: isArabic,
-                  context: context,
-                ),
-              );
-            }, childCount: students.length),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final student = students[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  child: _ChildStatusCard(
+                    student: student,
+                    studentIndex: index,
+                    isDark: isDark,
+                    isArabic: isArabic,
+                    context: context,
+                  ),
+                );
+              }, childCount: students.length),
+            ),
           ),
-        ),
-      ],
-    ));
+        ],
+      ),
+    );
   }
 }
 
@@ -121,17 +124,26 @@ class _ChildStatusCard extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                    backgroundImage:
+                        (student.avatarUrl != null &&
+                            student.avatarUrl!.isNotEmpty)
                         ? CachedNetworkImageProvider(
                             student.avatarUrl!,
                             headers: controller.token.isNotEmpty
-                                ? {'Authorization': 'Bearer ${controller.token}'}
+                                ? {
+                                    'Authorization':
+                                        'Bearer ${controller.token}',
+                                  }
                                 : null,
                           )
                         : null,
-                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                    child:
+                        (student.avatarUrl == null ||
+                            student.avatarUrl!.isEmpty)
                         ? Text(
-                            student.name.isNotEmpty ? student.name[0] : '?',
+                            student.displayName.isNotEmpty
+                                ? student.displayName.characters.first
+                                : '?',
                             style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
@@ -148,7 +160,7 @@ class _ChildStatusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.name,
+                        student.displayName,
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16, // Consistent size
@@ -159,7 +171,7 @@ class _ChildStatusCard extends StatelessWidget {
                       Text(
                         DateFormat(
                           'EEEE, d MMM',
-                          isArabic ? 'ar' : 'en',
+                          Localizations.localeOf(context).languageCode,
                         ).format(DateTime.now()),
                         style: TextStyle(
                           color: isDark
@@ -173,8 +185,8 @@ class _ChildStatusCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                if (student.status == StudentStatus.onBus || 
-                    student.status == StudentStatus.onBusToSchool || 
+                if (student.status == StudentStatus.onBus ||
+                    student.status == StudentStatus.onBusToSchool ||
                     student.status == StudentStatus.onBusToHome)
                   IconButton(
                     onPressed: () {
@@ -182,15 +194,12 @@ class _ChildStatusCard extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TrackingPage(),
+                          builder: (context) => const BusTrackingPage(),
                         ),
                       );
                     },
-                    icon: Icon(
-                      Icons.map_rounded,
-                      color: AppColors.primary,
-                    ),
-                    tooltip: isArabic ? 'تتبع الحافلة' : 'Track Bus',
+                    icon: Icon(Icons.map_rounded, color: AppColors.primary),
+                    tooltip: context.t('trackBus'),
                   ),
               ],
             ),
@@ -267,17 +276,27 @@ class _ChildStatusCard extends StatelessWidget {
                     currentStep = 5;
                   // Legacy fallbacks
                   case StudentStatus.onBus:
-                    currentStep = student.suggestedDirection == 'to_home' ? 4 : 2;
+                    currentStep = student.suggestedDirection == 'to_home'
+                        ? 4
+                        : 2;
                   case StudentStatus.atHome:
-                    currentStep = student.suggestedDirection == 'to_home' ? 5 : 1;
+                    currentStep = student.suggestedDirection == 'to_home'
+                        ? 5
+                        : 1;
                   case StudentStatus.late:
                     currentStep = 1;
                 }
 
-                String formatTime(int step, DateTime? time, bool reached, bool active) {
+                String formatTime(
+                  int step,
+                  DateTime? time,
+                  bool reached,
+                  bool active,
+                ) {
                   if (time != null) return DateFormat('hh:mm a').format(time);
-                  if (active) return DateFormat('hh:mm a').format(DateTime.now());
-                  
+                  if (active)
+                    return DateFormat('hh:mm a').format(DateTime.now());
+
                   return '--:--';
                 }
 
@@ -286,53 +305,99 @@ class _ChildStatusCard extends StatelessWidget {
                     // Step 1: Waiting at home
                     _TimelineStep(
                       label: context.t('atHome'),
-                      time: formatTime(1, student.waitingAtHomeTime, currentStep >= 1, currentStep == 1),
+                      time: formatTime(
+                        1,
+                        student.waitingAtHomeTime,
+                        currentStep >= 1,
+                        currentStep == 1,
+                      ),
                       isActive: currentStep == 1,
                       isCompleted: currentStep > 1,
                       isDark: isDark,
                       stepIcon: Icons.home_rounded,
                     ),
-                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 1, isDark: isDark)),
+                    Expanded(
+                      child: _TimelineConnector(
+                        isCompleted: currentStep > 1,
+                        isDark: isDark,
+                      ),
+                    ),
 
                     // Step 2: On bus to school
                     _TimelineStep(
                       label: context.t('onBus'),
-                      time: formatTime(2, student.onBusToSchoolTime, currentStep >= 2, currentStep == 2),
+                      time: formatTime(
+                        2,
+                        student.onBusToSchoolTime,
+                        currentStep >= 2,
+                        currentStep == 2,
+                      ),
                       isActive: currentStep == 2,
                       isCompleted: currentStep > 2,
                       isDark: isDark,
                       stepIcon: Icons.directions_bus_rounded,
                     ),
-                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 2, isDark: isDark)),
+                    Expanded(
+                      child: _TimelineConnector(
+                        isCompleted: currentStep > 2,
+                        isDark: isDark,
+                      ),
+                    ),
 
                     // Step 3: At school
                     _TimelineStep(
                       label: context.t('atSchool'),
-                      time: formatTime(3, student.atSchoolTime, currentStep >= 3, currentStep == 3),
+                      time: formatTime(
+                        3,
+                        student.atSchoolTime,
+                        currentStep >= 3,
+                        currentStep == 3,
+                      ),
                       isActive: currentStep == 3,
                       isCompleted: currentStep > 3,
                       isDark: isDark,
                       stepIcon: Icons.school_rounded,
                     ),
-                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 3, isDark: isDark)),
+                    Expanded(
+                      child: _TimelineConnector(
+                        isCompleted: currentStep > 3,
+                        isDark: isDark,
+                      ),
+                    ),
 
                     // Step 4: On bus to home
                     _TimelineStep(
                       label: context.t('onBus'),
-                      time: formatTime(4, student.onBusToHomeTime, currentStep >= 4, currentStep == 4),
+                      time: formatTime(
+                        4,
+                        student.onBusToHomeTime,
+                        currentStep >= 4,
+                        currentStep == 4,
+                      ),
                       isActive: currentStep == 4,
                       isCompleted: currentStep > 4,
                       isDark: isDark,
                       stepIcon: Icons.directions_bus_rounded,
                     ),
-                    Expanded(child: _TimelineConnector(isCompleted: currentStep > 4, isDark: isDark)),
+                    Expanded(
+                      child: _TimelineConnector(
+                        isCompleted: currentStep > 4,
+                        isDark: isDark,
+                      ),
+                    ),
 
                     // Step 5: Arrived home
                     _TimelineStep(
                       label: context.t('atHome'),
-                      time: formatTime(5, student.arrivedHomeTime, currentStep >= 5, currentStep == 5),
+                      time: formatTime(
+                        5,
+                        student.arrivedHomeTime,
+                        currentStep >= 5,
+                        currentStep == 5,
+                      ),
                       isActive: currentStep == 5,
-                      isCompleted: currentStep == 5, // Final step is green when active
+                      isCompleted:
+                          currentStep == 5, // Final step is green when active
                       isDark: isDark,
                       stepIcon: Icons.home_rounded,
                     ),
@@ -340,6 +405,11 @@ class _ChildStatusCard extends StatelessWidget {
                 );
               },
             ),
+          ),
+
+          Divider(
+            height: 1,
+            color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.1),
           ),
         ],
       ),

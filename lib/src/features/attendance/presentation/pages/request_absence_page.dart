@@ -36,12 +36,12 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
 
     try {
       final controller = AppScope.of(context);
-      
-      final type = selectedAbsenceType == 0 
-          ? AbsenceType.both 
-          : selectedAbsenceType == 1 
-              ? AbsenceType.returnOnly 
-              : AbsenceType.morning;
+
+      final type = selectedAbsenceType == 0
+          ? AbsenceType.both
+          : selectedAbsenceType == 1
+          ? AbsenceType.returnOnly
+          : AbsenceType.morning;
 
       final bool success = await controller.submitAbsenceRequest(
         studentIds: [selectedStudentId!],
@@ -114,7 +114,11 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
           AppSliverHeader(
             title: context.t('requestAbsence'),
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: isDark ? Colors.white : Colors.black87),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
               onPressed: () => AppScope.of(context).moveBack(),
             ),
           ),
@@ -127,7 +131,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
                   _buildSectionLabel(context.t('chooseStudent')),
                   const SizedBox(height: 12),
                   _studentSelector(context, textTheme, isDark),
-                  
+
                   const SizedBox(height: 30),
                   _buildSectionLabel(context.t('absenceType')),
                   const SizedBox(height: 12),
@@ -167,7 +171,11 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     );
   }
 
-  Widget _studentSelector(BuildContext context, TextTheme textTheme, bool isDark) {
+  Widget _studentSelector(
+    BuildContext context,
+    TextTheme textTheme,
+    bool isDark,
+  ) {
     final students = AppScope.of(context).students;
 
     if (students.isEmpty) {
@@ -179,7 +187,9 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
 
     final displayStudents = students.toList();
     if (selectedStudentId != null) {
-      final index = displayStudents.indexWhere((s) => s.id == selectedStudentId);
+      final index = displayStudents.indexWhere(
+        (s) => s.id == selectedStudentId,
+      );
       if (index != -1 && index != displayStudents.length - 1) {
         final selected = displayStudents.removeAt(index);
         displayStudents.add(selected);

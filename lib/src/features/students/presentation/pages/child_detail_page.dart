@@ -4,7 +4,6 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 
-
 class ChildDetailPage extends StatelessWidget {
   const ChildDetailPage({super.key, required this.studentId});
 
@@ -16,10 +15,7 @@ class ChildDetailPage extends StatelessWidget {
     final student = controller.students.firstWhere((s) => s.id == studentId);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.t('studentInfo')),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text(context.t('studentInfo')), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -30,9 +26,15 @@ class ChildDetailPage extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 50,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  backgroundImage: student.avatarUrl != null ? NetworkImage(student.avatarUrl!) : null,
+                  backgroundImage: student.avatarUrl != null
+                      ? NetworkImage(student.avatarUrl!)
+                      : null,
                   child: student.avatarUrl == null
-                      ? const Icon(Icons.person, size: 50, color: AppColors.primary)
+                      ? const Icon(
+                          Icons.person,
+                          size: 50,
+                          color: AppColors.primary,
+                        )
                       : null,
                 ),
               ),
@@ -50,15 +52,24 @@ class ChildDetailPage extends StatelessWidget {
             _InfoSection(
               title: context.t('busInfoTitle'),
               children: [
-                _InfoTile(label: context.t('busNumber'), value: student.bus.number),
-                _InfoTile(label: context.t('busPlate'), value: student.bus.plate),
+                _InfoTile(
+                  label: context.t('busNumber'),
+                  value: student.bus.number,
+                ),
+                _InfoTile(
+                  label: context.t('busPlate'),
+                  value: student.bus.plate,
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
             _InfoSection(
               title: context.t('busDriver'),
               children: [
-                _InfoTile(label: context.t('driverName'), value: student.bus.driver?.name ?? context.t('notAvailable')),
+                _InfoTile(
+                  label: context.t('driverName'),
+                  value: student.bus.driver?.name ?? context.t('notAvailable'),
+                ),
               ],
             ),
           ],
@@ -81,7 +92,11 @@ class _InfoSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: AppColors.primary,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Card(
@@ -107,7 +122,10 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(label, style: const TextStyle(fontSize: 14)),
-      trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      trailing: Text(
+        value,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

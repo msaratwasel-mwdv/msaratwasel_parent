@@ -10,6 +10,8 @@ import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
+    as date_utils;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,11 +34,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void _checkStudentLocations() {
     if (!mounted) return;
     final controller = AppScope.of(context);
-    
+
     // Skip if already checked in this session or still loading
     if (_checkedLocation || controller.isLoadingChildren) return;
 
-    final studentsMissingLocation = controller.students.where((s) => !s.hasLocation).toList();
+    final studentsMissingLocation = controller.students
+        .where((s) => !s.hasLocation)
+        .toList();
 
     if (studentsMissingLocation.isNotEmpty) {
       _showLocationEnforcementDialog();
@@ -45,29 +49,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showLocationEnforcementDialog() {
-    final isArabic = AppScope.of(context).locale.languageCode == 'ar';
-    
     showDialog(
       context: context,
       barrierDismissible: false, // Force the user to interact
       builder: (context) => PopScope(
         canPop: false, // Prevent back button
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
               const Icon(Icons.location_off_rounded, color: AppColors.error),
               const SizedBox(width: 10),
               Text(
-                isArabic ? 'تحديد موقع المنزل' : 'Set Home Location',
+                context.t('setHomeLocation'),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           content: Text(
-            isArabic 
-              ? 'يرجى تحديد موقع المنزل على الخريطة لضمان وصول الحافلة بدقة لابنائك. لا يمكن بدء تتبع الرحلات بدون تحديد الموقع.'
-              : 'Please set your home location on the map to ensure accurate bus routing for your children. Tracking cannot begin without a valid location.',
+            context.t('locationEnforcementBody'),
             style: const TextStyle(fontSize: 15),
           ),
           actions: [
@@ -89,13 +91,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   if (location != null) {
-                    final success = await AppScope.of(context).updateHomeLocationApi(location);
+                    String? address;
+                    if (result is Map) {
+                      // Prioritize user-typed note, then reverse geocoded label
+                      address = result['note']?.toString().isNotEmpty == true
+                          ? result['note']
+                          : result['label'];
+                    }
+
+                    final success = await AppScope.of(
+                      context,
+                    ).updateHomeLocationApi(location, address: address);
                     if (success && mounted) {
                       Navigator.pop(context);
                     } else if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(isArabic ? 'فشل تحديث الموقع' : 'Failed to update location'),
+                          content: Text(context.t('locationUpdateFailed')),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -106,9 +118,11 @@ class _HomeScreenState extends State<HomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: Text(isArabic ? 'تحديد الآن' : 'Set Now'),
+              child: Text(context.t('setNow')),
             ),
           ],
         ),
@@ -121,12 +135,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final controller = AppScope.of(context);
     final students = controller.students;
     final notifications = controller.notifications;
-    final isArabic = controller.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Trigger check again if students list changes (e.g. after refresh)
     if (!_checkedLocation && students.isNotEmpty) {
-       WidgetsBinding.instance.addPostFrameCallback((_) => _checkStudentLocations());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _checkStudentLocations(),
+      );
     }
 
     return RefreshIndicator(
@@ -135,90 +150,92 @@ class _HomeScreenState extends State<HomeScreen> {
         await controller.loadNotificationsFromApi();
         _checkedLocation = false; // Re-check after refresh
       },
-      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+      color: isDark
+          ? Theme.of(context).colorScheme.secondary
+          : AppColors.primary,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-        // Navigation Bar
-        // Navigation Bar
-        AppSliverHeader(
-          title: context.t('home'),
-          leading: Material(
-            color: Colors.transparent,
-            child: IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: isDark ? Colors.white : AppColors.primary,
+          // Navigation Bar
+          // Navigation Bar
+          AppSliverHeader(
+            title: context.t('home'),
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-        ),
 
-        // Content
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              // Welcome Header
-              _WelcomeHeader(isDark: isDark),
-              const SizedBox(height: AppSpacing.xl),
+          // Content
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Welcome Header
+                const _WelcomeHeader(),
+                const SizedBox(height: AppSpacing.xl),
 
-              // Summary Stats
-              _SummaryStats(
-                students: students,
-                notifications: notifications,
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // Children Quick View
-              _SectionTitle(title: context.t('myKids'), isDark: isDark),
-              const SizedBox(height: AppSpacing.md),
-              ...students.map(
-                (student) => _ChildQuickCard(
-                  student: student,
-                  isArabic: isArabic,
+                // Summary Stats
+                _SummaryStats(
+                  students: students,
+                  notifications: notifications,
                   isDark: isDark,
-                  onTap: () =>
-                      controller.setNavIndex(1), // Navigate to Children screen
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
 
-              // Recent Notifications
-              _SectionTitle(title: context.t('notifications'), isDark: isDark),
-              const SizedBox(height: AppSpacing.md),
-              _RecentNotifications(
-                notifications: notifications.take(3).toList(),
-                isArabic: isArabic,
-                isDark: isDark,
-                onViewAll: () =>
-                    controller.setNavIndex(4), // Navigate to Notifications
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                // Children Quick View
+                _SectionTitle(title: context.t('myKids'), isDark: isDark),
+                const SizedBox(height: AppSpacing.md),
+                ...students.map(
+                  (student) => _ChildQuickCard(
+                    student: student,
+                    isDark: isDark,
+                    onTap: () => controller.setNavIndex(1),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
 
-              // Quick Actions
-              _SectionTitle(
-                title: context.t('quickActionsTitle'),
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _QuickActions(controller: controller, isDark: isDark),
+                // Recent Notifications
+                _SectionTitle(
+                  title: context.t('notifications'),
+                  isDark: isDark,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _RecentNotifications(
+                  notifications: notifications.take(3).toList(),
+                  isDark: isDark,
+                  onViewAll: () =>
+                      controller.setNavIndex(4), // Navigate to Notifications
+                ),
+                const SizedBox(height: AppSpacing.xl),
 
-              const SizedBox(height: AppSpacing.xxl),
-            ]),
+                // Quick Actions
+                _SectionTitle(
+                  title: context.t('quickActionsTitle'),
+                  isDark: isDark,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _QuickActions(controller: controller, isDark: isDark),
+
+                const SizedBox(height: AppSpacing.xxl),
+              ]),
+            ),
           ),
-        ),
-      ],
-    ));
+        ],
+      ),
+    );
   }
 }
 
 class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader({required this.isDark});
-  final bool isDark;
+  const _WelcomeHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -351,7 +368,12 @@ class _SummaryStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onBusCount = students
-        .where((s) => s.status == StudentStatus.onBus || s.status == StudentStatus.onBusToSchool || s.status == StudentStatus.onBusToHome)
+        .where(
+          (s) =>
+              s.status == StudentStatus.onBus ||
+              s.status == StudentStatus.onBusToSchool ||
+              s.status == StudentStatus.onBusToHome,
+        )
         .length;
     final unreadCount = notifications.where((n) => !n.read).length;
 
@@ -470,19 +492,17 @@ class _StatCard extends StatelessWidget {
 class _ChildQuickCard extends StatelessWidget {
   const _ChildQuickCard({
     required this.student,
-    required this.isArabic,
     required this.isDark,
     required this.onTap,
   });
 
   final Student student;
-  final bool isArabic;
   final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final statusText = Labels.studentStatus(student.status, arabic: isArabic);
+    final statusText = Labels.studentStatus(context, student.status);
     final statusIcon = _statusIcon(student.status);
     final statusColor = _getStatusColor(student.status, isDark);
 
@@ -509,17 +529,23 @@ class _ChildQuickCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+                  backgroundImage:
+                      student.avatarUrl != null && student.avatarUrl!.isNotEmpty
                       ? CachedNetworkImageProvider(
                           student.avatarUrl!,
                           headers: AppScope.of(context).token.isNotEmpty
-                              ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                              ? {
+                                  'Authorization':
+                                      'Bearer ${AppScope.of(context).token}',
+                                }
                               : null,
                         )
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(
-                          student.name.isNotEmpty ? student.name.characters.first : '?',
+                          student.displayName.isNotEmpty
+                              ? student.displayName.characters.first
+                              : '?',
                           style: TextStyle(
                             color: isDark ? Colors.white : AppColors.primary,
                             fontSize: 20,
@@ -534,7 +560,7 @@ class _ChildQuickCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.name,
+                        student.displayName,
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16,
@@ -644,13 +670,11 @@ class _ChildQuickCard extends StatelessWidget {
 class _RecentNotifications extends StatelessWidget {
   const _RecentNotifications({
     required this.notifications,
-    required this.isArabic,
     required this.isDark,
     required this.onViewAll,
   });
 
   final List<AppNotification> notifications;
-  final bool isArabic;
   final bool isDark;
   final VoidCallback onViewAll;
 
@@ -670,11 +694,8 @@ class _RecentNotifications extends StatelessWidget {
       child: Column(
         children: [
           ...notifications.map(
-            (notification) => _NotificationItem(
-              notification: notification,
-              isDark: isDark,
-              isArabic: isArabic,
-            ),
+            (notification) =>
+                _NotificationItem(notification: notification, isDark: isDark),
           ),
           const SizedBox(height: AppSpacing.sm),
           TextButton(
@@ -694,19 +715,17 @@ class _RecentNotifications extends StatelessWidget {
 }
 
 class _NotificationItem extends StatelessWidget {
-  const _NotificationItem({
-    required this.notification,
-    required this.isDark,
-    required this.isArabic,
-  });
+  const _NotificationItem({required this.notification, required this.isDark});
 
   final AppNotification notification;
   final bool isDark;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
-    final timeAgo = _getTimeAgo(notification.time, isArabic);
+    final timeAgo = date_utils.timeAgo(
+      notification.time,
+      locale: Localizations.localeOf(context).languageCode,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -749,20 +768,6 @@ class _NotificationItem extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _getTimeAgo(DateTime time, bool isArabic) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inMinutes < 60) {
-      final minutes = diff.inMinutes;
-      return isArabic ? 'منذ $minutes دقيقة' : '$minutes min ago';
-    } else if (diff.inHours < 24) {
-      final hours = diff.inHours;
-      return isArabic ? 'منذ $hours ساعة' : '$hours h ago';
-    } else {
-      final days = diff.inDays;
-      return isArabic ? 'منذ $days يوم' : '$days d ago';
-    }
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,9 +14,9 @@ class ChildListPage extends StatelessWidget {
     final students = controller.students;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الأبناء')),
+      appBar: AppBar(title: Text(context.t('kidsTitle'))),
       body: students.isEmpty
-          ? const Center(child: Text('لا يوجد طلاب مسجلين حالياً'))
+          ? Center(child: Text(context.t('noChildrenFound')))
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: students.length,
@@ -40,18 +41,25 @@ class ChildListPage extends StatelessWidget {
         leading: CircleAvatar(
           radius: 26,
           backgroundColor: AppColors.primary.withAlpha(15),
-          backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+          backgroundImage:
+              student.avatarUrl != null && student.avatarUrl!.isNotEmpty
               ? CachedNetworkImageProvider(
                   student.avatarUrl!,
                   headers: AppScope.of(context).token.isNotEmpty
-                      ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                      ? {
+                          'Authorization':
+                              'Bearer ${AppScope.of(context).token}',
+                        }
                       : null,
                 )
               : null,
           child: student.avatarUrl == null || student.avatarUrl!.isEmpty
               ? Text(
                   student.name.isNotEmpty ? student.name.characters.first : '?',
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 )
               : null,
         ),
@@ -65,11 +73,7 @@ class ChildListPage extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right, color: AppColors.primary),
         onTap: () {
-          Navigator.pushNamed(
-            context,
-            '/child-details',
-            arguments: student,
-          );
+          Navigator.pushNamed(context, '/child-details', arguments: student);
         },
       ),
     );

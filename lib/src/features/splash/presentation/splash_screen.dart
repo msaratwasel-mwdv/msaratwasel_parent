@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (mounted) {
       FlutterNativeSplash.remove();
       // Inform the controller we are done, assuming it waits for splash?
-      // Actually standard logic is just to remove native splash, 
+      // Actually standard logic is just to remove native splash,
       // the controller itself handles routing via isBootCompleted.
       // So this screen will unmount automatically when isBootCompleted.
     }
@@ -36,12 +36,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Return a sleek centered logo with navy blue background
     return Scaffold(
       backgroundColor: const Color(0xFF062A5A),
-      body: Center(
-        child: Image.asset(
-          'assets/images/iconApp.png',
-          width: 150,
-        ),
-      ),
+      body: Center(child: Image.asset('assets/images/iconApp.png', width: 150)),
     );
   }
 }

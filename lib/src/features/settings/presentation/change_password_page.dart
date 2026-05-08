@@ -48,10 +48,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           'new_password': _newController.text,
           'new_password_confirmation': _confirmController.text,
         },
-        options: Options(headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
       );
 
       if (!mounted) return;

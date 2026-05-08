@@ -3,15 +3,14 @@ import '../config/app_config.dart';
 
 enum StudentStatus {
   // 5 distinct trip-cycle states
-  waitingAtHome,   // Step 1: Morning - waiting for bus at home
-  onBusToSchool,   // Step 2: On bus heading to school
-  atSchool,        // Step 3: At school
-  onBusToHome,     // Step 4: On bus heading back home
-  arrivedHome,     // Step 5: Arrived home after school
-
+  waitingAtHome, // Step 1: Morning - waiting for bus at home
+  onBusToSchool, // Step 2: On bus heading to school
+  atSchool, // Step 3: At school
+  onBusToHome, // Step 4: On bus heading back home
+  arrivedHome, // Step 5: Arrived home after school
   // Legacy/utility states (kept for compatibility)
-  onBus,           // Generic on bus (fallback)
-  atHome,          // Generic at home (fallback)
+  onBus, // Generic on bus (fallback)
+  atHome, // Generic at home (fallback)
   notBoarded,
   late,
 }
@@ -32,6 +31,9 @@ enum NotificationType {
   schoolAlert,
   supervisorMessage,
   chat,
+  locationRequest,
+  locationApproved,
+  locationRejected,
 }
 
 extension NotificationTypeX on NotificationType {
@@ -59,6 +61,12 @@ extension NotificationTypeX on NotificationType {
         return arabic ? 'رسالة من المشرفة' : 'Supervisor message';
       case NotificationType.chat:
         return arabic ? 'محادثة جديدة' : 'New chat message';
+      case NotificationType.locationRequest:
+        return arabic ? 'طلب تغيير موقع' : 'Location change request';
+      case NotificationType.locationApproved:
+        return arabic ? 'تمت الموافقة على الموقع' : 'Location approved';
+      case NotificationType.locationRejected:
+        return arabic ? 'تم رفض طلب الموقع' : 'Location request rejected';
     }
   }
 
@@ -71,7 +79,12 @@ extension NotificationTypeX on NotificationType {
 }
 
 class BusStaffInfo {
-  const BusStaffInfo({required this.id, required this.name, this.phone, this.imageUrl});
+  const BusStaffInfo({
+    required this.id,
+    required this.name,
+    this.phone,
+    this.imageUrl,
+  });
 
   final int id;
   final String name;
@@ -95,6 +108,14 @@ class BusInfo {
     required this.plate,
     this.driver,
     this.supervisor,
+    this.status,
+    this.latitude,
+    this.longitude,
+    this.totalStudents,
+    this.onBoardCount,
+    this.speed,
+    this.etaMinutes,
+    this.startTime,
   });
 
   final String id;
@@ -102,18 +123,80 @@ class BusInfo {
   final String plate;
   final BusStaffInfo? driver;
   final BusStaffInfo? supervisor;
+  final String? status;
+  final double? latitude;
+  final double? longitude;
+  final int? totalStudents;
+  final int? onBoardCount;
+  final double? speed;
+  final int? etaMinutes;
+  final DateTime? startTime;
+
+  BusInfo copyWith({
+    String? id,
+    String? number,
+    String? plate,
+    BusStaffInfo? driver,
+    BusStaffInfo? supervisor,
+    String? status,
+    double? latitude,
+    double? longitude,
+    int? totalStudents,
+    int? onBoardCount,
+    double? speed,
+    int? etaMinutes,
+    DateTime? startTime,
+  }) {
+    return BusInfo(
+      id: id ?? this.id,
+      number: number ?? this.number,
+      plate: plate ?? this.plate,
+      driver: driver ?? this.driver,
+      supervisor: supervisor ?? this.supervisor,
+      status: status ?? this.status,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      totalStudents: totalStudents ?? this.totalStudents,
+      onBoardCount: onBoardCount ?? this.onBoardCount,
+      speed: speed ?? this.speed,
+      etaMinutes: etaMinutes ?? this.etaMinutes,
+      startTime: startTime ?? this.startTime,
+    );
+  }
 
   factory BusInfo.fromJson(Map<String, dynamic> json) {
     return BusInfo(
-      id: json['id'].toString(),
-      number: json['bus_number'] as String? ?? '',
-      plate: json['plate_number'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      number: json['bus_number']?.toString() ?? '',
+      plate: json['plate_number']?.toString() ?? '',
+      status: (json['trip_status'] ?? json['status'])?.toString(),
       driver: json['driver'] != null
           ? BusStaffInfo.fromJson(json['driver'] as Map<String, dynamic>)
           : null,
       supervisor: json['supervisor'] != null
           ? BusStaffInfo.fromJson(json['supervisor'] as Map<String, dynamic>)
           : null,
+      latitude: double.tryParse(json['latitude']?.toString() ?? ''),
+      longitude: double.tryParse(json['longitude']?.toString() ?? ''),
+      totalStudents: int.tryParse(
+        json['total_students']?.toString() ??
+            json['students_count']?.toString() ??
+            '',
+      ),
+      onBoardCount: int.tryParse(
+        json['on_board_count']?.toString() ??
+            json['on_board']?.toString() ??
+            '',
+      ),
+      speed: double.tryParse(
+        json['speed']?.toString() ?? json['speed_kmh']?.toString() ?? '',
+      ),
+      etaMinutes: int.tryParse(json['eta_minutes']?.toString() ?? ''),
+      startTime: DateTime.tryParse(
+        json['departure_time']?.toString() ??
+            json['start_time']?.toString() ??
+            '',
+      ),
     );
   }
 }
@@ -143,6 +226,7 @@ class Student {
     this.atSchoolTime,
     this.onBusToHomeTime,
     this.arrivedHomeTime,
+    this.etaMinutes,
   });
 
   final String id;
@@ -156,16 +240,26 @@ class Student {
   final BusInfo bus;
   final StudentStatus status;
   final String? suggestedDirection;
-  final String? avatarUrl;     // image_url from API
-  final int tripCount;         // trip_count from API
+  final String? avatarUrl; // image_url from API
+  final int tripCount; // trip_count from API
   final int attendancePercentage; // attendance_percentage from API
   final LatLng? homeLocation;
   final String? locationNote;
   final String? schoolName;
   final String? schoolLocation;
-  
+
   /// Returns true if the student has a valid home location (non-null and non-zero)
-  bool get hasLocation => homeLocation != null && homeLocation!.latitude != 0 && homeLocation!.longitude != 0;
+  bool get hasLocation =>
+      homeLocation != null &&
+      homeLocation!.latitude != 0 &&
+      homeLocation!.longitude != 0;
+
+  /// Returns a displayable name for the student, falling back to code or ID if missing.
+  String get displayName {
+    if (name.trim().isNotEmpty) return name;
+    if (studentCode != null && studentCode!.trim().isNotEmpty) return studentCode!;
+    return id;
+  }
 
   // Timestamps for the 5-step cycle
   final DateTime? waitingAtHomeTime;
@@ -173,6 +267,7 @@ class Student {
   final DateTime? atSchoolTime;
   final DateTime? onBusToHomeTime;
   final DateTime? arrivedHomeTime;
+  final int? etaMinutes; // New: ETA in minutes from API
 
   /// إنشاء كائن Student من استجابة الـ API
   factory Student.fromJson(Map<String, dynamic> json) {
@@ -188,7 +283,7 @@ class Student {
       bus: json['bus'] != null
           ? BusInfo.fromJson(json['bus'] as Map<String, dynamic>)
           : const BusInfo(id: '', number: '-', plate: '-'),
-      status: _deriveStudentStatus(
+      status: deriveStudentStatus(
         json['status'] as String?,
         json['suggested_direction'] as String?,
       ),
@@ -211,6 +306,7 @@ class Student {
       atSchoolTime: null,
       onBusToHomeTime: null,
       arrivedHomeTime: null,
+      etaMinutes: json['eta_minutes'] as int?,
     );
   }
 
@@ -221,14 +317,17 @@ class Student {
     final path = url.startsWith('/') ? url.substring(1) : url;
     // Assume storage path if it doesn't contain storage/
     final fullPath = path.contains('storage/') ? path : 'storage/$path';
-    
+
     // Use the base URL from AppConfig instead of a hardcoded one
     final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api/', '');
     return '$baseUrl/$fullPath';
   }
 
   /// Derives the 5-state trip cycle status from API status + direction
-  static StudentStatus _deriveStudentStatus(String? rawStatus, String? direction) {
+  static StudentStatus deriveStudentStatus(
+    String? rawStatus,
+    String? direction,
+  ) {
     switch (rawStatus) {
       case 'onBus':
         if (direction == 'to_school') return StudentStatus.onBusToSchool;
@@ -270,6 +369,7 @@ class Student {
     DateTime? atSchoolTime,
     DateTime? onBusToHomeTime,
     DateTime? arrivedHomeTime,
+    int? etaMinutes,
   }) {
     return Student(
       id: id,
@@ -294,45 +394,9 @@ class Student {
       atSchoolTime: atSchoolTime ?? this.atSchoolTime,
       onBusToHomeTime: onBusToHomeTime ?? this.onBusToHomeTime,
       arrivedHomeTime: arrivedHomeTime ?? this.arrivedHomeTime,
+      etaMinutes: etaMinutes ?? this.etaMinutes,
     );
   }
-}
-
-
-class TrackingSnapshot {
-  const TrackingSnapshot({
-    required this.lat,
-    required this.lng,
-    required this.speedKmh,
-    required this.etaMinutes,
-    required this.distanceKm,
-    required this.studentsOnBoard,
-    required this.busState,
-    required this.updatedAt,
-    required this.routeDescription,
-    this.driverName,
-    this.driverImageUrl,
-    this.tripType,
-    this.busNumber,
-    this.plateNumber,
-    this.polylinePoints = const [],
-  });
-
-  final double lat;
-  final double lng;
-  final double speedKmh;
-  final int etaMinutes;
-  final double distanceKm;
-  final int studentsOnBoard;
-  final BusState busState;
-  final DateTime updatedAt;
-  final String routeDescription;
-  final String? driverName;
-  final String? driverImageUrl;
-  final String? tripType;
-  final String? busNumber;
-  final String? plateNumber;
-  final List<LatLng> polylinePoints;
 }
 
 class AppNotification {
@@ -387,6 +451,12 @@ class AppNotification {
         return NotificationType.supervisorMessage;
       case 'new_message':
         return NotificationType.chat;
+      case 'location_request':
+        return NotificationType.locationRequest;
+      case 'location_approved':
+        return NotificationType.locationApproved;
+      case 'location_rejected':
+        return NotificationType.locationRejected;
       default:
         return NotificationType.schoolAlert;
     }
@@ -444,4 +514,48 @@ class MessageItem {
   final DateTime time;
   final bool incoming;
   final String? mediaUrl;
+}
+
+class LocationChangeRequest {
+  const LocationChangeRequest({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    required this.createdAt,
+    required this.status,
+    this.newLatitude,
+    this.newLongitude,
+    this.newAddress,
+    this.rejectionReason,
+  });
+
+  final String id;
+  final String studentId;
+  final String studentName;
+  final DateTime createdAt;
+  final String status;
+  final double? newLatitude;
+  final double? newLongitude;
+  final String? newAddress;
+  final String? rejectionReason;
+
+  factory LocationChangeRequest.fromJson(Map<String, dynamic> json) {
+    return LocationChangeRequest(
+      id: json['id']?.toString() ?? '',
+      studentId: json['student_id']?.toString() ?? '',
+      studentName: json['student_name'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      status: json['status'] as String? ?? 'pending',
+      newLatitude: double.tryParse(json['new_latitude']?.toString() ?? ''),
+      newLongitude: double.tryParse(json['new_longitude']?.toString() ?? ''),
+      newAddress: json['new_address'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
+    );
+  }
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
 }

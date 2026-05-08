@@ -39,7 +39,10 @@ class NotificationService {
   }) async {
     // Check if Firebase is initialized
     if (Firebase.apps.isEmpty) {
-      developer.log('⚠️ NotificationService: Firebase not initialized. Skipping FCM setup.', name: 'FCM');
+      developer.log(
+        '⚠️ NotificationService: Firebase not initialized. Skipping FCM setup.',
+        name: 'FCM',
+      );
       return null;
     }
 
@@ -51,13 +54,14 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-    
+
     // Enable foreground notification banners on iOS
-    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await FirebaseMessaging.instance
+        .setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
 
     developer.log(
       '🔔 FCM permission: ${settings.authorizationStatus}',
@@ -65,7 +69,9 @@ class NotificationService {
     );
 
     // ── 2. تهيئة الإشعارات المحلية (لعرض الإشعار في الـ Foreground) ─────────
-    const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
+    const androidInit = AndroidInitializationSettings(
+      '@drawable/ic_notification',
+    );
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -78,19 +84,19 @@ class NotificationService {
     await _localNotif.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
-        developer.log('👆 Local notification tapped: ${details.payload}', name: 'FCM');
+        developer.log(
+          '👆 Local notification tapped: ${details.payload}',
+          name: 'FCM',
+        );
       },
     );
 
     // Request permissions for iOS local notifications explicitly
     await _localNotif
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+          IOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
 
     // ── 3. إعداد القناة لـ Android (مطلوب Android 8+) ──────────────────────
     const androidChannel = AndroidNotificationChannel(
@@ -98,10 +104,12 @@ class NotificationService {
       'مسارات واصل', // name
       description: 'إشعارات تطبيق مسارات واصل',
       importance: Importance.max,
+      playSound: true,
     );
     await _localNotif
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
 
     // ── 4. معالج الإشعارات في الخلفية ──────────────────────────────────────
@@ -127,10 +135,13 @@ class NotificationService {
               androidChannel.name,
               channelDescription: androidChannel.description,
               icon: '@drawable/ic_notification',
-              largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'),
+              largeIcon: const DrawableResourceAndroidBitmap(
+                '@mipmap/launcher_icon',
+              ),
               color: const Color(0xFF062A5A),
               importance: Importance.max,
               priority: Priority.high,
+              playSound: true,
             ),
             iOS: const DarwinNotificationDetails(
               presentAlert: true,
@@ -156,26 +167,38 @@ class NotificationService {
     // ── 7. التحقق من إشعار فتح التطبيق لأول مرة ─────────────────────────────
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
-      developer.log('🚀 FCM: App opened from terminated via notification', name: 'FCM');
+      developer.log(
+        '🚀 FCM: App opened from terminated via notification',
+        name: 'FCM',
+      );
       _handleRemoteMessage(initialMessage);
     }
 
     // ── 8. الحصول على الـ FCM Token ──────────────────────────────────────────
     // On iOS/macOS, we must wait for the APNS token to be ready before calling getToken()
     if (Platform.isIOS || Platform.isMacOS) {
-      developer.log('🍎 iOS/macOS detected: waiting for APNS token...', name: 'FCM');
+      developer.log(
+        '🍎 iOS/macOS detected: waiting for APNS token...',
+        name: 'FCM',
+      );
       String? apnsToken;
       int retryCount = 0;
       while (apnsToken == null && retryCount < 10) {
         apnsToken = await _fcm.getAPNSToken();
         if (apnsToken == null) {
-          developer.log('⏳ APNS token not ready yet, retrying ($retryCount/10)...', name: 'FCM');
+          developer.log(
+            '⏳ APNS token not ready yet, retrying ($retryCount/10)...',
+            name: 'FCM',
+          );
           await Future.delayed(const Duration(milliseconds: 500));
           retryCount++;
         }
       }
       if (apnsToken == null) {
-        developer.log('⚠️ Warning: APNS token still null after retries. getToken() might fail.', name: 'FCM');
+        developer.log(
+          '⚠️ Warning: APNS token still null after retries. getToken() might fail.',
+          name: 'FCM',
+        );
       } else {
         developer.log('✅ APNS token ready: $apnsToken', name: 'FCM');
       }
@@ -188,12 +211,12 @@ class NotificationService {
     } catch (e) {
       developer.log('❌ FCM: failed to get token: $e', name: 'FCM');
     }
- 
+
     // تحديث الـ Token عند تجديده
     _fcm.onTokenRefresh.listen((newToken) {
       developer.log('🔄 FCM Token refreshed = $newToken', name: 'FCM');
     });
- 
+
     developer.log('✅ NotificationService: FCM initialised', name: 'FCM');
     return token;
   }

@@ -23,7 +23,7 @@ class AppSliverHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     // Get navigation state - register dependency for rebuilds
     AppScope.of(context);
     final canPop = ModalRoute.of(context)?.canPop ?? false;
@@ -36,9 +36,7 @@ class AppSliverHeader extends StatelessWidget {
       // Regular pushed page
       activeLeading = Material(
         color: Colors.transparent,
-        child: BackButton(
-          color: isDark ? Colors.white : AppColors.primary,
-        ),
+        child: BackButton(color: isDark ? Colors.white : AppColors.primary),
       );
     } else {
       // Any tab (home or not) -> Show Menu (hamburger icon)

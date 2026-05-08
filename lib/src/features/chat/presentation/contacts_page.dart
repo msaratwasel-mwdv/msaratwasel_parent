@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
 import 'package:msaratwasel_user/src/features/chat/data/repositories/chat_repository.dart';
 import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
@@ -28,7 +29,10 @@ class _ContactsPageState extends State<ContactsPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_isLoading && _contacts.isEmpty && _conversations.isEmpty && _error == null) {
+    if (_isLoading &&
+        _contacts.isEmpty &&
+        _conversations.isEmpty &&
+        _error == null) {
       _repo = ChatRepository(dio: AppScope.of(context).dio);
       _loadData();
     }
@@ -45,8 +49,14 @@ class _ContactsPageState extends State<ContactsPage> {
 
       if (mounted) {
         setState(() {
-          _contacts = (results[0] as List<ChatContact>).where((c) => c.role != 'field_supervisor').toList();
-          _conversations = (results[1] as List<ChatConversation>).where((c) => !c.participants.any((p) => p.role == 'field_supervisor')).toList();
+          _contacts = (results[0] as List<ChatContact>)
+              .where((c) => c.role != 'field_supervisor')
+              .toList();
+          _conversations = (results[1] as List<ChatConversation>)
+              .where(
+                (c) => !c.participants.any((p) => p.role == 'field_supervisor'),
+              )
+              .toList();
           _isLoading = false;
         });
       }
@@ -54,9 +64,9 @@ class _ContactsPageState extends State<ContactsPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('فشل تحميل البيانات')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(context.t('failedToLoad'))));
         });
       }
     }
@@ -89,15 +99,15 @@ class _ContactsPageState extends State<ContactsPage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل فتح المحادثة: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${context.t('failedToOpenChat')}: $e')));
     }
   }
 
   Future<void> _openExistingConversation(ChatConversation conv) async {
     final other = conv.participants.isNotEmpty ? conv.participants.first : null;
-    
+
     // Optimistic UI update BEFORE navigation
     setState(() {
       conv.unreadCount = 0;
@@ -119,94 +129,98 @@ class _ContactsPageState extends State<ContactsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
-    final isArabic = app.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildError(isArabic)
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: CustomScrollView(
-                    slivers: [
-                      AppSliverHeader(
-                        title: isArabic ? 'المحادثات' : 'Messages',
-                        leading: Material(
-                          color: Colors.transparent,
-                          child: IconButton(
-                            icon: Icon(
-                              Icons.menu_rounded,
-                              color: isDark ? Colors.white : AppColors.primary,
-                            ),
-                            onPressed: () => Scaffold.of(context).openDrawer(),
-                          ),
+          ? _buildError()
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: CustomScrollView(
+                slivers: [
+                  AppSliverHeader(
+                    title: context.t('messages'),
+                    leading: Material(
+                      color: Colors.transparent,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.menu_rounded,
+                          color: isDark ? Colors.white : AppColors.primary,
                         ),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
                       ),
-                      SliverPadding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        sliver: SliverList(
-                          delegate: SliverChildListDelegate([
-                            // ── Contacts Section ──
-                      if (_contacts.isNotEmpty) ...[
-                        _SectionHeader(
-                          title: isArabic ? 'جهات الاتصال' : 'Contacts',
-                          icon: Icons.people_rounded,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        ..._contacts.map((c) => _ContactTile(
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // ── Contacts Section ──
+                        if (_contacts.isNotEmpty) ...[
+                          _SectionHeader(
+                            title: context.t('contacts'),
+                            icon: Icons.people_rounded,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          ..._contacts.map(
+                            (c) => _ContactTile(
                               contact: c,
                               isDark: isDark,
-                              isArabic: isArabic,
                               onTap: () => _openConversation(c),
-                            )),
-                      ],
-                      // ── Conversations Section ──
-                      if (_conversations.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.lg),
-                        _SectionHeader(
-                          title: isArabic ? 'المحادثات السابقة' : 'Recent Chats',
-                          icon: Icons.chat_rounded,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        ..._conversations.map((conv) => _ConversationTile(
+                            ),
+                          ),
+                        ],
+                        // ── Conversations Section ──
+                        if (_conversations.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          _SectionHeader(
+                            title: context.t('recentChats'),
+                            icon: Icons.chat_rounded,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          ..._conversations.map(
+                            (conv) => _ConversationTile(
                               conversation: conv,
                               isDark: isDark,
-                              isArabic: isArabic,
                               onTap: () => _openExistingConversation(conv),
-                            )),
-                      ],
-                            if (_contacts.isEmpty && _conversations.isEmpty)
-                              _buildEmpty(isArabic),
-                          ]),
-                        ),
-                      ),
-                    ],
+                            ),
+                          ),
+                        ],
+                        if (_contacts.isEmpty && _conversations.isEmpty)
+                          _buildEmpty(),
+                      ]),
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 
-  Widget _buildError(bool isArabic) {
+  Widget _buildError() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.textSecondary),
+            const Icon(
+              Icons.wifi_off_rounded,
+              size: 56,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              isArabic ? 'فشل تحميل البيانات' : 'Failed to load data',
+              context.t('failedToLoad'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.md),
             FilledButton.icon(
               onPressed: _loadData,
               icon: const Icon(Icons.refresh_rounded),
-              label: Text(isArabic ? 'إعادة المحاولة' : 'Retry'),
+              label: Text(context.t('retry')),
             ),
           ],
         ),
@@ -214,7 +228,7 @@ class _ContactsPageState extends State<ContactsPage> {
     );
   }
 
-  Widget _buildEmpty(bool isArabic) {
+  Widget _buildEmpty() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl * 2),
@@ -227,10 +241,10 @@ class _ContactsPageState extends State<ContactsPage> {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              isArabic ? 'لا توجد محادثات بعد' : 'No conversations yet',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              context.t('noMessages'),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -258,9 +272,9 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
         ),
       ],
     );
@@ -271,22 +285,20 @@ class _ContactTile extends StatelessWidget {
   const _ContactTile({
     required this.contact,
     required this.isDark,
-    required this.isArabic,
     required this.onTap,
   });
 
   final ChatContact contact;
   final bool isDark;
-  final bool isArabic;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isDriver = contact.role == 'driver';
-    final roleLabel = isArabic
-        ? (isDriver ? 'سائق' : 'مشرفة')
-        : (isDriver ? 'Driver' : 'Supervisor');
-    final avatarIcon = isDriver ? Icons.directions_bus_rounded : Icons.support_agent_rounded;
+    final roleLabel = isDriver ? context.t('driver') : context.t('supervisor');
+    final avatarIcon = isDriver
+        ? Icons.directions_bus_rounded
+        : Icons.support_agent_rounded;
     final avatarColor = isDriver
         ? const Color(0xFF2563EB)
         : const Color(0xFF7C3AED);
@@ -356,13 +368,11 @@ class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,
     required this.isDark,
-    required this.isArabic,
     required this.onTap,
   });
 
   final ChatConversation conversation;
   final bool isDark;
-  final bool isArabic;
   final VoidCallback onTap;
 
   @override
@@ -370,13 +380,18 @@ class _ConversationTile extends StatelessWidget {
     final other = conversation.participants.isNotEmpty
         ? conversation.participants.first
         : null;
-    final name = other?.name ?? (isArabic ? 'محادثة' : 'Chat');
+    final name = other?.name ?? context.t('chat');
     final isDriver = other?.role == 'driver';
-    final avatarIcon = isDriver ? Icons.directions_bus_rounded : Icons.support_agent_rounded;
-    final avatarColor = isDriver ? const Color(0xFF2563EB) : const Color(0xFF7C3AED);
+    final avatarIcon = isDriver
+        ? Icons.directions_bus_rounded
+        : Icons.support_agent_rounded;
+    final avatarColor = isDriver
+        ? const Color(0xFF2563EB)
+        : const Color(0xFF7C3AED);
 
     final lastMsg = conversation.lastMessage;
-    final subtitle = lastMsg?.body ?? (isArabic ? 'لا توجد رسائل' : 'No messages yet');
+    final subtitle =
+        lastMsg?.body ?? context.t('noMessages');
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),

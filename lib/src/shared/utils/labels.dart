@@ -1,49 +1,54 @@
+import 'package:flutter/widgets.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class Labels {
   const Labels._();
 
-  static String studentStatus(StudentStatus status, {required bool arabic}) {
+  static String studentStatus(BuildContext context, StudentStatus status) {
     switch (status) {
       case StudentStatus.waitingAtHome:
+        return context.t('waitingAtHome');
       case StudentStatus.arrivedHome:
+        return context.t('arrivedHome');
       case StudentStatus.atHome:
-        return arabic ? 'في المنزل' : 'At home';
+        return context.t('atHome');
       case StudentStatus.onBusToSchool:
       case StudentStatus.onBusToHome:
       case StudentStatus.onBus:
-        return arabic ? 'في الحافلة' : 'On the bus';
+        return context.t('onBus');
       case StudentStatus.atSchool:
-        return arabic ? 'في المدرسة' : 'At school';
+        return context.t('atSchool');
       case StudentStatus.notBoarded:
-        return arabic ? 'لم يصعد' : 'Not boarded';
+        return context.t('notBoarded');
       case StudentStatus.late:
-        return arabic ? 'متأخر' : 'Late';
+        return context.t('late');
     }
   }
 
-  static String busState(BusState state, {required bool arabic}) {
+  static String busState(BuildContext context, BusState state) {
     switch (state) {
       case BusState.enRoute:
-        return arabic ? 'في الطريق' : 'On route';
+        return context.t('enRoute');
       case BusState.atSchool:
-        return arabic ? 'وصلت المدرسة' : 'At school';
+        return context.t('arrivedSchool');
       case BusState.atHome:
-        return arabic ? 'وصلت المنزل' : 'At home';
+        return context.t('arrivedHome');
     }
   }
 
   static String attendanceDirection(
-    AttendanceDirection direction, {
-    required bool arabic,
-  }) {
+    BuildContext context,
+    AttendanceDirection direction,
+  ) {
     switch (direction) {
       case AttendanceDirection.outbound:
-        return arabic ? 'ذهاب' : 'Morning';
+        return context.t('morning');
       case AttendanceDirection.inbound:
-        return arabic ? 'عودة' : 'Return';
+        return context.t('return');
       case AttendanceDirection.fullDay:
-        return arabic ? 'اليوم كامل' : 'Full day';
+        return context.t('fullDay');
     }
   }
 }
+

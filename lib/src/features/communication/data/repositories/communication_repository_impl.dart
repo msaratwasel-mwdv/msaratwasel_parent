@@ -12,10 +12,14 @@ class CommunicationRepositoryImpl implements CommunicationRepository {
     final response = await dio.get('guardian/communication/threads/$threadId');
     final data = response.data['data'];
     final List<dynamic> messagesJson = data['messages'] ?? [];
-    
+
     return MessageThread(
       id: data['id'].toString(),
-      participants: (data['participants'] as List?)?.map((p) => p['name'].toString()).toList() ?? [],
+      participants:
+          (data['participants'] as List?)
+              ?.map((p) => p['name'].toString())
+              .toList() ??
+          [],
       messages: messagesJson.map((json) {
         return MessageItem(
           id: json['id'].toString(),
@@ -29,9 +33,13 @@ class CommunicationRepositoryImpl implements CommunicationRepository {
   }
 
   @override
-  Future<void> sendMessage({required String threadId, required String text}) async {
-    await dio.post('guardian/communication/threads/$threadId/messages', data: {
-      'body': text,
-    });
+  Future<void> sendMessage({
+    required String threadId,
+    required String text,
+  }) async {
+    await dio.post(
+      'guardian/communication/threads/$threadId/messages',
+      data: {'body': text},
+    );
   }
 }

@@ -64,8 +64,10 @@ class StorageService {
     if (nameEn != null) await p.setString(StorageKeys.userNameEn, nameEn);
     if (phone != null) await p.setString(StorageKeys.userPhone, phone);
     if (email != null) await p.setString(StorageKeys.userEmail, email);
-    if (nationalId != null) await p.setString(StorageKeys.userNationalId, nationalId);
-    if (avatarUrl != null) await p.setString(StorageKeys.userAvatarUrl, avatarUrl);
+    if (nationalId != null)
+      await p.setString(StorageKeys.userNationalId, nationalId);
+    if (avatarUrl != null)
+      await p.setString(StorageKeys.userAvatarUrl, avatarUrl);
   }
 
   Future<Map<String, dynamic>> readUserData() async {

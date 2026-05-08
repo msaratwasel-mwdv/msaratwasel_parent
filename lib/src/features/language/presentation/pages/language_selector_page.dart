@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 
-
 class LanguageSelectorPage extends StatelessWidget {
   const LanguageSelectorPage({super.key});
 

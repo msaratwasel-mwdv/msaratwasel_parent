@@ -85,21 +85,21 @@ Future<void> showAbsenceSheet(BuildContext context) async {
                       value: AttendanceDirection.outbound,
                       icon: const Icon(Icons.wb_sunny_rounded),
                       label: Text(
-                        _directionLabel(AttendanceDirection.outbound, lang),
+                        _directionLabel(context, AttendanceDirection.outbound),
                       ),
                     ),
                     ButtonSegment(
                       value: AttendanceDirection.inbound,
                       icon: const Icon(Icons.nightlight_rounded),
                       label: Text(
-                        _directionLabel(AttendanceDirection.inbound, lang),
+                        _directionLabel(context, AttendanceDirection.inbound),
                       ),
                     ),
                     ButtonSegment(
                       value: AttendanceDirection.fullDay,
                       icon: const Icon(Icons.all_inclusive_rounded),
                       label: Text(
-                        _directionLabel(AttendanceDirection.fullDay, lang),
+                        _directionLabel(context, AttendanceDirection.fullDay),
                       ),
                     ),
                   ],
@@ -152,6 +152,7 @@ Future<void> showAbsenceSheet(BuildContext context) async {
   noteController.dispose();
 }
 
-String _directionLabel(AttendanceDirection direction, String lang) {
-  return Labels.attendanceDirection(direction, arabic: lang == 'ar');
+String _directionLabel(BuildContext context, AttendanceDirection direction) {
+  return Labels.attendanceDirection(context, direction);
 }
+

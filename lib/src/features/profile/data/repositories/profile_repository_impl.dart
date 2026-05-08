@@ -11,7 +11,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<Profile> fetchProfile() async {
     final response = await dio.get('parent/profile');
     final data = response.data['data'];
-    
+
     String? avatarUrl = data['image_url'] ?? data['avatar_url'];
     if (avatarUrl != null && !avatarUrl.startsWith('http')) {
       avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
@@ -28,9 +28,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<void> updateProfile(Profile profile) async {
-    await dio.post('parent/profile/update', data: {
-      'phone': profile.phone,
-      'email': profile.email,
-    });
+    await dio.post(
+      'parent/profile/update',
+      data: {'phone': profile.phone, 'email': profile.email},
+    );
   }
 }

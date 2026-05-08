@@ -26,6 +26,12 @@ extension NotificationTypeUI on NotificationType {
         return Icons.support_agent_rounded;
       case NotificationType.chat:
         return Icons.chat_bubble_outline_rounded;
+      case NotificationType.locationRequest:
+        return Icons.edit_location_alt_rounded;
+      case NotificationType.locationApproved:
+        return Icons.add_location_alt_rounded;
+      case NotificationType.locationRejected:
+        return Icons.wrong_location_rounded;
     }
   }
 }

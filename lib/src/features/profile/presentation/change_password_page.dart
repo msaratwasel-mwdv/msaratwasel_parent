@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 
@@ -39,21 +40,21 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     try {
       final app = AppScope.of(context);
-      final response = await app.dio.post('auth/change-password', data: {
-        'current_password': _currentCtrl.text,
-        'new_password': _newCtrl.text,
-        'new_password_confirmation': _confirmCtrl.text,
-      });
+      final response = await app.dio.post(
+        'auth/change-password',
+        data: {
+          'current_password': _currentCtrl.text,
+          'new_password': _newCtrl.text,
+          'new_password_confirmation': _confirmCtrl.text,
+        },
+      );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      final msg = response.data['message'] ?? 'تم تغيير كلمة السر بنجاح.';
+      final msg = response.data['message'] ?? context.t('passwordUpdatedSuccess');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text(msg), backgroundColor: Colors.green),
       );
       Navigator.pop(context);
     } on DioException catch (e) {
@@ -76,24 +77,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMsg),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
-    final isArabic = app.locale.languageCode == 'ar';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isArabic ? 'تغيير كلمة السر' : 'Change Password',
+          context.t('changePassword'),
           style: TextStyle(
             color: isDark ? Colors.white : AppColors.textPrimary,
             fontWeight: FontWeight.w700,
@@ -124,30 +120,32 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   gradient: AppColors.brandGradient,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.lock_reset_rounded, size: 40, color: Colors.white),
+                child: const Icon(
+                  Icons.lock_reset_rounded,
+                  size: 40,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                isArabic
-                    ? 'أدخل كلمة السر الحالية والجديدة'
-                    : 'Enter your current and new password',
+                context.t('signInToContinue'), // Or add a better key like 'changePasswordSubtitle'
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xxl),
 
               // Current Password
               _buildPasswordField(
                 controller: _currentCtrl,
-                label: isArabic ? 'كلمة السر الحالية' : 'Current Password',
+                label: context.t('currentPassword'),
                 icon: Icons.lock_outline_rounded,
                 show: _showCurrent,
                 onToggle: () => setState(() => _showCurrent = !_showCurrent),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
-                    return isArabic ? 'مطلوبة' : 'Required';
+                    return context.t('fieldRequired');
                   }
                   return null;
                 },
@@ -158,16 +156,16 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               // New Password
               _buildPasswordField(
                 controller: _newCtrl,
-                label: isArabic ? 'كلمة السر الجديدة' : 'New Password',
+                label: context.t('newPassword'),
                 icon: Icons.lock_rounded,
                 show: _showNew,
                 onToggle: () => setState(() => _showNew = !_showNew),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
-                    return isArabic ? 'مطلوبة' : 'Required';
+                    return context.t('fieldRequired');
                   }
                   if (v.length < 6) {
-                    return isArabic ? '6 أحرف على الأقل' : 'At least 6 characters';
+                    return context.t('passwordLengthError');
                   }
                   return null;
                 },
@@ -178,13 +176,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               // Confirm Password
               _buildPasswordField(
                 controller: _confirmCtrl,
-                label: isArabic ? 'تأكيد كلمة السر' : 'Confirm Password',
+                label: context.t('confirmPassword'),
                 icon: Icons.lock_rounded,
                 show: _showConfirm,
                 onToggle: () => setState(() => _showConfirm = !_showConfirm),
                 validator: (v) {
                   if (v != _newCtrl.text) {
-                    return isArabic ? 'غير مطابقة' : 'Does not match';
+                    return context.t('passwordMismatch');
                   }
                   return null;
                 },
@@ -226,7 +224,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             ),
                           )
                         : Text(
-                            isArabic ? 'حفظ كلمة السر' : 'Save Password',
+                            context.t('savePassword'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,

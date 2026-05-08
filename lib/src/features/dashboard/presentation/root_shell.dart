@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/pages/children_status_page.dart';
@@ -11,7 +12,9 @@ import 'package:msaratwasel_user/src/features/chat/presentation/contacts_page.da
 import 'package:msaratwasel_user/src/features/notifications/presentation/notifications_page.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/parent_profile_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/more_page.dart';
-import 'package:msaratwasel_user/src/features/tracking/presentation/tracking_page.dart';
+import 'package:msaratwasel_user/src/features/tracking/presentation/pages/bus_tracking_page.dart';
+import 'package:msaratwasel_user/src/features/location_requests/presentation/pages/location_requests_page.dart';
+
 import 'package:msaratwasel_user/src/features/absence/presentation/pages/absence_history_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
@@ -33,7 +36,7 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
-    _pages = List<Widget?>.filled(11, null, growable: false);
+    _pages = List<Widget?>.filled(12, null, growable: false);
     // Preload the first tab only to avoid initializing heavy widgets (e.g., Google Maps) prematurely.
     _pages[0] = const HomeScreen();
   }
@@ -42,12 +45,12 @@ class _RootShellState extends State<RootShell> {
 
   @override
   Widget build(BuildContext context) {
+    AppLogger.d('🏠 RootShell: building');
     final controller = AppScope.of(context);
 
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final isArabic = controller.locale.languageCode == 'ar';
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
         final page = _buildPage(currentIndex);
 
@@ -95,7 +98,6 @@ class _RootShellState extends State<RootShell> {
             drawer: CustomDrawer(
               controller: controller,
               currentIndex: currentIndex,
-              isArabic: isArabic,
               onSelect: (index) {
                 controller.setNavIndex(index);
                 // Close drawer after selection
@@ -120,7 +122,7 @@ class _RootShellState extends State<RootShell> {
     _pages[index] ??= switch (index) {
       0 => const HomeScreen(),
       1 => const ChildrenScreen(),
-      2 => const TrackingPage(),
+      2 => const BusTrackingPage(),
       3 => const ChildrenStatusPage(), // New Page
       4 => const NotificationsPage(),
       5 => const ContactsPage(),
@@ -129,6 +131,7 @@ class _RootShellState extends State<RootShell> {
       8 => const ParentProfilePage(),
       9 => const MorePage(),
       10 => const AbsenceHistoryPage(),
+      11 => const LocationRequestsPage(),
       _ => const HomeScreen(),
     };
     return _pages[index]!;
@@ -146,36 +149,34 @@ class CustomDrawer extends StatelessWidget {
     super.key,
     required this.controller,
     required this.currentIndex,
-    required this.isArabic,
     required this.onSelect,
   });
 
   final AppController controller;
   final int currentIndex;
-  final bool isArabic;
   final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    AppLogger.d('🏠 RootShell: building');
+    final controller = AppScope.of(context);
 
     // Premium: Dark text for light mode, White text for dark mode
     final textColor = isDark ? Colors.white : AppColors.textPrimary;
     final subTextColor = isDark ? Colors.white70 : AppColors.textSecondary;
     final drawerBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
-    return Directionality(
-      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-      child: Drawer(
-        elevation: 10,
-        backgroundColor: drawerBg,
-        // Premium: Rounded corners on the end
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.horizontal(
-            end: Radius.circular(30),
-          ),
+    return Drawer(
+      elevation: 10,
+      backgroundColor: drawerBg,
+      // Premium: Rounded corners on the end
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadiusDirectional.horizontal(
+          end: Radius.circular(30),
         ),
+      ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -217,12 +218,18 @@ class CustomDrawer extends StatelessWidget {
                             ),
                             child: CircleAvatar(
                               radius: 42,
-                              backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                              backgroundImage: controller.userAvatarUrl.isNotEmpty
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.2,
+                              ),
+                              backgroundImage:
+                                  controller.userAvatarUrl.isNotEmpty
                                   ? CachedNetworkImageProvider(
                                       controller.userAvatarUrl,
                                       headers: controller.token.isNotEmpty
-                                          ? {'Authorization': 'Bearer ${controller.token}'}
+                                          ? {
+                                              'Authorization':
+                                                  'Bearer ${controller.token}',
+                                            }
                                           : null,
                                     )
                                   : null,
@@ -232,7 +239,9 @@ class CustomDrawer extends StatelessWidget {
                                           ? controller.userName.characters.first
                                           : '?',
                                       style: TextStyle(
-                                        color: isDark ? Colors.white : AppColors.primary,
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.primary,
                                         fontSize: 28,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -363,11 +372,18 @@ class CustomDrawer extends StatelessWidget {
                     onTap: () => onSelect(7),
                   ),
                   _DrawerItem(
-                    title: isArabic ? 'سجل طلبات الغياب' : 'Absence Requests',
+                    title: context.t('absenceRequests'),
                     icon: Icons.assignment_turned_in_rounded,
                     isSelected: currentIndex == 10,
                     isDark: isDark,
                     onTap: () => onSelect(10),
+                  ),
+                  _DrawerItem(
+                    title: context.t('locationRequests'),
+                    icon: Icons.location_history_rounded,
+                    isSelected: currentIndex == 11,
+                    isDark: isDark,
+                    onTap: () => onSelect(11),
                   ),
                   _DrawerItem(
                     title: context.t('settings'),
@@ -442,10 +458,9 @@ class CustomDrawer extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
+    }
   }
-}
 
 class _DrawerItem extends StatelessWidget {
   const _DrawerItem({

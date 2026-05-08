@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
@@ -30,7 +31,6 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    final isArabic = app.locale.languageCode == 'ar';
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -41,8 +41,7 @@ class _MessagesPageState extends State<MessagesPage> {
         final hasMessages = messages.isNotEmpty;
         final isSupervisorTyping =
             messages.isNotEmpty && messages.first.incoming;
-        final name = isArabic ? 'عائشة' : 'Aisha';
-        // final role = isArabic ? 'مشرفة الحافلة' : 'Bus Supervisor';
+        final name = context.t('supervisorName');
 
         return Scaffold(
           appBar: AppBar(
@@ -103,17 +102,13 @@ class _MessagesPageState extends State<MessagesPage> {
 
                           if (showDateSeparator) {
                             widgets.add(
-                              _DateSeparator(
-                                date: msg.time,
-                                isArabic: isArabic,
-                              ),
+                              _DateSeparator(date: msg.time),
                             );
                           }
 
                           widgets.add(
                             _MessageBubble(
                               message: msg,
-                              isArabic: isArabic,
                               isParent: !msg.incoming,
                             ),
                           );
@@ -135,16 +130,12 @@ class _MessagesPageState extends State<MessagesPage> {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              isArabic
-                                  ? 'لا توجد رسائل بعد'
-                                  : 'No messages yet',
+                              context.t('noMessages'),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              isArabic
-                                  ? 'ابدأ المراسلة مع المشرفة'
-                                  : 'Start chatting with the supervisor',
+                              context.t('startChatting'),
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: AppColors.textSecondary),
                             ),
@@ -189,9 +180,7 @@ class _MessagesPageState extends State<MessagesPage> {
                         maxLines: 4,
                         style: textTheme.bodyMedium,
                         decoration: InputDecoration(
-                          hintText: isArabic
-                              ? 'اكتب رسالتك…'
-                              : 'Type your message…',
+                          hintText: context.t('typeMessage'),
                         ),
                       ),
                     ),
@@ -238,7 +227,6 @@ class _MessagesPageState extends State<MessagesPage> {
   Future<void> _pickImage(BuildContext context) async {
     final picker = ImagePicker();
     final app = AppScope.of(context);
-    final isArabic = app.locale.languageCode == 'ar';
 
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -254,12 +242,12 @@ class _MessagesPageState extends State<MessagesPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded),
-                title: Text(isArabic ? 'الكاميرا' : 'Camera'),
+                title: Text(context.t('camera')),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
-                title: Text(isArabic ? 'معرض الصور' : 'Gallery'),
+                title: Text(context.t('gallery')),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
             ],
@@ -280,10 +268,9 @@ class _MessagesPageState extends State<MessagesPage> {
 // _ChatHeader class removed as it is replaced by CupertinoSliverNavigationBar
 
 class _DateSeparator extends StatelessWidget {
-  const _DateSeparator({required this.date, required this.isArabic});
+  const _DateSeparator({required this.date});
 
   final DateTime date;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
@@ -292,13 +279,16 @@ class _DateSeparator extends StatelessWidget {
     if (date.year == now.year &&
         date.month == now.month &&
         date.day == now.day) {
-      label = isArabic ? 'اليوم' : 'Today';
+      label = context.t('today');
     } else if (date.year == now.year &&
         date.month == now.month &&
         date.day == now.day - 1) {
-      label = isArabic ? 'أمس' : 'Yesterday';
+      label = context.t('yesterday');
     } else {
-      label = date_utils.formatDate(date, locale: isArabic ? 'ar' : 'en');
+      label = date_utils.formatDate(
+        date,
+        locale: Localizations.localeOf(context).languageCode,
+      );
     }
 
     return Padding(
@@ -328,12 +318,10 @@ class _DateSeparator extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
-    required this.isArabic,
     required this.isParent,
   });
 
   final MessageItem message;
-  final bool isArabic;
   final bool isParent;
 
   @override
@@ -427,7 +415,7 @@ class _MessageBubble extends StatelessWidget {
                                     Icons.broken_image_rounded,
                                     size: 50,
                                     color: Colors.white70,
-                                  ),
+                                    ),
                                 )
                               : const Icon(
                                   Icons.image_not_supported_rounded,
@@ -450,7 +438,7 @@ class _MessageBubble extends StatelessWidget {
                         Text(
                           date_utils.formatTime(
                             message.time,
-                            locale: isArabic ? 'ar' : 'en',
+                            locale: Localizations.localeOf(context).languageCode,
                           ),
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(

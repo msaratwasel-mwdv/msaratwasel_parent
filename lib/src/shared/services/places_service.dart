@@ -29,7 +29,7 @@ class PlacesService {
             'circle': {
               'center': {'latitude': 23.5859, 'longitude': 58.4059},
               'radius': 5000.0,
-            }
+            },
           },
         },
         cancelToken: cancelToken,
@@ -70,9 +70,7 @@ class PlacesService {
     try {
       final response = await _dio.get(
         'https://places.googleapis.com/v1/places/$placeId',
-        queryParameters: {
-          'sessionToken': sessionToken,
-        },
+        queryParameters: {'sessionToken': sessionToken},
         cancelToken: cancelToken,
         options: Options(
           headers: {

@@ -47,9 +47,11 @@ class _AddressDisplayState extends State<AddressDisplay> {
       // Delay to avoid over-fetching if tracking updates rapidly
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      
+
       final service = GeocodingService();
-      final address = await service.reverseGeocode(LatLng(widget.lat, widget.lng));
+      final address = await service.reverseGeocode(
+        LatLng(widget.lat, widget.lng),
+      );
       if (mounted) {
         setState(() {
           _address = address;
@@ -77,7 +79,9 @@ class _AddressDisplayState extends State<AddressDisplay> {
           const SizedBox(width: 8),
           Text(
             context.t('fetchingAddress') ?? 'Fetching address...',
-            style: widget.style ?? const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style:
+                widget.style ??
+                const TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
         ],
       );
@@ -101,10 +105,12 @@ class _AddressDisplayState extends State<AddressDisplay> {
         Expanded(
           child: Text(
             _address!,
-            style: widget.style ?? TextStyle(
-              color: isDark ? Colors.white70 : AppColors.textSecondary,
-              fontSize: 12,
-            ),
+            style:
+                widget.style ??
+                TextStyle(
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                  fontSize: 12,
+                ),
           ),
         ),
       ],

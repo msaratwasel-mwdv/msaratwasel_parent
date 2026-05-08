@@ -29,6 +29,11 @@ class NotificationRepositoryImpl implements NotificationsRepository {
                 ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
                 : DateTime.now(),
             read: json['read'] == true || json['status'] == 'read',
+            data: json['data'] is Map
+                ? Map<String, dynamic>.from(json['data'] as Map)
+                : (json['metadata'] is Map
+                      ? Map<String, dynamic>.from(json['metadata'] as Map)
+                      : const {}),
           );
         }).toList();
       }

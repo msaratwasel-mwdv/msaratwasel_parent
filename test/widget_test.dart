@@ -15,26 +15,19 @@ void main() {
     expect(find.byType(TextFormField), findsNWidgets(2));
   });
 
-  testWidgets('User can log in and reach home screen',
-      (WidgetTester tester) async {
+  testWidgets('User can log in and reach home screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MsaratWaselApp());
 
     // Wait for splash -> login transition.
     await tester.pump(const Duration(seconds: 4));
 
     // Fill in login form.
-    await tester.enterText(
-      find.byType(TextFormField).at(0),
-      '1234567890',
-    );
-    await tester.enterText(
-      find.byType(TextFormField).at(1),
-      '555123456',
-    );
+    await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
+    await tester.enterText(find.byType(TextFormField).at(1), '555123456');
 
-    await tester.tap(
-      find.widgetWithText(ElevatedButton, 'تسجيل الدخول'),
-    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'تسجيل الدخول'));
 
     // Let the simulated login Future complete and UI rebuild.
     await tester.pump();

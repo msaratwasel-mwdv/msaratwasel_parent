@@ -18,55 +18,73 @@ void main() {
   group('GeocodingService', () {
     const testLocation = LatLng(23.5859, 58.4059);
 
-    test('returns landmark name when address_descriptors are present', () async {
-      when(() => mockDio.get(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => Response(
-                data: {
-                  'status': 'OK',
-                  'results': [
-                    {
-                      'address_descriptors': {
-                        'landmarks': [
-                          {
-                            'display_name': {'text': 'Grand Mosque'},
-                            'spatial_relationship': 'NEAR'
-                          }
-                        ]
+    test(
+      'returns landmark name when address_descriptors are present',
+      () async {
+        when(
+          () => mockDio.get(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            data: {
+              'status': 'OK',
+              'results': [
+                {
+                  'address_descriptors': {
+                    'landmarks': [
+                      {
+                        'display_name': {'text': 'Grand Mosque'},
+                        'spatial_relationship': 'NEAR',
                       },
-                      'formatted_address': 'Some Address, Muscat'
-                    }
-                  ]
+                    ],
+                  },
+                  'formatted_address': 'Some Address, Muscat',
                 },
-                statusCode: 200,
-                requestOptions: RequestOptions(path: ''),
-              ));
+              ],
+            },
+            statusCode: 200,
+            requestOptions: RequestOptions(path: ''),
+          ),
+        );
 
-      final result = await geocodingService.reverseGeocode(testLocation);
-      expect(result, equals('Near Grand Mosque'));
-    });
+        final result = await geocodingService.reverseGeocode(testLocation);
+        expect(result, equals('Near Grand Mosque'));
+      },
+    );
 
-    test('falls back to formatted_address when address_descriptors are missing', () async {
-      when(() => mockDio.get(any(), queryParameters: any(named: 'queryParameters')))
-          .thenAnswer((_) async => Response(
-                data: {
-                  'status': 'OK',
-                  'results': [
-                    {
-                      'formatted_address': 'Fallback Address, Muscat'
-                    }
-                  ]
-                },
-                statusCode: 200,
-                requestOptions: RequestOptions(path: ''),
-              ));
+    test(
+      'falls back to formatted_address when address_descriptors are missing',
+      () async {
+        when(
+          () => mockDio.get(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            data: {
+              'status': 'OK',
+              'results': [
+                {'formatted_address': 'Fallback Address, Muscat'},
+              ],
+            },
+            statusCode: 200,
+            requestOptions: RequestOptions(path: ''),
+          ),
+        );
 
-      final result = await geocodingService.reverseGeocode(testLocation);
-      expect(result, equals('Fallback Address, Muscat'));
-    });
+        final result = await geocodingService.reverseGeocode(testLocation);
+        expect(result, equals('Fallback Address, Muscat'));
+      },
+    );
 
     test('returns Unknown Location on failure', () async {
-      when(() => mockDio.get(any(), queryParameters: any(named: 'queryParameters')))
-          .thenThrow(DioException(requestOptions: RequestOptions(path: '')));
+      when(
+        () =>
+            mockDio.get(any(), queryParameters: any(named: 'queryParameters')),
+      ).thenThrow(DioException(requestOptions: RequestOptions(path: '')));
 
       final result = await geocodingService.reverseGeocode(testLocation);
       expect(result, equals('Unknown Location'));

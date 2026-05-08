@@ -12,15 +12,18 @@ class AbsenceRepositoryImpl implements AbsenceRepository {
     // Since request might have multiple students, and backend handles one student_id
     // We loop through them in the repository or controller.
     // Given the UI, let's assume one student for now as selected in the Page.
-    
+
     for (final studentId in request.studentIds) {
       final typeStr = _mapType(request.type);
-      await dio.post('parent/absence-requests', data: {
-        'student_id': studentId,
-        'date': request.date.toIso8601String().split('T')[0],
-        'type': typeStr,
-        'reason': request.note ?? '',
-      });
+      await dio.post(
+        'parent/absence-requests',
+        data: {
+          'student_id': studentId,
+          'date': request.date.toIso8601String().split('T')[0],
+          'type': typeStr,
+          'reason': request.note ?? '',
+        },
+      );
     }
   }
 

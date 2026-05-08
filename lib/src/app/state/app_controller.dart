@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -6,12 +7,10 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 // FCM token registration — see _registerFcmToken below
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
-import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/features/language/data/repositories/language_repository_impl.dart';
 import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:msaratwasel_user/src/features/absence/data/repositories/absence_repository_impl.dart';
@@ -19,15 +18,19 @@ import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/core/services/reverb_service.dart';
 import 'package:msaratwasel_user/src/features/notifications/data/repositories/notification_repository_impl.dart';
 import 'package:msaratwasel_user/src/core/services/notification_service.dart';
+import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking.dart';
+import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking_group.dart';
 
 class AppController extends ChangeNotifier {
   AppController()
     : _students = [],
-      _tracking = {},
+      _tripGroups = {},
       _notifications = [],
+
       _messages = [],
       _attendance = [],
-      _trips = [] {
+      _trips = [],
+      _locationRequests = [] {
     AppLogger.i('🏗️ AppController: Instance created');
     _initDio();
   }
@@ -62,9 +65,13 @@ class AppController extends ChangeNotifier {
         },
         onError: (e, handler) {
           if (e.response?.statusCode == 401) {
-            final isBroadcasting = e.requestOptions.path.contains('broadcasting/auth');
+            final isBroadcasting = e.requestOptions.path.contains(
+              'broadcasting/auth',
+            );
             if (isBroadcasting) {
-              AppLogger.w('⚠️ Reverb Auth 401: Laravel broadcasting route unauthenticated / middleware issue.');
+              AppLogger.w(
+                '⚠️ Reverb Auth 401: Laravel broadcasting route unauthenticated / middleware issue.',
+              );
             } else {
               AppLogger.w('⚠️ API 401: Token expired or invalid');
               _isAuthenticated = false;
@@ -107,7 +114,11 @@ class AppController extends ChangeNotifier {
   String _userNationalId = '';
 
   List<Student> _students;
-  final Map<String, TrackingSnapshot> _tracking;
+
+  Map<String, BusTrackingGroup> _tripGroups;
+  String? _selectedBusId;
+  bool _isFetchingTracking = false;
+  int _trackingRequestVersion = 0;
   final List<AppNotification> _notifications; // mutable — fed by FCM & API
   final List<MessageItem> _messages;
   bool _hasNewMessages = false;
@@ -122,8 +133,14 @@ class AppController extends ChangeNotifier {
   final List<AttendanceEntry> _attendance;
   final List<TripEntry> _trips;
   List<AbsenceRequest> _absenceRequests = [];
+  List<LocationChangeRequest> _locationRequests = [];
   bool _isLoadingChildren = false;
+  bool _isLocationRequestsLoading = false;
   int? _userId;
+
+  List<LocationChangeRequest> get locationRequests =>
+      List.unmodifiable(_locationRequests);
+  bool get isLocationRequestsLoading => _isLocationRequestsLoading;
   ReverbService? _reverbService;
   String _token = '';
 
@@ -138,14 +155,60 @@ class AppController extends ChangeNotifier {
   List<Student> get students => List.unmodifiable(_students);
   Student? get currentStudent =>
       _students.isNotEmpty ? _students[_selectedStudentIndex] : null;
-  TrackingSnapshot? get currentTracking =>
-      _students.isNotEmpty ? _tracking[currentStudent!.id] : null;
+
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
   List<MessageItem> get messages => List.unmodifiable(_messages);
   List<AttendanceEntry> get attendance => List.unmodifiable(_attendance);
   List<TripEntry> get trips => List.unmodifiable(_trips);
   List<AbsenceRequest> get absenceRequests =>
       List.unmodifiable(_absenceRequests);
+
+  List<BusTrackingGroup> get activeTripGroups =>
+      _tripGroups.values.where((g) => g.isActiveTrip).toList();
+
+  List<BusTrackingGroup> get allTripGroups => _tripGroups.values.toList();
+
+  List<Student> get inactiveStudents {
+    final activeBusIds = activeTripGroups.map((g) => g.busId).toSet();
+    return _students.where((s) => !activeBusIds.contains(s.bus.id)).toList();
+  }
+
+  String? get selectedBusId => _selectedBusId;
+
+  BusTrackingGroup? get selectedGroup {
+    final all = _tripGroups.values.toList();
+    if (all.isEmpty) {
+      _selectedBusId = null;
+      return null;
+    }
+
+    final active = activeTripGroups;
+
+    // 1. If manual selection exists and is valid, keep it
+    if (_selectedBusId != null && _tripGroups.containsKey(_selectedBusId)) {
+      return _tripGroups[_selectedBusId];
+    }
+
+    // 2. Fallback: Prefer first active trip
+    if (active.isNotEmpty) {
+      _selectedBusId = active.first.busId;
+    } else {
+      // 3. Last fallback: Just pick the first bus available
+      _selectedBusId = all.first.busId;
+    }
+
+    return _tripGroups[_selectedBusId];
+  }
+
+  BusTrackingGroup? groupForBus(String busId) => _tripGroups[busId];
+  BusTracking? trackingForBus(String busId) => _tripGroups[busId]?.tracking;
+
+  void selectBus(String busId) {
+    if (_tripGroups.containsKey(busId)) {
+      _selectedBusId = busId;
+      notifyListeners();
+    }
+  }
 
   // User data getters
   String get userName => _locale.languageCode == 'ar'
@@ -204,10 +267,6 @@ class AppController extends ChangeNotifier {
   String get userNationalId => _userNationalId;
   bool get isLoadingChildren => _isLoadingChildren;
 
-  TrackingSnapshot? trackingForStudent(String studentId) {
-    return _tracking[studentId];
-  }
-
   void setNavIndex(int index) {
     if (_navIndex == index) return;
     _navIndex = index;
@@ -255,10 +314,13 @@ class AppController extends ChangeNotifier {
 
         // 🚌 الاشتراك في قنوات الباصات للأبناء لتتبع مواقعهم لحظياً
         for (var student in _students) {
-          if (student.bus.id.isNotEmpty) {
+          if (student.bus.id.isNotEmpty && student.bus.id != '-') {
             _reverbService?.subscribe('private-bus.${student.bus.id}');
           }
         }
+
+        // Synchronize trip groups with the loaded students
+        _syncTripGroupsWithStudents();
 
         // LOAD PERSISTED TIMESTAMPS FOR TODAY
         final todayStr =
@@ -284,11 +346,7 @@ class AppController extends ChangeNotifier {
           );
         }
 
-        // NOTE: Do NOT initialize tracking snapshots with fallback coordinates.
-        // Tracking entries are only created when real bus location data arrives
-        // from the API polling (_fetchTrackingFromApi) or WebSocket (_handleRealtimeLocationUpdate).
-
-        AppLogger.d('✅ Loaded ${_students.length} children and initialized tracking');
+        AppLogger.d('✅ Loaded ${_students.length} children');
         notifyListeners();
       }
     } catch (e, st) {
@@ -302,6 +360,9 @@ class AppController extends ChangeNotifier {
   Timer? _trackingTimer;
   int _pollCycleCount = 0;
   bool _isTrackingPolling = false;
+  bool _isTrackingInitialFetchDone = false;
+
+  bool get isTrackingDataReady => _isTrackingInitialFetchDone;
 
   void startTrackingPoll() {
     _trackingTimer?.cancel();
@@ -311,13 +372,25 @@ class AppController extends ChangeNotifier {
 
   void _scheduleTrackingPoll({bool immediate = false}) {
     _trackingTimer?.cancel();
-    _trackingTimer = Timer(Duration(seconds: immediate ? 0 : 10), _runTrackingPollCycle);
+    _trackingTimer = Timer(
+      Duration(seconds: immediate ? 0 : 10),
+      _runTrackingPollCycle,
+    );
   }
 
   Future<void> _runTrackingPollCycle() async {
     // If not authenticated or no students, just wait for next cycle
     if (!_isAuthenticated || _students.isEmpty) {
       if (_trackingTimer != null) _scheduleTrackingPoll();
+
+      // If we are authenticated but have no students, mark as "done" so UI can show empty state
+      if (!_isTrackingInitialFetchDone && _isAuthenticated) {
+        AppLogger.d(
+          'ℹ️ _runTrackingPollCycle: No students found. Setting _isTrackingInitialFetchDone = true',
+        );
+        _isTrackingInitialFetchDone = true;
+        notifyListeners();
+      }
       return;
     }
 
@@ -327,7 +400,7 @@ class AppController extends ChangeNotifier {
     try {
       await _fetchTrackingFromApi();
       _pollCycleCount++;
-      
+
       // Polling as fallback only (every 60s) — primary updates via WebSocket
       if (_pollCycleCount % 6 == 0) {
         await _refreshStudentStatuses();
@@ -336,6 +409,16 @@ class AppController extends ChangeNotifier {
       AppLogger.d('❌ Tracking poll cycle failed: $e');
     } finally {
       _isTrackingPolling = false;
+
+      // Ensure we mark initial fetch as done after the first attempt (success or fail)
+      if (!_isTrackingInitialFetchDone) {
+        AppLogger.d(
+          '✅ _runTrackingPollCycle: Initial fetch attempt completed. Setting _isTrackingInitialFetchDone = true',
+        );
+        _isTrackingInitialFetchDone = true;
+        notifyListeners();
+      }
+
       // Schedule next poll automatically if we haven't been stopped
       if (_trackingTimer != null) {
         _scheduleTrackingPoll();
@@ -349,137 +432,91 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _fetchTrackingFromApi() async {
-    try {
-      final token = await _storage.readAccessToken();
-      if (token == null) return;
+    if (_isFetchingTracking) return;
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ),
-      );
+    try {
+      _isFetchingTracking = true;
+      final currentVersion = ++_trackingRequestVersion;
 
       // We need to fetch tracking for each bus our students are on
-      final busIds = _students.map((s) => s.bus.id).toSet();
+      final busIds = _students
+          .map((s) => s.bus.id)
+          .where((id) => id.isNotEmpty && id != '-')
+          .toSet();
+      AppLogger.d(
+        '🚌 _fetchTrackingFromApi: Starting poll for busIds: $busIds',
+      );
 
-      bool updated = false;
       for (final busId in busIds) {
         try {
+          AppLogger.d('📡 _fetchTrackingFromApi: Calling API for bus $busId');
           final response = await dio.get('bus/$busId/location');
+          AppLogger.d(
+            '📡 _fetchTrackingFromApi: API response for bus $busId: ${response.statusCode}',
+          );
+
           if (response.statusCode == 200) {
             final data = response.data;
-            final lat = (data['latitude'] as num?)?.toDouble();
-            final lng = (data['longitude'] as num?)?.toDouble();
 
-            if (lat != null && lng != null) {
-              // Update all students on this bus
-              for (final student in _students.where((s) => s.bus.id == busId)) {
-                final old = _tracking[student.id];
-                final driverData = data['driver'];
+            // Update Bus-Centric State (with version check)
+            _updateBusTracking(busId, data, currentVersion);
 
-                // Calculate distance and ETA if home location is available
-                double distanceKm = old?.distanceKm ?? 0.0;
-                int etaMinutes = old?.etaMinutes ?? 0;
-
-                if (student.homeLocation != null) {
-                  distanceKm = _calculateDistance(
-                    lat,
-                    lng,
-                    student.homeLocation!.latitude,
-                    student.homeLocation!.longitude,
+            // Update student statuses from bus polling response (real-time)
+            final studentStatuses = data['student_statuses'] as List<dynamic>?;
+            if (studentStatuses != null) {
+              for (final ss in studentStatuses) {
+                final sid = ss['student_id'].toString();
+                final statusStr = ss['status'] as String? ?? 'atHome';
+                final idx = _students.indexWhere((s) => s.id == sid);
+                if (idx != -1) {
+                  final newStatus = StudentStatus.values.firstWhere(
+                    (e) => e.name == statusStr,
+                    orElse: () => StudentStatus.atHome,
                   );
-                  // Estimate ETA based on a fixed speed of 60 km/h (1 min per km)
-                  etaMinutes = distanceKm.ceil();
-                }
-
-                _tracking[student.id] = TrackingSnapshot(
-                  lat: lat,
-                  lng: lng,
-                  speedKmh: (data['speed_kmh'] as num?)?.toDouble() ?? 0.0,
-                  etaMinutes: etaMinutes,
-                  distanceKm: distanceKm,
-                  studentsOnBoard:
-                      (data['students_on_board'] as num?)?.toInt() ?? 0,
-                  busState: _mapTripStatusToBusState(data['trip_status']),
-                  updatedAt:
-                      DateTime.tryParse(data['last_update'] ?? '') ??
-                      DateTime.now(),
-                  routeDescription: old?.routeDescription ?? 'جاري التتبع',
-                  driverName: driverData?['name'] as String?,
-                  driverImageUrl: driverData?['image_url'] as String?,
-                  tripType: data['trip_type']?.toString() ?? old?.tripType,
-                  busNumber: data['bus_number']?.toString() ?? student.bus.number,
-                  plateNumber: data['plate_number']?.toString() ?? student.bus.plate,
-                  polylinePoints: (student.homeLocation != null)
-                      ? await _getPolyline(
-                          lat,
-                          lng,
-                          student.homeLocation!.latitude,
-                          student.homeLocation!.longitude,
-                        )
-                      : [],
-                );
-              }
-
-              // Update student statuses from bus polling response (real-time)
-              final studentStatuses =
-                  data['student_statuses'] as List<dynamic>?;
-              if (studentStatuses != null) {
-                for (final ss in studentStatuses) {
-                  final sid = ss['student_id'].toString();
-                  final statusStr = ss['status'] as String? ?? 'atHome';
-                  final idx = _students.indexWhere((s) => s.id == sid);
-                  if (idx != -1) {
-                    final newStatus = StudentStatus.values.firstWhere(
-                      (e) => e.name == statusStr,
-                      orElse: () => StudentStatus.atHome,
+                  if (_students[idx].status != newStatus) {
+                    final now = DateTime.now();
+                    _students[idx] = _students[idx].copyWith(
+                      status: newStatus,
+                      waitingAtHomeTime:
+                          (newStatus == StudentStatus.waitingAtHome)
+                          ? now
+                          : _students[idx].waitingAtHomeTime,
+                      onBusToSchoolTime:
+                          (newStatus == StudentStatus.onBusToSchool)
+                          ? now
+                          : _students[idx].onBusToSchoolTime,
+                      atSchoolTime: (newStatus == StudentStatus.atSchool)
+                          ? now
+                          : _students[idx].atSchoolTime,
+                      onBusToHomeTime: (newStatus == StudentStatus.onBusToHome)
+                          ? now
+                          : _students[idx].onBusToHomeTime,
+                      arrivedHomeTime: (newStatus == StudentStatus.arrivedHome)
+                          ? now
+                          : _students[idx].arrivedHomeTime,
                     );
-                    if (_students[idx].status != newStatus) {
-                      final now = DateTime.now();
-                      _students[idx] = _students[idx].copyWith(
-                        status: newStatus,
-                        waitingAtHomeTime:
-                            (newStatus == StudentStatus.waitingAtHome)
-                            ? now
-                            : _students[idx].waitingAtHomeTime,
-                        onBusToSchoolTime:
-                            (newStatus == StudentStatus.onBusToSchool)
-                            ? now
-                            : _students[idx].onBusToSchoolTime,
-                        atSchoolTime: (newStatus == StudentStatus.atSchool)
-                            ? now
-                            : _students[idx].atSchoolTime,
-                        onBusToHomeTime:
-                            (newStatus == StudentStatus.onBusToHome)
-                            ? now
-                            : _students[idx].onBusToHomeTime,
-                        arrivedHomeTime:
-                            (newStatus == StudentStatus.arrivedHome)
-                            ? now
-                            : _students[idx].arrivedHomeTime,
-                      );
-                      _persistTimestamps(_students[idx]);
-                    }
+                    _persistTimestamps(_students[idx]);
                   }
                 }
               }
-              updated = true;
             }
           }
         } catch (e) {
-          AppLogger.d('Failed to fetch tracking for bus $busId: $e');
+          AppLogger.d(
+            '❌ _fetchTrackingFromApi: Failed to fetch for bus $busId: $e',
+          );
         }
       }
 
-      if (updated) {
-        notifyListeners();
-      }
+      AppLogger.d(
+        '✅ _fetchTrackingFromApi: Poll finished. Setting _isTrackingInitialFetchDone = true',
+      );
+      _isTrackingInitialFetchDone = true;
+      notifyListeners();
     } catch (e) {
       AppLogger.d('Error in _fetchTrackingFromApi: $e');
+    } finally {
+      _isFetchingTracking = false;
     }
   }
 
@@ -533,38 +570,11 @@ class AppController extends ChangeNotifier {
             );
             _persistTimestamps(_students[idx]);
             updated = true;
-
-            // Update tracking snapshot bus state
-            final old = _tracking[studentId];
-            if (old != null) {
-              final driverData = raw['bus']?['driver'];
-              _tracking[studentId] = TrackingSnapshot(
-                lat: old.lat,
-                lng: old.lng,
-                speedKmh: old.speedKmh,
-                etaMinutes: old.etaMinutes,
-                distanceKm: old.distanceKm,
-                studentsOnBoard: old.studentsOnBoard,
-                busState: newStatus == StudentStatus.onBus
-                    ? BusState.enRoute
-                    : (newStatus == StudentStatus.atSchool
-                          ? BusState.atSchool
-                          : BusState.atHome),
-                updatedAt: old.updatedAt,
-                routeDescription: old.routeDescription,
-                driverName: driverData?['name'] as String? ?? old.driverName,
-                driverImageUrl:
-                    driverData?['image_url'] as String? ?? old.driverImageUrl,
-                tripType: old.tripType,
-                busNumber: old.busNumber,
-                plateNumber: old.plateNumber,
-                polylinePoints: old.polylinePoints,
-              );
-            }
           }
         }
 
         if (updated) {
+          _syncTripGroupsWithStudents();
           developer.log(
             '🔄 Student statuses refreshed from API',
             name: 'TRACKING',
@@ -577,100 +587,86 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  BusState _mapTripStatusToBusState(String? status) {
-    if (status == 'morning_ongoing' ||
-        status == 'afternoon_ongoing' ||
-        status == 'on_route') {
-      return BusState.enRoute;
-    }
-    return BusState.atHome;
-  }
-
   Future<void> bootstrap() async {
     try {
-      // Initialize configuration, cached session, etc.
+      AppLogger.i('🚀 AppController: Starting optimized bootstrap...');
+
+      // 1. Core Config & Auth (Critical Path)
       final prefs = await _storage.prefs;
-
-      // 1. Check onboarding
-      final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
-      _shouldShowOnboarding = !hasSeen;
-
-      // 2. Check Authentication
       final savedToken = await _storage.readAccessToken();
       final savedName = prefs.getString('user_name') ?? '';
+      
+      _shouldShowOnboarding = !(prefs.getBool('has_seen_onboarding') ?? false);
+      _userId = prefs.getInt('user_id');
+
       if (savedToken != null && savedName.isNotEmpty) {
         _token = savedToken;
         _isAuthenticated = true;
         _userName = savedName;
         _userNameEn = prefs.getString('user_name_en') ?? savedName;
-        _userPhone = prefs.getString('user_phone') ?? '';
-        _userEmail = prefs.getString('user_email') ?? '';
-        _userNationalId = prefs.getString('user_national_id') ?? '';
         _userAvatarUrl = prefs.getString('user_avatar_url') ?? '';
-        developer.log(
-          '🔐 AppController: Token found → Auto Login ($savedName)',
-          name: 'AUTH',
-        );
-
-        // Initialize FCM if already logged in
-        final fcmToken = await NotificationService.init(
-          onNotificationReceived: addNotification,
-        );
-
-        // Re-register FCM token just in case it changed
-        if (fcmToken != null) {
-          await _registerFcmToken(dio: dio, token: _token, fcmToken: fcmToken);
-        }
-
-        // Load history + refresh profile from API
-        loadNotificationsFromApi();
-        loadChildrenFromApi();
-        loadProfileFromApi();
-
-        // استعادة WebSocket إذا كان المستخدم مسجل دخول
-        _userId = prefs.getInt('user_id');
-        if (_userId != null && _userId! > 0) {
-          _initReverb(_token);
-        }
+        
+        // 🔥 Non-blocking background initialization
+        _backgroundInitialize(savedToken);
       } else {
-        // No valid session — force login
         _isAuthenticated = false;
         await _storage.deleteAccessToken();
-        developer.log(
-          '🔐 AppController: No saved session → Show Login',
-          name: 'AUTH',
-        );
       }
 
+      // Signal core boot completion so UI can render
       _bootCompleted = true;
-      print(
-        '🏁 AppController: Bootstrap completed. Onboarding needed: $_shouldShowOnboarding | Authenticated: $_isAuthenticated',
-      );
-    } catch (e, st) {
-      developer.log(
-        '❌ AppController: Bootstrap failed',
-        name: 'BOOT',
-        error: e,
-        stackTrace: st,
-      );
-      // Fallback to allow app entry (or handle error state appropriately)
-      _bootCompleted = true;
-    } finally {
-      developer.log(
-        '✨ AppController: Bootstrap sequence finished',
-        name: 'BOOT',
-      );
       notifyListeners();
 
-      // Remove the native splash screen smoothly after the first frame of the new route renders
+    } catch (e, stack) {
+      AppLogger.e('❌ AppController: Bootstrap sequence failed: $e');
+      developer.log('Bootstrap Error', error: e, stackTrace: stack);
+      _bootCompleted = true;
+      notifyListeners();
+    } finally {
+      // Immediate splash removal
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          // You will need to make sure FlutterNativeSplash is imported at the top of this file
-          FlutterNativeSplash.remove();
-        } catch (e) {
-          AppLogger.d('AppController: Native splash already removed or error: $e');
-        }
+        try { 
+          FlutterNativeSplash.remove(); 
+        } catch (_) {}
       });
+      
+      // Secondary safety removal
+      Future.delayed(const Duration(milliseconds: 500), () {
+        try { FlutterNativeSplash.remove(); } catch (_) {}
+      });
+    }
+  }
+
+  /// Handles initialization tasks that can run while the UI is already showing
+  Future<void> _backgroundInitialize(String token) async {
+    try {
+      // Initialize Notifications (Wait up to 5s, but don't block boot)
+      final fcmToken = await NotificationService.init(
+        onNotificationReceived: addNotification,
+      ).timeout(const Duration(seconds: 5), onTimeout: () => null);
+
+      if (fcmToken != null) {
+        _registerFcmToken(dio: dio, token: token, fcmToken: fcmToken)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      }
+
+      // Load API data in parallel
+      await Future.wait([
+        loadNotificationsFromApi(),
+        loadChildrenFromApi(),
+        loadProfileFromApi(),
+        loadAbsenceRequestsFromApi(),
+        loadLocationRequestsFromApi(),
+      ]).timeout(const Duration(seconds: 10), onTimeout: () => []);
+
+      // Restore WebSocket
+      if (_userId != null && _userId! > 0) {
+        _initReverb(token);
+      }
+      
+      notifyListeners(); // Refresh UI with loaded data
+    } catch (e) {
+      AppLogger.w('⚠️ AppController: Background initialization partially failed: $e');
     }
   }
 
@@ -706,80 +702,13 @@ class AppController extends ChangeNotifier {
     final busId = data['bus_id']?.toString();
     if (busId == null) return;
 
-    final lat = double.tryParse(data['latitude']?.toString() ?? '') ?? 0.0;
-    final lng = double.tryParse(data['longitude']?.toString() ?? '') ?? 0.0;
-    if (lat == 0.0 || lng == 0.0) return;
+    // We use the current request version to allow the update if it's the latest
+    _updateBusTracking(busId, data, _trackingRequestVersion);
 
-    // تحديث تتبع جميع الطلاب المرتبطين بهذا الباص
-    bool updated = false;
-    for (var student in _students) {
-      if (student.bus.id == busId) {
-        final current = _tracking[student.id];
-        
-        // Calculate distance and ETA if home location is available
-        double distanceKm = current?.distanceKm ?? 0.0;
-        int etaMinutes = current?.etaMinutes ?? 0;
-
-        if (student.homeLocation != null) {
-          distanceKm = _calculateDistance(
-            lat,
-            lng,
-            student.homeLocation!.latitude,
-            student.homeLocation!.longitude,
-          );
-          // Estimate ETA based on a fixed speed of 40 km/h in city (approx 1.5 min per km)
-          // Or just use the 1 min per km (60km/h) as a baseline
-          etaMinutes = distanceKm.ceil();
-        } else {
-          // Fallback to WebSocket data if available
-          etaMinutes = int.tryParse(data['eta_minutes']?.toString() ?? '') ?? etaMinutes;
-        }
-
-        final driverData = data['driver'];
-
-        _tracking[student.id] = TrackingSnapshot(
-          lat: lat,
-          lng: lng,
-          speedKmh: double.tryParse(data['speed_kmh']?.toString() ?? '') ?? 0.0,
-          etaMinutes: etaMinutes,
-          distanceKm: distanceKm,
-          studentsOnBoard:
-              int.tryParse(data['students_on_board']?.toString() ?? '') ??
-              (current?.studentsOnBoard ?? 0),
-          busState: _parseBusState(data['trip_status']?.toString()),
-          updatedAt: DateTime.now(),
-          routeDescription: current?.routeDescription ?? '',
-          driverName: driverData?['name'] as String? ?? current?.driverName,
-          driverImageUrl: driverData?['image_url'] as String? ?? current?.driverImageUrl,
-          tripType: data['trip_type']?.toString() ?? current?.tripType,
-          busNumber: data['bus_number']?.toString() ?? current?.busNumber,
-          plateNumber: data['plate_number']?.toString() ?? current?.plateNumber,
-          polylinePoints: current?.polylinePoints ?? [],
-        );
-        updated = true;
-      }
-    }
-
-    if (updated) {
-      developer.log(
-        '📍 Real-time location update for bus $busId',
-        name: 'REVERB',
-      );
-      notifyListeners();
-    }
-  }
-
-  BusState _parseBusState(String? status) {
-    switch (status) {
-      case 'to_school':
-      case 'to_home':
-      case 'on_route':
-        return BusState.enRoute;
-      case 'at_school':
-        return BusState.atSchool;
-      default:
-        return BusState.atHome;
-    }
+    developer.log(
+      '📍 Real-time location update for bus $busId',
+      name: 'REVERB',
+    );
   }
 
   /// معالجة تحديث الحالة الفوري من WebSocket
@@ -973,8 +902,10 @@ class AppController extends ChangeNotifier {
       _navIndex = 0;
 
       // تحميل الإشعارات وبيانات الأبناء من API بعد تسجيل الدخول
-      loadNotificationsFromApi();
-      loadChildrenFromApi();
+      await loadNotificationsFromApi();
+      await loadChildrenFromApi();
+      await loadAbsenceRequestsFromApi();
+      await loadLocationRequestsFromApi();
 
       // ═══════════════════════════════════════════════════════════
       // 🔌 تهيئة WebSocket للتحديثات الفورية
@@ -1137,6 +1068,13 @@ class AppController extends ChangeNotifier {
   void selectStudent(int index) {
     if (index < 0 || index >= _students.length) return;
     _selectedStudentIndex = index;
+
+    // Also update selected bus context for tracking
+    final student = _students[index];
+    if (student.bus.id.isNotEmpty && student.bus.id != '-') {
+      _selectedBusId = student.bus.id;
+    }
+
     notifyListeners();
   }
 
@@ -1180,32 +1118,11 @@ class AppController extends ChangeNotifier {
         if (newStatus != null) {
           _students[index] = _students[index].copyWith(status: newStatus);
 
-          // Update tracking snapshot ONLY if a real one already exists.
-          // Do NOT inject fake coordinates, speed, ETA, or distance.
-          final oldTracking = _tracking[studentId];
-          if (oldTracking != null) {
-            _tracking[studentId] = TrackingSnapshot(
-              lat: oldTracking.lat,
-              lng: oldTracking.lng,
-              speedKmh: oldTracking.speedKmh,
-              etaMinutes: oldTracking.etaMinutes,
-              distanceKm: oldTracking.distanceKm,
-              studentsOnBoard: oldTracking.studentsOnBoard,
-              busState: newStatus == StudentStatus.onBus
-                  ? BusState.enRoute
-                  : (newStatus == StudentStatus.atHome
-                        ? BusState.atHome
-                        : BusState.atSchool),
-              updatedAt: DateTime.now(),
-              routeDescription: notification.body,
-              driverName: oldTracking.driverName,
-              driverImageUrl: oldTracking.driverImageUrl,
-              tripType: oldTracking.tripType,
-              busNumber: oldTracking.busNumber,
-              plateNumber: oldTracking.plateNumber,
-              polylinePoints: oldTracking.polylinePoints,
-            );
-          }
+          // Tracking state is handled by _syncTripGroupsWithStudents and _updateBusTracking
+          developer.log(
+            '🔄 FCM: Student $studentId status updated',
+            name: 'NOTIFICATION',
+          );
 
           developer.log(
             '🔄 FCM: Student $studentId status and tracking updated',
@@ -1305,6 +1222,56 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> loadLocationRequestsFromApi() async {
+    try {
+      _isLocationRequestsLoading = true;
+      notifyListeners();
+
+      final token = await _storage.readAccessToken();
+      if (token == null) return;
+
+      final response = await dio.get(
+        'parent/location-requests',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        developer.log(
+          '🔍 AppController: Raw location requests data: ${response.data}',
+          name: 'LOCATION',
+        );
+        final List<dynamic> data = response.data['data'] ?? [];
+        _locationRequests = data
+            .map((json) {
+              try {
+                return LocationChangeRequest.fromJson(json);
+              } catch (e) {
+                developer.log(
+                  '❌ AppController: Error parsing location request JSON: $e, JSON: $json',
+                  name: 'LOCATION',
+                );
+                return null;
+              }
+            })
+            .whereType<LocationChangeRequest>()
+            .toList();
+
+        developer.log(
+          '📋 AppController: Successfully parsed ${_locationRequests.length} location requests',
+          name: 'LOCATION',
+        );
+      }
+    } catch (e) {
+      developer.log(
+        '⚠️ AppController: failed to load location requests: $e',
+        name: 'LOCATION',
+      );
+    } finally {
+      _isLocationRequestsLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> submitAbsenceRequest({
     required List<String> studentIds,
     required AbsenceType type,
@@ -1324,7 +1291,7 @@ class AppController extends ChangeNotifier {
       );
 
       await repo.submitAbsence(request);
-      
+
       // Refresh local state
       await loadChildrenFromApi();
       await loadAbsenceRequestsFromApi();
@@ -1397,12 +1364,18 @@ class AppController extends ChangeNotifier {
   }
 
   /// Updates the home location in the backend (for the guardian or a specific student).
-  Future<bool> updateHomeLocationApi(LatLng location, {String? studentId, String? address}) async {
+  Future<bool> updateHomeLocationApi(
+    LatLng location, {
+    String? studentId,
+    String? address,
+  }) async {
     try {
       final token = await _storage.readAccessToken();
       if (token == null) return false;
 
-      final endpoint = studentId != null ? 'parent/student/location/update' : 'parent/location/update';
+      final endpoint = studentId != null
+          ? 'parent/student/location/update'
+          : 'parent/location/update';
       final payload = {
         'latitude': location.latitude,
         'longitude': location.longitude,
@@ -1423,6 +1396,7 @@ class AppController extends ChangeNotifier {
         // Refresh local data to ensure everything is in sync
         await loadChildrenFromApi();
         await loadProfileFromApi();
+        await loadLocationRequestsFromApi();
         return true;
       }
       return false;
@@ -1446,34 +1420,337 @@ class AppController extends ChangeNotifier {
             math.cos(lat2 * p) *
             (1 - math.cos((lon2 - lon1) * p)) /
             2;
-     return 12742 * math.asin(math.sqrt(a));
+    return 12742 * math.asin(math.sqrt(a));
   }
 
-  Future<List<LatLng>> _getPolyline(
-    double sourceLat,
-    double sourceLng,
-    double destLat,
-    double destLng,
-  ) async {
-    try {
-      PolylinePoints polylinePoints = PolylinePoints(apiKey: AppConfig.googleMapsApiKey);
-      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-        request: PolylineRequest(
-          origin: PointLatLng(sourceLat, sourceLng),
-          destination: PointLatLng(destLat, destLng),
-          mode: TravelMode.driving,
-        ),
+  void _updateBusTracking(
+    String busId,
+    Map<String, dynamic> data,
+    int requestVersion,
+  ) {
+    // 0. Version Check (takeLatest)
+    if (requestVersion < _trackingRequestVersion) {
+      AppLogger.d(
+        '📍 _updateBusTracking: Ignoring stale version for bus $busId',
       );
-
-      if (result.points.isNotEmpty) {
-        return result.points
-            .map((point) => LatLng(point.latitude, point.longitude))
-            .toList();
-      }
-    } catch (e) {
-      AppLogger.d('❌ Polyline fetch error: $e');
+      return;
     }
-    return [];
+    final lat = double.tryParse(
+      data['latitude']?.toString() ?? data['lat']?.toString() ?? '',
+    );
+    final lng = double.tryParse(
+      data['longitude']?.toString() ?? data['lng']?.toString() ?? '',
+    );
+    final speed =
+        (data['speed_kmh'] ?? data['speed'] as num?)?.toDouble() ?? 0.0;
+    final heading = (data['heading'] as num?)?.toDouble() ?? 0.0;
+
+    final etaMinutesRaw =
+        (data['eta_minutes'] ?? data['eta'] as num?)?.toInt() ?? 0;
+
+    AppLogger.d(
+      '📍 _updateBusTracking: bus=$busId, lat=$lat, lng=$lng, speed=$speed',
+    );
+
+    // Extract Refined ETA from Google Maps data if available
+    final List? etaData = data['eta_data'] as List?;
+    int? refinedEta;
+    if (etaData != null && _students.isNotEmpty) {
+      for (var s in _students) {
+        if (s.hasLocation) {
+          final destStr =
+              "${s.homeLocation!.latitude},${s.homeLocation!.longitude}";
+          final match = etaData.firstWhere(
+            (e) => e is Map && e['destination'] == destStr,
+            orElse: () => null,
+          );
+          if (match != null && match is Map) {
+            final durationSeconds =
+                (match['duration_value'] as num?)?.toInt() ?? 0;
+            refinedEta = (durationSeconds / 60).round();
+            break;
+          }
+        }
+      }
+    }
+    final etaMinutes = refinedEta ?? etaMinutesRaw;
+
+    final updatedAt =
+        DateTime.tryParse(data['last_update'] ?? '') ?? DateTime.now();
+    final tripStatus = (data['trip_status'] ?? data['status'])?.toString();
+    final busNumber = data['bus_number']?.toString();
+    final busPlate = data['plate_number']?.toString();
+
+    // Improved Student Count Logic
+    final rawTotal =
+        data['total_students'] ??
+        data['students_count'] ??
+        data['total_students_count'];
+    final totalStudents = int.tryParse(rawTotal?.toString() ?? '');
+
+    final rawOnBoard =
+        data['on_board_count'] ?? data['on_board'] ?? data['on_bus_count'];
+    final totalOnBoard = int.tryParse(rawOnBoard?.toString() ?? '');
+
+    final tripTypeStr = data['trip_type']?.toString(); // to_school / to_home
+    final startTime = DateTime.tryParse(
+      data['departure_time']?.toString() ??
+          data['started_at']?.toString() ??
+          data['start_time']?.toString() ??
+          data['trip_start_time']?.toString() ??
+          '',
+    );
+
+    // Extract Staff Info
+    final driverJson = data['driver'];
+    final supervisorJson = data['supervisor'];
+    final BusStaffInfo? driver = driverJson != null
+        ? BusStaffInfo.fromJson(driverJson)
+        : null;
+    final BusStaffInfo? supervisor = supervisorJson != null
+        ? BusStaffInfo.fromJson(supervisorJson)
+        : null;
+
+    // 0. Update Student Statuses from Real-time Data
+    final List? statuses = data['student_statuses'] as List?;
+    if (statuses != null) {
+      for (var sStatus in statuses) {
+        if (sStatus is Map) {
+          final sId = sStatus['student_id']?.toString();
+          final rawStatus = sStatus['status']?.toString();
+          if (sId != null && rawStatus != null) {
+            final studentIdx = _students.indexWhere((s) => s.id == sId);
+            if (studentIdx != -1) {
+              final updatedStudent = _students[studentIdx].copyWith(
+                status: Student.deriveStudentStatus(rawStatus, tripTypeStr),
+              );
+              _students[studentIdx] = updatedStudent;
+            }
+          }
+        }
+      }
+    }
+
+    final existingGroup = _tripGroups[busId];
+
+    // 1. Quality Filters for Location (Pre-process)
+    final bool hasLocation = lat != null && lng != null;
+    final bool isOverspeed = hasLocation && speed > 80.0;
+
+    // 2. Initial/Update Logic
+    if (existingGroup == null) {
+      // Find students for this bus
+      final busStudents = _students.where((s) => s.bus.id == busId).toList();
+
+      // Create new group (even if tracking is null, provided we have students or status)
+      _tripGroups[busId] = BusTrackingGroup(
+        busId: busId,
+        busNumber: busNumber,
+        tracking: hasLocation
+            ? BusTracking(
+                latitude: lat,
+                longitude: lng,
+                speed: speed,
+                heading: heading,
+                lastUpdate: updatedAt,
+                etaMinutes: etaMinutes,
+              )
+            : null,
+        students: busStudents,
+        tripStatus: tripStatus,
+        totalStudentsOnBoard: totalOnBoard,
+        totalStudentsCount: totalStudents,
+        driver:
+            driver ??
+            (busStudents.isNotEmpty ? busStudents.first.bus.driver : null),
+        supervisor:
+            supervisor ??
+            (busStudents.isNotEmpty ? busStudents.first.bus.supervisor : null),
+        busPlate: busPlate,
+        tripType: tripTypeStr,
+        startTime: startTime,
+      );
+      AppLogger.d(
+        '🚌 _updateBusTracking: Created new group for bus $busId (hasLocation: $hasLocation)',
+      );
+    } else {
+      // 3. Stale Data/Quality Checks for existing groups
+      if (hasLocation && !isOverspeed) {
+        if (existingGroup.tracking != null &&
+            updatedAt.isBefore(existingGroup.tracking!.lastUpdate)) {
+          AppLogger.d(
+            '📍 _updateBusTracking: Ignoring stale location update for bus $busId',
+          );
+        } else {
+          // Significant Change or Metadata Update
+          final distance = existingGroup.tracking == null
+              ? 1.0
+              : _calculateDistance(
+                  lat,
+                  lng,
+                  existingGroup.tracking!.latitude,
+                  existingGroup.tracking!.longitude,
+                );
+
+          if (distance < 0.005 && existingGroup.tracking != null) {
+            _tripGroups[busId] = existingGroup.copyWith(
+              tracking: existingGroup.tracking!.copyWith(
+                lastUpdate: updatedAt,
+                etaMinutes: etaMinutes,
+              ),
+              tripStatus: tripStatus ?? existingGroup.tripStatus,
+              startTime: startTime ?? existingGroup.startTime,
+              totalStudentsCount:
+                  totalStudents ?? existingGroup.totalStudentsCount,
+              driver: driver ?? existingGroup.driver,
+              supervisor: supervisor ?? existingGroup.supervisor,
+            );
+          } else {
+            _tripGroups[busId] = existingGroup.copyWith(
+              tracking: BusTracking(
+                latitude: lat,
+                longitude: lng,
+                speed: speed,
+                heading: heading,
+                lastUpdate: updatedAt,
+                etaMinutes: etaMinutes,
+              ),
+              tripStatus: tripStatus ?? existingGroup.tripStatus,
+              busNumber: busNumber ?? existingGroup.busNumber,
+              busPlate: busPlate ?? existingGroup.busPlate,
+              totalStudentsOnBoard:
+                  totalOnBoard ?? existingGroup.totalStudentsOnBoard,
+              totalStudentsCount:
+                  totalStudents ?? existingGroup.totalStudentsCount,
+              driver: driver ?? existingGroup.driver,
+              supervisor: supervisor ?? existingGroup.supervisor,
+              tripType: tripTypeStr ?? existingGroup.tripType,
+              startTime: startTime ?? existingGroup.startTime,
+            );
+          }
+        }
+      } else if (tripStatus != null && tripStatus != existingGroup.tripStatus) {
+        // Status-only update
+        _tripGroups[busId] = existingGroup.copyWith(
+          tripStatus: tripStatus,
+          startTime: startTime ?? existingGroup.startTime,
+          totalStudentsCount: totalStudents ?? existingGroup.totalStudentsCount,
+          driver: driver ?? existingGroup.driver,
+          supervisor: supervisor ?? existingGroup.supervisor,
+        );
+        AppLogger.d(
+          '🚌 _updateBusTracking: Updated status only for bus $busId to $tripStatus',
+        );
+      }
+    }
+
+    // 4. Initial Selection Logic
+    if (_selectedBusId == null && _tripGroups.isNotEmpty) {
+      _selectedBusId = busId;
+    }
+
+    AppLogger.d(
+      '📍 _updateBusTracking: Received data for bus $busId | status: $tripStatus | location: $hasLocation',
+    );
+    notifyListeners();
+  }
+
+  void _syncTripGroupsWithStudents() {
+    final Map<String, List<Student>> grouped = {};
+    for (final s in _students) {
+      if (s.bus.id.isNotEmpty && s.bus.id != '-') {
+        grouped.putIfAbsent(s.bus.id, () => []).add(s);
+      }
+    }
+
+    final newGroups = Map<String, BusTrackingGroup>.from(_tripGroups);
+    final now = DateTime.now();
+
+    // Remove groups for buses no longer present or stale (>3m without update)
+    newGroups.removeWhere((id, group) {
+      final isGone = !grouped.containsKey(id);
+      // Increased stale timeout to 10 minutes to be more resilient
+      final isStale =
+          group.tracking != null &&
+          now.difference(group.tracking!.lastUpdate).inMinutes >= 10;
+
+      if (isStale) {
+        AppLogger.d(
+          '🚌 _syncTripGroupsWithStudents: Removing stale bus $id (no update for >10m)',
+        );
+      }
+      return isGone || isStale;
+    });
+
+    // Add or update groups
+    grouped.forEach((busId, studentsOnBus) {
+      final existing = newGroups[busId];
+      final firstBus = studentsOnBus.first.bus;
+
+      // Determine initial tracking from API if available and existing is null
+      BusTracking? initialTracking;
+      if (firstBus.latitude != null &&
+          firstBus.longitude != null &&
+          firstBus.latitude != 0) {
+        initialTracking = BusTracking(
+          latitude: firstBus.latitude!,
+          longitude: firstBus.longitude!,
+          speed: 0,
+          heading: 0,
+          lastUpdate: DateTime.now(),
+        );
+        AppLogger.d(
+          '🚌 Initial location for bus $busId: ${firstBus.latitude}, ${firstBus.longitude}',
+        );
+      }
+
+      if (existing == null) {
+        newGroups[busId] = BusTrackingGroup(
+          busId: busId,
+          busNumber: firstBus.number,
+          busPlate: firstBus.plate,
+          students: studentsOnBus,
+          tracking: initialTracking?.copyWith(
+            speed: firstBus.speed,
+            etaMinutes: firstBus.etaMinutes,
+          ),
+          tripStatus: firstBus.status ?? 'offline',
+          driver: firstBus.driver,
+          supervisor: firstBus.supervisor,
+          totalStudentsCount: firstBus.totalStudents,
+          totalStudentsOnBoard: firstBus.onBoardCount,
+          startTime: firstBus.startTime,
+        );
+      } else {
+        newGroups[busId] = existing.copyWith(
+          students: studentsOnBus,
+          busNumber: existing.busNumber ?? firstBus.number,
+          busPlate: existing.busPlate ?? firstBus.plate,
+          driver: existing.driver ?? firstBus.driver,
+          supervisor: existing.supervisor ?? firstBus.supervisor,
+          startTime: existing.startTime ?? firstBus.startTime,
+          totalStudentsCount:
+              firstBus.totalStudents ?? existing.totalStudentsCount,
+          totalStudentsOnBoard:
+              firstBus.onBoardCount ?? existing.totalStudentsOnBoard,
+          // Fill tracking if missing from initial API data
+          tracking:
+              existing.tracking ??
+              initialTracking?.copyWith(
+                speed: firstBus.speed,
+                etaMinutes: firstBus.etaMinutes,
+              ),
+        );
+      }
+    });
+
+    _tripGroups = newGroups;
+
+    // Initial selection if none or current selected is gone
+    if ((_selectedBusId == null || !_tripGroups.containsKey(_selectedBusId)) &&
+        _tripGroups.isNotEmpty) {
+      _selectedBusId = _tripGroups.keys.first;
+    }
   }
 }
 

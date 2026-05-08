@@ -342,7 +342,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
 
   Widget _buildSubmitButton(BuildContext context) {
     final controller = AppScope.of(context);
-    
+
     return SizedBox(
       height: 56,
       child: DecoratedBox(
@@ -391,14 +391,17 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (context) => const Center(child: CircularProgressIndicator()),
+              builder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
             );
 
             final success = await controller.submitAbsenceRequest(
               studentIds: [_selectedChild!.id],
-              type: _selectedAbsenceType == 0 
-                  ? AbsenceType.both 
-                  : (_selectedAbsenceType == 1 ? AbsenceType.morning : AbsenceType.returnOnly),
+              type: _selectedAbsenceType == 0
+                  ? AbsenceType.both
+                  : (_selectedAbsenceType == 1
+                        ? AbsenceType.morning
+                        : AbsenceType.returnOnly),
               date: _selectedDate!,
               reason: _reasonController.text,
             );

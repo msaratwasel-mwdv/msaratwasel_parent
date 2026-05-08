@@ -26,74 +26,86 @@ class ChildrenScreen extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () => controller.loadChildrenFromApi(),
-      color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+      color: isDark
+          ? Theme.of(context).colorScheme.secondary
+          : AppColors.primary,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-        // Navigation Bar
-        AppSliverHeader(
-          title: '${context.t('myKids')} (${students.length})',
-          leading: Material(
-            color: Colors.transparent,
-            child: IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: isDark ? Colors.white : AppColors.primary,
+          // Navigation Bar
+          AppSliverHeader(
+            title: '${context.t('myKids')} (${students.length})',
+            leading: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(
+                  Icons.menu_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                ),
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-        ),
 
-        // Loading state
-        if (controller.isLoadingChildren)
-          const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          )
-        // Empty state
-        else if (students.isEmpty)
-          SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.child_care_rounded, size: 64, color: isDark ? Colors.white30 : Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text(
-                    isArabic ? 'لا يوجد أبناء مسجلون' : 'No children registered',
-                    style: TextStyle(color: isDark ? Colors.white54 : AppColors.textSecondary),
-                  ),
-                ],
+          // Loading state
+          if (controller.isLoadingChildren)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          // Empty state
+          else if (students.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.child_care_rounded,
+                      size: 64,
+                      color: isDark ? Colors.white30 : Colors.grey.shade300,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isArabic
+                          ? 'لا يوجد أبناء مسجلون'
+                          : 'No children registered',
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white54
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          // Content
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final student = students[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                    child: _ChildCard(
+                      student: student,
+                      isDark: isDark,
+                      isArabic: isArabic,
+                      onTap: () => _showChildDetails(
+                        context,
+                        student,
+                        isDark,
+                        isArabic,
+                        attendance,
+                        trips,
+                      ),
+                    ),
+                  );
+                }, childCount: students.length),
               ),
             ),
-          )
-        // Content
-        else
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final student = students[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  child: _ChildCard(
-                    student: student,
-                    isDark: isDark,
-                    isArabic: isArabic,
-                    onTap: () => _showChildDetails(
-                      context,
-                      student,
-                      isDark,
-                      isArabic,
-                      attendance,
-                      trips,
-                    ),
-                  ),
-                );
-              }, childCount: students.length),
-            ),
-          ),
         ],
       ),
     );
@@ -138,7 +150,7 @@ class _ChildCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final statusText = Labels.studentStatus(student.status, arabic: isArabic);
+    final statusText = Labels.studentStatus(context, student.status);
     final statusIcon = _statusIcon(student.status);
     final statusColor = _getStatusColor(student.status, isDark);
 
@@ -181,17 +193,26 @@ class _ChildCard extends StatelessWidget {
                       radius: 32,
                       backgroundColor: Colors.white,
                       // Show real photo if available and not empty, else initials
-                      backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                      backgroundImage:
+                          (student.avatarUrl != null &&
+                              student.avatarUrl!.isNotEmpty)
                           ? CachedNetworkImageProvider(
                               student.avatarUrl!,
                               headers: AppScope.of(context).token.isNotEmpty
-                                  ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                                  ? {
+                                      'Authorization':
+                                          'Bearer ${AppScope.of(context).token}',
+                                    }
                                   : null,
                             )
                           : null,
-                      child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                      child:
+                          (student.avatarUrl == null ||
+                              student.avatarUrl!.isEmpty)
                           ? Text(
-                              student.name.isNotEmpty ? student.name[0] : '?',
+                              student.displayName.isNotEmpty
+                                  ? student.displayName.characters.first
+                                  : '?',
                               style: TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 28,
@@ -207,7 +228,7 @@ class _ChildCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          student.name,
+                          student.displayName,
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white
@@ -408,8 +429,6 @@ class _ChildCard extends StatelessWidget {
   }
 }
 
-
-
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
@@ -512,6 +531,7 @@ class _StatBox extends StatelessWidget {
     );
   }
 }
+
 class _ChildDetailsSheet extends StatelessWidget {
   const _ChildDetailsSheet({
     required this.student,
@@ -562,17 +582,26 @@ class _ChildDetailsSheet extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.white,
-                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
+                    backgroundImage:
+                        (student.avatarUrl != null &&
+                            student.avatarUrl!.isNotEmpty)
                         ? CachedNetworkImageProvider(
                             student.avatarUrl!,
                             headers: AppScope.of(context).token.isNotEmpty
-                                ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                                ? {
+                                    'Authorization':
+                                        'Bearer ${AppScope.of(context).token}',
+                                  }
                                 : null,
                           )
                         : null,
-                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
+                    child:
+                        (student.avatarUrl == null ||
+                            student.avatarUrl!.isEmpty)
                         ? Text(
-                            student.name.isNotEmpty ? student.name[0] : '?',
+                            student.displayName.isNotEmpty
+                                ? student.displayName.characters.first
+                                : '?',
                             style: TextStyle(
                               color: AppColors.primary,
                               fontSize: 24,
@@ -588,7 +617,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.name,
+                        student.displayName,
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 20,
@@ -637,24 +666,25 @@ class _ChildDetailsSheet extends StatelessWidget {
                     children: [
                       _DetailRow(
                         label: context.t('busNumber'),
-                        value: (student.bus.number.isNotEmpty && student.bus.number != '-') 
-                            ? student.bus.number 
+                        value:
+                            (student.bus.number.isNotEmpty &&
+                                student.bus.number != '-')
+                            ? student.bus.number
                             : context.t('notSpecified'),
                         isDark: isDark,
                       ),
                       _DetailRow(
                         label: context.t('busPlate'),
-                        value: (student.bus.plate.isNotEmpty && student.bus.plate != '-') 
-                            ? student.bus.plate 
+                        value:
+                            (student.bus.plate.isNotEmpty &&
+                                student.bus.plate != '-')
+                            ? student.bus.plate
                             : context.t('notSpecified'),
                         isDark: isDark,
                       ),
                       _DetailRow(
                         label: context.t('statusLabel'),
-                        value: Labels.studentStatus(
-                          student.status,
-                          arabic: isArabic,
-                        ),
+                        value: Labels.studentStatus(context, student.status),
                         isDark: isDark,
                       ),
                     ],
@@ -681,12 +711,16 @@ class _ChildDetailsSheet extends StatelessWidget {
                                 Text(
                                   student.hasLocation
                                       ? '${student.homeLocation!.latitude.toStringAsFixed(4)}, ${student.homeLocation!.longitude.toStringAsFixed(4)}'
-                                      : (isArabic ? 'الموقع غير محدد' : 'Location not set'),
+                                      : (isArabic
+                                            ? 'الموقع غير محدد'
+                                            : 'Location not set'),
                                   textDirection: TextDirection.ltr,
                                   style: TextStyle(
                                     color: !student.hasLocation
                                         ? AppColors.error
-                                        : (isDark ? Colors.white : AppColors.textPrimary),
+                                        : (isDark
+                                              ? Colors.white
+                                              : AppColors.textPrimary),
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -715,71 +749,126 @@ class _ChildDetailsSheet extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (!student.hasLocation)
-                             TextButton.icon(
-                              onPressed: () async {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const LocationPickerScreen(),
-                                  ),
-                                );
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Edit/Set Location Button
+                              TextButton.icon(
+                                onPressed: () async {
+                                  // Show loading overlay
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
 
-                                if (result != null && context.mounted) {
-                                  LatLng? location;
-                                  if (result is LatLng) {
-                                    location = result;
-                                  } else if (result is Map) {
-                                    location = result['location'] as LatLng?;
-                                  }
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          LocationPickerScreen(
+                                            initialLocation:
+                                                student.homeLocation,
+                                          ),
+                                    ),
+                                  );
 
-                                  if (location != null) {
-                                    final success = await AppScope.of(context).updateHomeLocationApi(
-                                      location,
-                                      studentId: student.id,
-                                      address: result is Map ? result['label'] as String? : null,
-                                    );
-                                    if (success && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(isArabic ? 'تم تحديث الموقع بنجاح' : 'Location updated successfully'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    } else if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(isArabic ? 'فشل تحديث الموقع' : 'Failed to update location'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
+                                  if (context.mounted)
+                                    Navigator.pop(
+                                      context,
+                                    ); // Remove loading if it was showing or just safety
+
+                                  if (result != null && context.mounted) {
+                                    LatLng? location;
+                                    String? label;
+
+                                    if (result is LatLng) {
+                                      location = result;
+                                    } else if (result is Map) {
+                                      location = result['location'] as LatLng?;
+                                      label = result['label'] as String?;
+                                    }
+
+                                    if (location != null) {
+                                      final success = await AppScope.of(context)
+                                          .updateHomeLocationApi(
+                                            location,
+                                            studentId: student.id,
+                                            address: label,
+                                          );
+                                      if (success && context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              context.t(
+                                                'locationUpdateRequestSent',
+                                              ),
+                                            ),
+                                            backgroundColor: Colors.blue,
+                                          ),
+                                        );
+                                      } else if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              context.t('failedToLoadMessages'),
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
                                     }
                                   }
-                                }
-                              },
-                              icon: const Icon(Icons.add_location_alt_rounded, size: 18),
-                              label: Text(isArabic ? 'تحديد الآن' : 'Set Now'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.error,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                              ),
-                            )
-                          else
-                            IconButton(
-                              icon: const Icon(Icons.map_rounded, size: 22),
-                              color: isDark ? Colors.white : AppColors.primary,
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => LocationPickerScreen(
-                                      initialLocation: student.homeLocation,
-                                      isReadOnly: true,
-                                    ),
+                                },
+                                icon: Icon(
+                                  student.hasLocation
+                                      ? Icons.edit_location_alt_rounded
+                                      : Icons.add_location_alt_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  student.hasLocation
+                                      ? context.t('edit')
+                                      : context.t('setNow'),
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: student.hasLocation
+                                      ? AppColors.primary
+                                      : AppColors.error,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              ),
+
+                              if (student.hasLocation)
+                                IconButton(
+                                  icon: const Icon(Icons.map_rounded, size: 22),
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.primary,
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            LocationPickerScreen(
+                                              initialLocation:
+                                                  student.homeLocation,
+                                              isReadOnly: true,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ],
@@ -797,9 +886,10 @@ class _ChildDetailsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (student.schoolName != null && student.schoolName!.isNotEmpty)
+                        (student.schoolName != null &&
+                                student.schoolName!.isNotEmpty)
                             ? student.schoolName!
-                            : (isArabic ? 'غير محدد' : 'Not Specified'),
+                            : context.t('notSpecified'),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16,
@@ -818,9 +908,10 @@ class _ChildDetailsSheet extends StatelessWidget {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              (student.schoolLocation != null && student.schoolLocation!.isNotEmpty)
+                              (student.schoolLocation != null &&
+                                      student.schoolLocation!.isNotEmpty)
                                   ? student.schoolLocation!
-                                  : (isArabic ? 'غير محدد' : 'Not Specified'),
+                                  : context.t('notSpecified'),
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white70
@@ -852,7 +943,8 @@ class _ChildDetailsSheet extends StatelessWidget {
                     ),
                   ),
 
-                if (student.bus.driver != null) const SizedBox(height: AppSpacing.lg),
+                if (student.bus.driver != null)
+                  const SizedBox(height: AppSpacing.lg),
 
                 // Bus Supervisor Info
                 if (student.bus.supervisor != null)
@@ -1011,17 +1103,25 @@ class _ContactInfoRow extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                backgroundImage:
+                    (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
                     ? CachedNetworkImageProvider(
                         avatarUrl!,
                         headers: AppScope.of(context).token.isNotEmpty
-                            ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                            ? {
+                                'Authorization':
+                                    'Bearer ${AppScope.of(context).token}',
+                              }
                             : null,
                       )
                     : null,
                 backgroundColor: AppColors.primary.withAlpha(30),
                 child: (avatarUrl == null || avatarUrl!.trim().isEmpty)
-                    ? const Icon(Icons.person_rounded, color: AppColors.primary, size: 18)
+                    ? const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.primary,
+                        size: 18,
+                      )
                     : null,
               ),
               const SizedBox(width: AppSpacing.md),

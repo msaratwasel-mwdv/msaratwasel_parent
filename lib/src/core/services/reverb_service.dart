@@ -24,7 +24,7 @@ class ReverbService {
 
   // إعدادات Reverb المستمدة من إعدادات السيرفر الخاصة بك
   static const String _reverbKey = 'masarat-wasel-key';
-  
+
   static String get _reverbHost {
     if (!AppConfig.isLocal) return '187.77.162.203';
     final apiUrl = AppConfig.apiBaseUrl;
@@ -34,13 +34,15 @@ class ReverbService {
 
   // نستخدم المنفذ 8080 كما حددت في إعدادات السيرفر
   static const int _reverbPort = 8080;
-  
+
   // نضبط البروتوكول ليكون ws وفقاً لإعداداتك في الاستضافة (REVERB_SCHEME=http)
-  static const bool _forceNonSecure = true; 
-  static bool get _isSecure => _forceNonSecure ? false : AppConfig.apiBaseUrl.startsWith('https');
+  static const bool _forceNonSecure = true;
+  static bool get _isSecure =>
+      _forceNonSecure ? false : AppConfig.apiBaseUrl.startsWith('https');
 
   // قائمة القنوات المشترك بها حالياً
   final Set<String> _subscribedChannels = {};
+  final List<String> _pendingSubscriptions = [];
 
   ReverbService({
     required String token,
@@ -48,10 +50,10 @@ class ReverbService {
     required Dio dio,
     required void Function(Map<String, dynamic> data) onStudentStatusUpdated,
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
-  })  : _userId = userId,
-        _dio = dio,
-        _onStudentStatusUpdated = onStudentStatusUpdated,
-        _onBusLocationUpdated = onBusLocationUpdated;
+  }) : _userId = userId,
+       _dio = dio,
+       _onStudentStatusUpdated = onStudentStatusUpdated,
+       _onBusLocationUpdated = onBusLocationUpdated;
 
   /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
@@ -104,17 +106,31 @@ class ReverbService {
           final socketId = data['socket_id'] as String;
           _lastSocketId = socketId;
           developer.log('✅ Connected! Socket ID: $socketId', name: 'REVERB');
-          
+
           // 1. الاشتراك في القناة الخاصة بولي الأمر تلقائياً
           subscribe('private-guardian.$_userId', socketId);
+
+          // 2. معالجة الاشتراكات المعلقة
+          if (_pendingSubscriptions.isNotEmpty) {
+            final pending = List<String>.from(_pendingSubscriptions);
+            _pendingSubscriptions.clear();
+            for (final ch in pending) {
+              subscribe(ch, socketId);
+            }
+          }
           break;
 
         case 'student.status.updated':
+          developer.log('🔔 Event: student.status.updated', name: 'REVERB');
           final data = _parseData(message['data']);
           _onStudentStatusUpdated(data);
           break;
 
+        case 'driver.location.updated':
         case 'bus.location.updated':
+        case 'BusLocationUpdated':
+        case 'App\\Events\\BusLocationUpdated':
+          developer.log('📍 Event: ${event}', name: 'REVERB');
           final data = _parseData(message['data']);
           if (_onBusLocationUpdated != null) {
             _onBusLocationUpdated(data);
@@ -122,10 +138,20 @@ class ReverbService {
           break;
 
         case 'pusher_internal:subscription_succeeded':
-          developer.log('✅ Subscription succeeded for: ${message['channel']}', name: 'REVERB');
+          developer.log(
+            '✅ Subscription succeeded for: ${message['channel']}',
+            name: 'REVERB',
+          );
+          break;
+
+        case 'pusher:pong':
+          // Ignore heartbeat response
           break;
 
         default:
+          if (event != null && !event.startsWith('pusher:')) {
+            developer.log('❓ Unknown event: $event', name: 'REVERB');
+          }
           break;
       }
     } catch (e) {
@@ -142,8 +168,18 @@ class ReverbService {
 
   /// تنفيذ الاشتراك في قناة معينة (خاص أو عام)
   Future<void> subscribe(String channelName, [String? socketId]) async {
-    if (!_isConnected || _channel == null) return;
     if (_subscribedChannels.contains(channelName)) return;
+
+    if (!_isConnected || _channel == null) {
+      if (!_pendingSubscriptions.contains(channelName)) {
+        _pendingSubscriptions.add(channelName);
+        developer.log(
+          '⏳ Subscription queued (not connected yet): $channelName',
+          name: 'REVERB',
+        );
+      }
+      return;
+    }
 
     final effectiveSocketId = socketId ?? _lastSocketId;
 
@@ -151,10 +187,16 @@ class ReverbService {
       // إذا كانت قناة خاصة، نحتاج لمصادقة
       if (channelName.startsWith('private-')) {
         if (effectiveSocketId == null) {
-          developer.log('⚠️ Cannot subscribe to private channel $channelName without socketId', name: 'REVERB');
+          developer.log(
+            '⚠️ Cannot subscribe to private channel $channelName without socketId',
+            name: 'REVERB',
+          );
           return;
         }
-        final authData = await _authenticateChannel(channelName, effectiveSocketId);
+        final authData = await _authenticateChannel(
+          channelName,
+          effectiveSocketId,
+        );
         _send({
           'event': 'pusher:subscribe',
           'data': {'channel': channelName, 'auth': authData['auth']},
@@ -168,23 +210,32 @@ class ReverbService {
       _subscribedChannels.add(channelName);
       developer.log('📡 Subscribed to: $channelName', name: 'REVERB');
     } catch (e) {
-      developer.log('❌ Subscription failed for $channelName: $e', name: 'REVERB');
+      developer.log(
+        '❌ Subscription failed for $channelName: $e',
+        name: 'REVERB',
+      );
     }
   }
 
-  Future<Map<String, dynamic>> _authenticateChannel(String channelName, String socketId) async {
+  Future<Map<String, dynamic>> _authenticateChannel(
+    String channelName,
+    String socketId,
+  ) async {
     try {
-      final response = await _dio.post('broadcasting/auth', data: {
-        'socket_id': socketId,
-        'channel_name': channelName,
-      });
+      final response = await _dio.post(
+        'broadcasting/auth',
+        data: {'socket_id': socketId, 'channel_name': channelName},
+      );
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
       }
       throw Exception('Auth failed with status ${response.statusCode}');
     } catch (e) {
-      developer.log('❌ Channel auth failed for $channelName: $e', name: 'REVERB');
+      developer.log(
+        '❌ Channel auth failed for $channelName: $e',
+        name: 'REVERB',
+      );
       rethrow;
     }
   }

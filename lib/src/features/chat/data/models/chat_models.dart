@@ -44,14 +44,17 @@ class ChatConversation {
   final DateTime? updatedAt;
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
-    final participantsList = (json['participants'] as List<dynamic>?)
+    final participantsList =
+        (json['participants'] as List<dynamic>?)
             ?.map((p) => ChatParticipant.fromJson(p as Map<String, dynamic>))
             .toList() ??
         [];
 
     ChatMessage? lastMsg;
     if (json['last_message'] != null) {
-      lastMsg = ChatMessage.fromJson(json['last_message'] as Map<String, dynamic>);
+      lastMsg = ChatMessage.fromJson(
+        json['last_message'] as Map<String, dynamic>,
+      );
     }
 
     return ChatConversation(
@@ -128,7 +131,8 @@ class ChatMessage {
       type: json['type'] as String? ?? 'text',
       attachmentUrl: json['attachment_url'] as String?,
       isMine: json['is_mine'] as bool? ?? false,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
     );
   }

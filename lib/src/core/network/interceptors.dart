@@ -24,7 +24,10 @@ class AuthInterceptor extends Interceptor {
 class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    developer.log('🌐 DIO [REQ]: ${options.method} ${options.uri}', name: 'NETWORK');
+    developer.log(
+      '🌐 DIO [REQ]: ${options.method} ${options.uri}',
+      name: 'NETWORK',
+    );
     if (options.data != null) {
       developer.log('📦 DIO [BODY]: ${options.data}', name: 'NETWORK');
     }
@@ -33,13 +36,20 @@ class LoggingInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    developer.log('✅ DIO [RES]: ${response.statusCode} ${response.requestOptions.uri}', name: 'NETWORK');
+    developer.log(
+      '✅ DIO [RES]: ${response.statusCode} ${response.requestOptions.uri}',
+      name: 'NETWORK',
+    );
     super.onResponse(response, handler);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    developer.log('❌ DIO [ERR]: ${err.response?.statusCode} ${err.requestOptions.uri}', name: 'NETWORK', error: err);
+    developer.log(
+      '❌ DIO [ERR]: ${err.response?.statusCode} ${err.requestOptions.uri}',
+      name: 'NETWORK',
+      error: err,
+    );
     super.onError(err, handler);
   }
 }

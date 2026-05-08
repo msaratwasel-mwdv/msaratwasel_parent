@@ -66,7 +66,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     markerId: const MarkerId('selected-location'),
                     position: _controller.selectedLocation,
                     draggable: !widget.isReadOnly,
-                    onDragEnd: (newPosition) => _controller.onLongPress(newPosition),
+                    onDragEnd: (newPosition) =>
+                        _controller.onLongPress(newPosition),
                   ),
                 },
                 myLocationEnabled: true,
@@ -86,7 +87,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(20),
@@ -105,7 +109,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           const SizedBox(width: 8),
                           Text(
                             context.t('fetchingAddress'),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -128,7 +135,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 child: FloatingActionButton(
                   heroTag: 'my_location_btn',
                   onPressed: () => _controller.moveToMyLocation(context),
-                  backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  backgroundColor: isDark
+                      ? const Color(0xFF1E293B)
+                      : Colors.white,
                   elevation: 4,
                   child: const Icon(
                     Icons.my_location_rounded,
@@ -138,8 +147,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               ),
 
               // 5. Bottom Confirmation Sheet
-              if (!widget.isReadOnly)
-                _buildBottomActions(context, isDark),
+              if (!widget.isReadOnly) _buildBottomActions(context, isDark),
             ],
           ),
         );
@@ -156,7 +164,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Container(
             decoration: BoxDecoration(
-              color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.95),
+              color: (isDark ? const Color(0xFF1E293B) : Colors.white)
+                  .withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(50),
               boxShadow: [
                 BoxShadow(
@@ -173,7 +182,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   color: AppColors.primary,
                   onPressed: () => Navigator.pop(context),
                 ),
-                Container(height: 24, width: 1, color: isDark ? Colors.white24 : Colors.black12),
+                Container(
+                  height: 24,
+                  width: 1,
+                  color: isDark ? Colors.white24 : Colors.black12,
+                ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: TextField(
@@ -186,13 +199,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     ),
                     decoration: InputDecoration(
                       hintText: context.t('searchLocation'),
-                      hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.grey,
+                      ),
                       border: InputBorder.none,
                       isDense: true,
                     ),
                   ),
                 ),
-                if (_controller.searchController.text.isNotEmpty && !widget.isReadOnly)
+                if (_controller.searchController.text.isNotEmpty &&
+                    !widget.isReadOnly)
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
                     color: Colors.grey,
@@ -201,8 +217,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: AppSpacing.md),
                   child: _controller.isSearching
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.search_rounded, color: AppColors.primary),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.search_rounded,
+                          color: AppColors.primary,
+                        ),
                 ),
               ],
             ),
@@ -210,34 +233,62 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         ),
 
         // Suggestions Overlay
-        if (_controller.predictions.isNotEmpty)
-          _buildSuggestions(isDark),
+        if (_controller.predictions.isNotEmpty) _buildSuggestions(isDark),
       ],
     );
   }
 
   Widget _buildSuggestions(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxHeight: 250),
         decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.95),
+          color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(
+            alpha: 0.95,
+          ),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+            ),
+          ],
         ),
         child: ListView.separated(
           padding: EdgeInsets.zero,
           shrinkWrap: true,
           itemCount: _controller.predictions.length,
-          separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.black12),
+          separatorBuilder: (_, __) => Divider(
+            height: 1,
+            color: isDark ? Colors.white10 : Colors.black12,
+          ),
           itemBuilder: (context, index) {
             final p = _controller.predictions[index];
             return ListTile(
               dense: true,
-              leading: const Icon(Icons.location_on_outlined, color: Colors.grey, size: 20),
-              title: Text(p.mainText, style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.bold)),
-              subtitle: Text(p.secondaryText, style: TextStyle(color: isDark ? Colors.white60 : Colors.grey, fontSize: 12)),
+              leading: const Icon(
+                Icons.location_on_outlined,
+                color: Colors.grey,
+                size: 20,
+              ),
+              title: Text(
+                p.mainText,
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Text(
+                p.secondaryText,
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
               onTap: () => _controller.selectPlace(p),
             );
           },
@@ -260,16 +311,28 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                ),
+              ],
             ),
             child: TextField(
               controller: _controller.noteController,
-              style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+              style: TextStyle(
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
               decoration: InputDecoration(
                 hintText: context.t('locationNoteHint'),
-                hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey,
+                ),
                 border: InputBorder.none,
-                icon: Icon(Icons.note_alt_outlined, color: isDark ? Colors.white70 : Colors.grey),
+                icon: Icon(
+                  Icons.note_alt_outlined,
+                  color: isDark ? Colors.white70 : Colors.grey,
+                ),
               ),
             ),
           ),
@@ -289,9 +352,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: Text(context.t('confirmLocation'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Text(
+                context.t('confirmLocation'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],

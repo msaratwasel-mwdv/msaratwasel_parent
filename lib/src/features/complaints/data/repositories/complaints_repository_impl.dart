@@ -9,10 +9,13 @@ class ComplaintsRepositoryImpl implements ComplaintsRepository {
 
   @override
   Future<void> submitComplaint(Complaint complaint) async {
-    await dio.post('guardian/complaints', data: {
-      'type': complaint.type.name,
-      'message': complaint.message,
-      'student_id': complaint.studentId,
-    });
+    await dio.post(
+      'guardian/complaints',
+      data: {
+        'type': complaint.type.name,
+        'message': complaint.message,
+        'student_id': complaint.studentId,
+      },
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class LanguageSelectorScreen extends StatelessWidget {
   const LanguageSelectorScreen({super.key});
@@ -6,7 +7,7 @@ class LanguageSelectorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('اختيار اللغة')),
+      appBar: AppBar(title: Text(context.t('language'))),
       body: const Center(child: Text('Language selector placeholder')),
     );
   }

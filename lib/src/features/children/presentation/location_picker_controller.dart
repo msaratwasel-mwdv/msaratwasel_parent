@@ -16,9 +16,9 @@ class LocationPickerController extends ChangeNotifier {
     PlacesService? placesService,
     GeocodingService? geocodingService,
     LatLng? initialLocation,
-  })  : _placesService = placesService ?? PlacesService(),
-        _geocodingService = geocodingService ?? GeocodingService(),
-        _selectedLocation = initialLocation ?? const LatLng(23.5859, 58.4059) {
+  }) : _placesService = placesService ?? PlacesService(),
+       _geocodingService = geocodingService ?? GeocodingService(),
+       _selectedLocation = initialLocation ?? const LatLng(23.5859, 58.4059) {
     if (initialLocation != null) {
       _reverseGeocode(initialLocation);
     }
@@ -60,7 +60,7 @@ class LocationPickerController extends ChangeNotifier {
   LatLng? _lastGeocodedLatLng;
   static const double _geocodeThresholdMeters = 5.0;
 
-  /// Registers the GoogleMapController. 
+  /// Registers the GoogleMapController.
   /// Disposes it immediately if the parent controller is already disposed.
   void setMapController(GoogleMapController controller) {
     if (_isDisposed) {
@@ -78,7 +78,7 @@ class LocationPickerController extends ChangeNotifier {
   /// Handles search input changes with debounce and session token management.
   void onSearchChanged(String query) {
     if (_isDisposed) return;
-    
+
     _debounce?.cancel();
     if (query.isEmpty) {
       _predictions = [];
@@ -90,7 +90,10 @@ class LocationPickerController extends ChangeNotifier {
     }
 
     _sessionToken ??= _uuid.v4();
-    _debounce = Timer(const Duration(milliseconds: 300), () => _fetchPredictions(query));
+    _debounce = Timer(
+      const Duration(milliseconds: 300),
+      () => _fetchPredictions(query),
+    );
   }
 
   Future<void> _fetchPredictions(String query) async {
@@ -106,8 +109,8 @@ class LocationPickerController extends ChangeNotifier {
 
     try {
       final results = await _placesService.getPredictions(
-        query, 
-        _sessionToken!, 
+        query,
+        _sessionToken!,
         cancelToken: _autocompleteToken,
       );
 
@@ -139,11 +142,11 @@ class LocationPickerController extends ChangeNotifier {
 
     try {
       final location = await _placesService.getPlaceDetails(
-        prediction.placeId, 
+        prediction.placeId,
         token,
         cancelToken: _detailsToken,
       );
-      
+
       if (_isDisposed) return;
 
       // Clear session after final billable call
@@ -177,7 +180,8 @@ class LocationPickerController extends ChangeNotifier {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (context.mounted) _showSnackBar(context, 'Location services are disabled.');
+        if (context.mounted)
+          _showSnackBar(context, 'Location services are disabled.');
         return;
       }
 
@@ -185,13 +189,18 @@ class LocationPickerController extends ChangeNotifier {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          if (context.mounted) _showSnackBar(context, 'Location permissions are denied.');
+          if (context.mounted)
+            _showSnackBar(context, 'Location permissions are denied.');
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        if (context.mounted) _showSnackBar(context, 'Location permissions are permanently denied.');
+        if (context.mounted)
+          _showSnackBar(
+            context,
+            'Location permissions are permanently denied.',
+          );
         return;
       }
 
@@ -199,7 +208,7 @@ class LocationPickerController extends ChangeNotifier {
       if (_isDisposed) return;
 
       final latLng = LatLng(position.latitude, position.longitude);
-      
+
       _animateToLocation(latLng);
       _updateLocation(latLng);
       _reverseGeocode(latLng);
@@ -247,7 +256,7 @@ class LocationPickerController extends ChangeNotifier {
         location,
         cancelToken: _geocodingToken,
       );
-      
+
       if (_isDisposed) return;
 
       _addressLabel = address;

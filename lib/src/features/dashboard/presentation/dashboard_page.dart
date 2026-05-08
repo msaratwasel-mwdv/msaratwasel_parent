@@ -9,6 +9,7 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/labels.dart';
+import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking_group.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_page.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -21,7 +22,6 @@ class DashboardPage extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final isArabic = controller.locale.languageCode == 'ar';
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final unread = controller.notifications.where((n) => !n.read).length;
         final latest = controller.notifications.isNotEmpty
@@ -34,7 +34,9 @@ class DashboardPage extends StatelessWidget {
             await controller.loadChildrenFromApi();
             await controller.loadNotificationsFromApi();
           },
-          color: isDark ? Theme.of(context).colorScheme.secondary : AppColors.primary,
+          color: isDark
+              ? Theme.of(context).colorScheme.secondary
+              : AppColors.primary,
           backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -116,14 +118,12 @@ class DashboardPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _WelcomeHeader(
-                        isArabic: isArabic,
                         studentName: students.isNotEmpty
                             ? students.first.name
-                            : context.t('student'), 
+                            : context.t('student'),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _ActivityCard(
-                        isArabic: isArabic,
                         unread: unread,
                         latest: latest,
                         onViewAll: () => controller.setNavIndex(2),
@@ -141,19 +141,17 @@ class DashboardPage extends StatelessWidget {
                             builder: (_) => const ContactUsPage(),
                           ),
                         ),
-                        isArabic: isArabic,
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       _SectionTitle(title: context.t('kidsTitle')),
                       const SizedBox(height: AppSpacing.sm),
                       if (students.isEmpty)
-                        _EmptyStudentsCard(isArabic: isArabic)
+                        const _EmptyStudentsCard()
                       else ...[
                         for (final student in students) ...[
                           _StudentCard(
                             student: student,
-                            tracking: controller.trackingForStudent(student.id),
-                            isArabic: isArabic,
+                            group: controller.groupForBus(student.bus.id),
                             onTrack: () {
                               final index = controller.students.indexOf(
                                 student,
@@ -167,11 +165,15 @@ class DashboardPage extends StatelessWidget {
                       ],
                       const SizedBox(height: AppSpacing.sm),
                       if (controller.currentStudent != null &&
-                          controller.currentTracking != null)
+                          controller.groupForBus(
+                                controller.currentStudent!.bus.id,
+                              ) !=
+                              null)
                         _BusInfoCard(
-                          isArabic: isArabic,
                           student: controller.currentStudent!,
-                          tracking: controller.currentTracking!,
+                          group: controller.groupForBus(
+                            controller.currentStudent!.bus.id,
+                          )!,
                         ),
                       const SizedBox(height: AppSpacing.lg),
                       Center(
@@ -198,9 +200,8 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader({required this.isArabic, required this.studentName});
+  const _WelcomeHeader({required this.studentName});
 
-  final bool isArabic;
   final String studentName;
 
   @override
@@ -258,9 +259,7 @@ class _WelcomeHeader extends StatelessWidget {
 }
 
 class _EmptyStudentsCard extends StatelessWidget {
-  const _EmptyStudentsCard({required this.isArabic});
-
-  final bool isArabic;
+  const _EmptyStudentsCard();
 
   @override
   Widget build(BuildContext context) {
@@ -304,13 +303,11 @@ class _EmptyStudentsCard extends StatelessWidget {
 
 class _ActivityCard extends StatelessWidget {
   const _ActivityCard({
-    required this.isArabic,
     required this.unread,
     required this.latest,
     required this.onViewAll,
   });
 
-  final bool isArabic;
   final int unread;
   final AppNotification? latest;
   final VoidCallback onViewAll;
@@ -443,14 +440,12 @@ class _QuickServicesGrid extends StatelessWidget {
     required this.onCanteen,
     required this.onKids,
     required this.onSupport,
-    required this.isArabic,
   });
 
   final VoidCallback onTrack;
   final VoidCallback onCanteen;
   final VoidCallback onKids;
   final VoidCallback onSupport;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
@@ -570,25 +565,26 @@ class _QuickServiceItem extends StatelessWidget {
 class _StudentCard extends StatelessWidget {
   const _StudentCard({
     required this.student,
-    required this.tracking,
-    required this.isArabic,
+    required this.group,
     required this.onTrack,
   });
 
   final Student student;
-  final TrackingSnapshot? tracking;
-  final bool isArabic;
+  final BusTrackingGroup? group;
   final VoidCallback onTrack;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tracking = group?.tracking;
     final canTrack =
-        tracking != null && tracking!.busState == BusState.enRoute && tracking!.etaMinutes > 0;
+        tracking != null &&
+        group?.busState == BusState.enRoute &&
+        (tracking.etaMinutes ?? 0) > 0;
     final etaText = canTrack
-        ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
+        ? '${tracking.etaMinutes} ${context.t('minutesSuffix')}'
         : context.t('notAvailable');
-    final statusText = Labels.studentStatus(student.status, arabic: isArabic);
+    final statusText = Labels.studentStatus(context, student.status);
     final statusColors = _statusChipColors(student.status);
 
     return Card(
@@ -610,17 +606,23 @@ class _StudentCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: AppColors.primary.withAlpha(18),
-                  backgroundImage: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+                  backgroundImage:
+                      student.avatarUrl != null && student.avatarUrl!.isNotEmpty
                       ? CachedNetworkImageProvider(
                           student.avatarUrl!,
                           headers: AppScope.of(context).token.isNotEmpty
-                              ? {'Authorization': 'Bearer ${AppScope.of(context).token}'}
+                              ? {
+                                  'Authorization':
+                                      'Bearer ${AppScope.of(context).token}',
+                                }
                               : null,
                         )
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(
-                          student.name.isNotEmpty ? student.name.characters.first : '?',
+                          student.name.isNotEmpty
+                              ? student.name.characters.first
+                              : '?',
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w800,
@@ -707,7 +709,10 @@ class _StudentCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    Labels.busState(tracking?.busState ?? BusState.atHome, arabic: isArabic),
+                    Labels.busState(
+                      context,
+                      group?.busState ?? BusState.atHome,
+                    ),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -774,14 +779,12 @@ class _StudentCard extends StatelessWidget {
 
 class _BusInfoCard extends StatelessWidget {
   const _BusInfoCard({
-    required this.isArabic,
     required this.student,
-    required this.tracking,
+    required this.group,
   });
 
-  final bool isArabic;
   final Student student;
-  final TrackingSnapshot tracking;
+  final BusTrackingGroup group;
 
   @override
   Widget build(BuildContext context) {
@@ -789,12 +792,12 @@ class _BusInfoCard extends StatelessWidget {
       _InfoItem(
         icon: Icons.person_rounded,
         label: context.t('driverName'),
-        value: student.bus.driver?.name ?? (isArabic ? 'غير محدد' : 'N/A'),
+        value: student.bus.driver?.name ?? context.t('notAvailable'),
       ),
       _InfoItem(
         icon: Icons.escalator_warning_rounded,
         label: context.t('assistantName'),
-        value: student.bus.supervisor?.name ?? (isArabic ? 'غير محدد' : 'N/A'),
+        value: student.bus.supervisor?.name ?? context.t('notAvailable'),
       ),
       _InfoItem(
         icon: Icons.pin_drop_rounded,
@@ -809,7 +812,7 @@ class _BusInfoCard extends StatelessWidget {
       _InfoItem(
         icon: Icons.route_rounded,
         label: context.t('route'),
-        value: tracking.routeDescription,
+        value: group.routeDescription,
       ),
     ];
 

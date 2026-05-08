@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'dart:developer' as developer;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -88,11 +89,28 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
   }
 
   Widget _buildHome() {
+    // Transition State: Bootstrap is still running (showing indicator)
     if (!_controller.isBootCompleted) {
-      // Return empty while booting; Native splash will cover this seamlessly
-      // until `isBootCompleted` becomes true and `FlutterNativeSplash.remove()` is called.
-      return const Scaffold(backgroundColor: Color(0xFF062A5A));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                _controller.locale.languageCode == 'ar'
+                    ? 'جاري التحميل...'
+                    : 'Loading...',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      );
     }
+
+    AppLogger.d('🚀 app.dart: Switching to RootShell');
 
     if (_controller.shouldShowOnboarding) {
       return OnboardingPage(controller: _controller);

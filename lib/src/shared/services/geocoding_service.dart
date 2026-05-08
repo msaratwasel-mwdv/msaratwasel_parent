@@ -11,8 +11,13 @@ class GeocodingService {
   /// Performs reverse geocoding with Address Descriptors (Landmarks).
   ///
   /// Falls back to formatted_address if address_descriptors are not available.
-  Future<String> reverseGeocode(LatLng location, {CancelToken? cancelToken}) async {
-    print('🔍 GeocodingService: Reverse geocoding for ${location.latitude}, ${location.longitude}');
+  Future<String> reverseGeocode(
+    LatLng location, {
+    CancelToken? cancelToken,
+  }) async {
+    print(
+      '🔍 GeocodingService: Reverse geocoding for ${location.latitude}, ${location.longitude}',
+    );
     try {
       final response = await _dio.get(
         'https://maps.googleapis.com/maps/api/geocode/json',
@@ -23,9 +28,7 @@ class GeocodingService {
         },
         cancelToken: cancelToken,
         options: Options(
-          headers: {
-            'X-Android-Package': 'com.msaratwasel.user',
-          },
+          headers: {'X-Android-Package': 'com.msaratwasel.user'},
         ),
       );
 
@@ -44,7 +47,7 @@ class GeocodingService {
               final landmark = landmarks.first;
               final name = landmark['display_name']['text'];
               final spatialRelationship = landmark['spatial_relationship'];
-              
+
               final relation = _mapSpatialRelationship(spatialRelationship);
               return '$relation $name';
             }
@@ -65,14 +68,22 @@ class GeocodingService {
 
   String _mapSpatialRelationship(String? relationship) {
     switch (relationship) {
-      case 'NEAR': return 'Near';
-      case 'WITHIN': return 'In';
-      case 'BESIDE': return 'Beside';
-      case 'ACROSS_THE_ROAD': return 'Across from';
-      case 'DOWN_THE_ROAD': return 'Down from';
-      case 'AROUND_THE_CORNER': return 'Around the corner from';
-      case 'BEHIND': return 'Behind';
-      default: return 'Near';
+      case 'NEAR':
+        return 'Near';
+      case 'WITHIN':
+        return 'In';
+      case 'BESIDE':
+        return 'Beside';
+      case 'ACROSS_THE_ROAD':
+        return 'Across from';
+      case 'DOWN_THE_ROAD':
+        return 'Down from';
+      case 'AROUND_THE_CORNER':
+        return 'Around the corner from';
+      case 'BEHIND':
+        return 'Behind';
+      default:
+        return 'Near';
     }
   }
 }

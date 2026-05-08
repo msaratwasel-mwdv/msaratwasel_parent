@@ -33,6 +33,8 @@ class AppColors {
 
   static AppThemeColors get light => const AppThemeColors(
     scaffold: surface,
+    card: surfaceAlt,
+    surfaceContainer: Color(0xFFF8F9FA),
     text: textPrimary,
     text70: textSecondary,
     accent: accent,
@@ -41,6 +43,8 @@ class AppColors {
 
   static AppThemeColors get dark => const AppThemeColors(
     scaffold: Color(0xFF0F172A),
+    card: Color(0xFF1E293B),
+    surfaceContainer: Color(0xFF1E293B),
     text: Colors.white,
     text70: Colors.white70,
     accent: Color(0xFF64B5F6),
@@ -51,6 +55,8 @@ class AppColors {
 class AppThemeColors {
   const AppThemeColors({
     required this.scaffold,
+    required this.card,
+    required this.surfaceContainer,
     required this.text,
     required this.text70,
     required this.accent,
@@ -58,6 +64,8 @@ class AppThemeColors {
   });
 
   final Color scaffold;
+  final Color card;
+  final Color surfaceContainer;
   final Color text;
   final Color text70;
   final Color accent;

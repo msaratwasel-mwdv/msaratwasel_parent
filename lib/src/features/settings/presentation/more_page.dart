@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
@@ -12,9 +11,6 @@ import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_p
 import 'package:msaratwasel_user/src/features/settings/presentation/about_app_page.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
-
 class MorePage extends StatefulWidget {
   const MorePage({super.key});
 
@@ -25,139 +21,13 @@ class MorePage extends StatefulWidget {
 class _MorePageState extends State<MorePage> {
   bool notificationsEnabled = true;
 
-  void _showStudentSelectionSheet(BuildContext context) {
-    final controller = AppScope.of(context);
-    final students = controller.students;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.t('selectChildToChangeLocation'),
-              style: GoogleFonts.cairo(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ...students.map(
-              (student) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: ListTile(
-                  onTap: () async {
-                    Navigator.pop(context); // Close sheet
-                    // Navigate to Location Picker
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LocationPickerScreen(
-                          initialLocation: student.homeLocation,
-                        ),
-                      ),
-                    );
-
-                    if (result != null && context.mounted) {
-                      LatLng? location;
-                      if (result is Map) {
-                        location = result['location'] as LatLng?;
-                      } else if (result is LatLng) {
-                        location = result;
-                      }
-
-                      if (location != null) {
-                        final success = await controller.updateHomeLocationApi(location);
-                        
-                        if (success && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(context.t('locationUpdated')),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } else if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(AppScope.of(context).locale.languageCode == 'ar' ? 'فشل التحديث' : 'Update failed'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    backgroundImage: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
-                        ? CachedNetworkImageProvider(
-                            student.avatarUrl!,
-                            headers: controller.token.isNotEmpty
-                                ? {'Authorization': 'Bearer ${controller.token}'}
-                                : null,
-                          )
-                        : null,
-                    child: (student.avatarUrl == null || student.avatarUrl!.isEmpty)
-                        ? Text(
-                            student.name.isNotEmpty ? student.name[0] : '?',
-                            style: GoogleFonts.cairo(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : null,
-                  ),
-                  title: Text(
-                    student.name,
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${context.t('studentGrade')}: ${student.grade}',
-                    style: GoogleFonts.cairo(
-                      color: isDark ? Colors.white70 : AppColors.textSecondary,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
-                    color: isDark ? Colors.white30 : Colors.black26,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isDark ? Colors.white12 : AppColors.border,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final isArabic = controller.locale.languageCode == 'ar';
     final theme = Theme.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = theme.brightness == Brightness.dark;
+    final locale = Localizations.localeOf(context).languageCode;
+    final isArabic = locale == 'ar';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -212,56 +82,6 @@ class _MorePageState extends State<MorePage> {
                           ),
                         ),
                       ),
-                      _Divider(),
-                      _SettingsTile(
-                        icon: PhosphorIcons.users(PhosphorIconsStyle.duotone),
-                        title: context.t('changeChildrenLocation'),
-                        subtitle: context.t('manageKids'),
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(
-                                context.t('locationChangeWarningTitle'),
-                                style: GoogleFonts.cairo(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Text(
-                                context.t('locationChangeWarningBody'),
-                                style: GoogleFonts.cairo(),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text(
-                                    context.t('cancel'),
-                                    style: GoogleFonts.cairo(
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context); // Close warning
-                                    _showStudentSelectionSheet(context);
-                                  },
-                                  child: Text(
-                                    context.t('proceed'),
-                                    style: GoogleFonts.cairo(
-                                      color: isDark
-                                          ? AppColors.dark.accent
-                                          : AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -305,7 +125,7 @@ class _MorePageState extends State<MorePage> {
                           value:
                               !isArabic, // False (Left) = Arabic, True (Right) = English
                           onChanged: (targetIsEnglish) {
-                            // If target matches current isArabic state (e.g. Target English(true) and isArabic(true)), it means we need to toggle
+                            // If target matches current isArabic state, toggle
                             if (targetIsEnglish == isArabic) {
                               controller.toggleLanguage();
                             }

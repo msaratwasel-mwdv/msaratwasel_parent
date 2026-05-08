@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class ChildListScreen extends StatelessWidget {
   const ChildListScreen({super.key});
@@ -6,7 +7,7 @@ class ChildListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('الأبناء')),
+      appBar: AppBar(title: Text(context.t('kidsTitle'))),
       body: const Center(child: Text('Child list placeholder')),
     );
   }
