@@ -75,9 +75,21 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 zoomControlsEnabled: false,
                 padding: EdgeInsets.only(
                   top: topPadding + 80,
-                  bottom: widget.isReadOnly ? 0 : 220,
+                  bottom: widget.isReadOnly ? 0 : 300,
                 ),
               ),
+
+              // Hide Google Logo (Bottom Left)
+              if (!widget.isReadOnly)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  child: Container(
+                    width: 120,
+                    height: 40,
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  ),
+                ),
 
               // 2. Loading Feedback for Geocoding
               if (_controller.isGeocoding)
@@ -342,24 +354,85 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context, {
-                  'location': _controller.selectedLocation,
-                  'note': _controller.noteController.text.trim(),
-                  'label': _controller.addressLabel,
-                });
+                if (_controller.noteController.text.trim().isEmpty) {
+                  // If no note, just confirm
+                  Navigator.pop(context, {
+                    'location': _controller.selectedLocation,
+                    'note': _controller.noteController.text.trim(),
+                    'label': _controller.addressLabel,
+                  });
+                  return;
+                }
+
+                // Show confirmation with Note
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(context.t('confirmLocation')),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(context.t('confirmLocationMessage') ?? 'هل أنت متأكد من تغيير الموقع؟'),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'الملاحظة:',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(_controller.noteController.text.trim()),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(context.t('cancel')),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context); // Close dialog
+                          Navigator.pop(context, {
+                            'location': _controller.selectedLocation,
+                            'note': _controller.noteController.text.trim(),
+                            'label': _controller.addressLabel,
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(context.t('confirm')),
+                      ),
+                    ],
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                elevation: 4,
               ),
               child: Text(
                 context.t('confirmLocation'),
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),

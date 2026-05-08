@@ -1368,6 +1368,7 @@ class AppController extends ChangeNotifier {
     LatLng location, {
     String? studentId,
     String? address,
+    String? note,
   }) async {
     try {
       final token = await _storage.readAccessToken();
@@ -1381,6 +1382,7 @@ class AppController extends ChangeNotifier {
         'longitude': location.longitude,
         if (studentId != null) 'student_id': studentId,
         if (address != null) 'address': address,
+        if (note != null) 'note': note,
       };
 
       final response = await dio.post(

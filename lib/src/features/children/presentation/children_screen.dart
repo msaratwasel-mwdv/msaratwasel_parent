@@ -734,15 +734,46 @@ class _ChildDetailsSheet extends StatelessWidget {
                                 ],
                                 if (student.locationNote != null &&
                                     student.locationNote!.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    student.locationNote!,
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white70
-                                          : AppColors.textSecondary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'ملاحظة الموقع:',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.amber,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                student.locationNote!,
+                                                style: TextStyle(
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : AppColors.textPrimary,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -783,12 +814,14 @@ class _ChildDetailsSheet extends StatelessWidget {
                                   if (result != null && context.mounted) {
                                     LatLng? location;
                                     String? label;
+                                    String? note;
 
                                     if (result is LatLng) {
                                       location = result;
                                     } else if (result is Map) {
                                       location = result['location'] as LatLng?;
                                       label = result['label'] as String?;
+                                      note = result['note'] as String?;
                                     }
 
                                     if (location != null) {
@@ -797,6 +830,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                                             location,
                                             studentId: student.id,
                                             address: label,
+                                            note: note,
                                           );
                                       if (success && context.mounted) {
                                         ScaffoldMessenger.of(

@@ -252,6 +252,23 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           ),
         );
       }
+
+      // Add School Marker if available (using first student's school as reference)
+      final firstStudent = group?.students.isNotEmpty == true ? group!.students.first : null;
+      if (firstStudent != null && firstStudent.schoolCoords != null) {
+          markers.add(
+            Marker(
+              markerId: const MarkerId('school'),
+              position: firstStudent.schoolCoords!,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueRed,
+              ),
+              infoWindow: InfoWindow(
+                title: firstStudent.schoolName ?? 'School',
+              ),
+            ),
+          );
+      }
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;

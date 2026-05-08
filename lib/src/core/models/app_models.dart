@@ -221,6 +221,7 @@ class Student {
     this.locationNote,
     this.schoolName,
     this.schoolLocation,
+    this.schoolCoords,
     this.waitingAtHomeTime,
     this.onBusToSchoolTime,
     this.atSchoolTime,
@@ -247,6 +248,7 @@ class Student {
   final String? locationNote;
   final String? schoolName;
   final String? schoolLocation;
+  final LatLng? schoolCoords;
 
   /// Returns true if the student has a valid home location (non-null and non-zero)
   bool get hasLocation =>
@@ -300,6 +302,12 @@ class Student {
       locationNote: json['location_note'] as String?,
       schoolName: json['school']?['name'] as String?,
       schoolLocation: json['school']?['location'] as String?,
+      schoolCoords: (json['school']?['latitude'] != null && json['school']?['longitude'] != null)
+          ? LatLng(
+              double.tryParse(json['school']['latitude'].toString()) ?? 0.0,
+              double.tryParse(json['school']['longitude'].toString()) ?? 0.0,
+            )
+          : null,
       // These will be populated by AppController when updates arrive
       waitingAtHomeTime: null,
       onBusToSchoolTime: null,
@@ -364,6 +372,7 @@ class Student {
     String? locationNote,
     String? schoolName,
     String? schoolLocation,
+    LatLng? schoolCoords,
     DateTime? waitingAtHomeTime,
     DateTime? onBusToSchoolTime,
     DateTime? atSchoolTime,
@@ -389,6 +398,7 @@ class Student {
       locationNote: locationNote ?? this.locationNote,
       schoolName: schoolName ?? this.schoolName,
       schoolLocation: schoolLocation ?? this.schoolLocation,
+      schoolCoords: schoolCoords ?? this.schoolCoords,
       waitingAtHomeTime: waitingAtHomeTime ?? this.waitingAtHomeTime,
       onBusToSchoolTime: onBusToSchoolTime ?? this.onBusToSchoolTime,
       atSchoolTime: atSchoolTime ?? this.atSchoolTime,
