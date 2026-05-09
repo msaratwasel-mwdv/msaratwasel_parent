@@ -2,139 +2,202 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../core/config/app_config.dart';
 
 class MarkerGenerator {
-  /// Creates a [BitmapDescriptor] from a widget.
-  ///
-  /// This function renders the provided widget into an image and then converts
-  /// it into a [BitmapDescriptor] suitable for use as a Google Maps marker.
-  static Future<BitmapDescriptor> createCustomMarkerBitmap(
-    String label, {
+  /// Creates a [BitmapDescriptor] from a student's data.
+  static Future<BitmapDescriptor> createStudentMarker({
+    required String name,
     String? imageUrl,
-    required Size size,
-    required BuildContext context,
+    required Color color,
+    String? authToken,
+    required double size,
   }) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    final sizePx = Size(
-      size.width * 2,
-      size.height * 2,
-    ); // Higher resolution canvas
-    final double width = sizePx.width;
-    final double height = sizePx.height;
-    final double radius = width / 2;
+    
+    // Use a higher resolution for the drawing
+    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double canvasSize = size * pixelRatio;
+    final double radius = (canvasSize * 0.8) / 2;
+    final Offset center = Offset(canvasSize / 2, (canvasSize * 0.4));
 
-    final paint = Paint()..color = Colors.blueAccent;
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    // Draw Pin Shape
+    // 1. Draw Tail (Triangle)
+    final paint = Paint()..color = color;
     final path = Path();
-    // Start at bottom center (the tip of the pin)
-    path.moveTo(width / 2, height);
-    // Curve to the right side
-    path.quadraticBezierTo(width / 2, height * 0.75, width, height * 0.45);
-    // Top circle arc
-    path.arcToPoint(
-      Offset(0, height * 0.45),
-      radius: Radius.circular(width / 2),
-      clockwise: false,
-    );
-    // Curve back to bottom center
-    path.quadraticBezierTo(width / 2, height * 0.75, width / 2, height);
+    path.moveTo(canvasSize / 2, canvasSize * 0.9); // Tip
+    path.lineTo(canvasSize / 2 - (radius * 0.4), canvasSize * 0.6);
+    path.lineTo(canvasSize / 2 + (radius * 0.4), canvasSize * 0.6);
     path.close();
-
-    // Draw Shadow
-    canvas.drawPath(
-      path.shift(const Offset(0, 4)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
-
-    // Draw Pin Background (White)
-    paint.color = Colors.white;
     canvas.drawPath(path, paint);
 
-    // Draw Inner White Circle
-    final double innerRadius = radius * 0.85; // Slightly larger white area
-    // Center of the top circle part
-    final topCenter = Offset(width / 2, height * 0.4);
+    // 2. Draw Main Circle
+    canvas.drawCircle(center, radius, paint);
+    
+    // 3. Draw White Border
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.1;
+    canvas.drawCircle(center, radius, borderPaint);
 
-    paint.color = Colors.white;
-    canvas.drawCircle(topCenter, innerRadius, paint);
-
-    // Load and Draw Image or Initials
+    // 4. Draw Content (Image or Initial)
     ui.Image? profileImage;
     if (imageUrl != null && imageUrl.isNotEmpty) {
       try {
         final completer = Completer<ui.Image>();
-        final stream = NetworkImage(imageUrl).resolve(ImageConfiguration.empty);
+        final Map<String, String>? headers = authToken != null && authToken.isNotEmpty
+            ? {'Authorization': 'Bearer $authToken'}
+            : null;
+            
+        final stream = NetworkImage(imageUrl, headers: headers).resolve(ImageConfiguration.empty);
         final listener = ImageStreamListener((ImageInfo info, bool syncCall) {
-          completer.complete(info.image);
+          if (!completer.isCompleted) completer.complete(info.image);
+        }, onError: (e, stack) {
+          if (!completer.isCompleted) completer.completeError(e);
         });
         stream.addListener(listener);
-        profileImage = await completer.future.timeout(
-          const Duration(seconds: 3),
-        );
+        profileImage = await completer.future.timeout(AppConfig.markerImageTimeout);
         stream.removeListener(listener);
       } catch (e) {
-        // Fallback to initials if image load fails
-        debugPrint('Failed to load marker image: $e');
+        debugPrint('Failed to load marker image for $name: $e');
       }
     }
 
     if (profileImage != null) {
-      // Draw Avatar
-      final Path clipPath = Path()
-        ..addOval(
-          Rect.fromCircle(center: topCenter, radius: innerRadius * 0.9),
-        );
+      // Draw Circular Image
+      final Path clipPath = Path()..addOval(Rect.fromCircle(center: center, radius: radius * 0.9));
       canvas.save();
       canvas.clipPath(clipPath);
-
-      // Scale image to fit
-      final src = Rect.fromLTWH(
-        0,
-        0,
-        profileImage.width.toDouble(),
-        profileImage.height.toDouble(),
-      );
-      final dst = Rect.fromCircle(center: topCenter, radius: innerRadius * 0.9);
-      canvas.drawImageRect(profileImage, src, dst, Paint());
+      
+      final src = Rect.fromLTWH(0, 0, profileImage.width.toDouble(), profileImage.height.toDouble());
+      final dst = Rect.fromCircle(center: center, radius: radius * 0.9);
+      canvas.drawImageRect(profileImage, src, dst, Paint()..filterQuality = ui.FilterQuality.high);
       canvas.restore();
     } else {
-      // Draw Initials
-      final String text = label.isNotEmpty ? label[0].toUpperCase() : '?';
-      textPainter.text = TextSpan(
-        text: text,
-        style: TextStyle(
-          fontSize: innerRadius,
-          fontWeight: FontWeight.bold,
-          color: Colors.blueAccent,
+      // Draw Initial
+      final String text = name.isNotEmpty ? name[0].toUpperCase() : '?';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontSize: radius,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
+        textDirection: TextDirection.ltr,
       );
       textPainter.layout();
       textPainter.paint(
         canvas,
-        Offset(
-          topCenter.dx - textPainter.width / 2,
-          topCenter.dy - textPainter.height / 2,
-        ),
+        Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
       );
     }
 
-    // Convert canvas to image
+    // Convert to BitmapDescriptor
     final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(
-      sizePx.width.toInt(),
-      sizePx.height.toInt(),
+    final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    
+    if (byteData == null) return BitmapDescriptor.defaultMarker;
+    return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
+  }
+
+  /// Simple version for School Marker
+  static Future<BitmapDescriptor> createSchoolMarker({
+    required Color color,
+    required double size,
+  }) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double canvasSize = size * pixelRatio;
+    final center = Offset(canvasSize / 2, canvasSize / 2);
+    final radius = canvasSize / 2;
+
+    final paint = Paint()..color = color;
+    canvas.drawCircle(center, radius, paint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.school.codePoint),
+        style: TextStyle(
+          fontSize: radius * 1.2,
+          fontFamily: Icons.school.fontFamily,
+          package: Icons.school.fontPackage,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
     );
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+    );
 
-    if (byteData == null) {
-      return BitmapDescriptor.defaultMarker;
-    }
+    final picture = pictureRecorder.endRecording();
+    final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    
+    if (byteData == null) return BitmapDescriptor.defaultMarker;
+    return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
+  }
 
+  /// Creates a beautiful Bus Marker
+  static Future<BitmapDescriptor> createBusMarker({
+    required Color color,
+    required double size,
+  }) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double canvasSize = size * pixelRatio;
+    final center = Offset(canvasSize / 2, canvasSize / 2);
+    final radius = canvasSize / 2;
+
+    // 1. Draw Outer Glow/Shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withAlpha(40)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(center, radius * 0.9, shadowPaint);
+
+    // 2. Draw Main Circle
+    final paint = Paint()..color = color;
+    canvas.drawCircle(center, radius * 0.85, paint);
+
+    // 3. Draw White Border
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.15;
+    canvas.drawCircle(center, radius * 0.85, borderPaint);
+
+    // 4. Draw Bus Icon
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.directions_bus.codePoint),
+        style: TextStyle(
+          fontSize: radius * 1.1,
+          fontFamily: Icons.directions_bus.fontFamily,
+          package: Icons.directions_bus.fontPackage,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    
+    if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
 }

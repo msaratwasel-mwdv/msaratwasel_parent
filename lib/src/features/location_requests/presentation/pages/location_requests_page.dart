@@ -31,27 +31,15 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
     final requests = appScope.locationRequests;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? null : const Color(0xFFF8F9FD),
-      body: CustomScrollView(
+    return Container(
+      color: isDark ? null : const Color(0xFFF8F9FD),
+      child: CustomScrollView(
         slivers: [
           AppSliverHeader(
             title: context.t('locationRequests'),
-            leading: Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: Icon(
-                  Icons.menu_rounded,
-                  color: isDark ? Colors.white : AppColors.primary,
-                ),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
           ),
           SliverFillRemaining(
-            child: requests == null
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
+            child: RefreshIndicator(
                     onRefresh: () => appScope.loadLocationRequestsFromApi(),
                     color: isDark
                         ? Theme.of(context).colorScheme.secondary
@@ -113,8 +101,6 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
     LocationChangeRequest request,
     bool isDark,
   ) {
-    final statusColor = _getStatusColor(request.status);
-    final statusText = _getStatusText(context, request.status);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -141,12 +127,22 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      request.studentName,
-                      style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final student = AppScope.of(context).students.where((s) => s.id == request.studentId).firstOrNull;
+                        final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                        final displayName = student != null 
+                          ? (isAr ? student.name : (student.nameEn ?? student.name))
+                          : request.studentName;
+                        
+                        return Text(
+                          displayName,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        );
+                      }
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -221,9 +217,9 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.05),
+                color: Colors.red.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.1)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

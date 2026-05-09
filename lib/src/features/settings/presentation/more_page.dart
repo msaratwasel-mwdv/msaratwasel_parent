@@ -4,7 +4,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
-import 'package:msaratwasel_user/src/features/settings/presentation/change_password_page.dart';
+import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/privacy_policy_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_page.dart';

@@ -34,21 +34,23 @@ class AppSliverHeader extends StatelessWidget {
       activeLeading = leading;
     } else if (canPop) {
       // Regular pushed page
-      activeLeading = Material(
-        color: Colors.transparent,
-        child: BackButton(color: isDark ? Colors.white : AppColors.primary),
+      activeLeading = IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 22,
+          color: isDark ? Colors.white : AppColors.primary,
+        ),
+        onPressed: () => Navigator.maybePop(context),
       );
     } else {
       // Any tab (home or not) -> Show Menu (hamburger icon)
-      activeLeading = Material(
-        color: Colors.transparent,
-        child: IconButton(
-          icon: Icon(
-            Icons.menu_rounded,
-            color: isDark ? Colors.white : AppColors.primary,
-          ),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+      activeLeading = IconButton(
+        icon: Icon(
+          Icons.menu_rounded,
+          size: 28,
+          color: isDark ? Colors.white : AppColors.primary,
         ),
+        onPressed: () => Scaffold.of(context).openDrawer(),
       );
     }
 

@@ -106,21 +106,13 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: CustomScrollView(
+    return Container(
+      color: theme.scaffoldBackgroundColor,
+      child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           AppSliverHeader(
             title: context.t('requestAbsence'),
-            leading: IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 20,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              onPressed: () => AppScope.of(context).moveBack(),
-            ),
           ),
           SliverToBoxAdapter(
             child: Padding(

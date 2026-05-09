@@ -22,23 +22,11 @@ class ReverbService {
   final void Function(Map<String, dynamic> data) _onStudentStatusUpdated;
   final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
 
-  // إعدادات Reverb المستمدة من إعدادات السيرفر الخاصة بك
-  static const String _reverbKey = 'masarat-wasel-key';
-
-  static String get _reverbHost {
-    if (!AppConfig.isLocal) return '187.77.162.203';
-    final apiUrl = AppConfig.apiBaseUrl;
-    final uri = Uri.parse(apiUrl);
-    return uri.host;
-  }
-
-  // نستخدم المنفذ 8080 كما حددت في إعدادات السيرفر
-  static const int _reverbPort = 8080;
-
-  // نضبط البروتوكول ليكون ws وفقاً لإعداداتك في الاستضافة (REVERB_SCHEME=http)
-  static const bool _forceNonSecure = true;
-  static bool get _isSecure =>
-      _forceNonSecure ? false : AppConfig.apiBaseUrl.startsWith('https');
+  // إعدادات Reverb المستمدة من AppConfig
+  static const String _reverbKey = AppConfig.reverbKey;
+  static String get _reverbHost => AppConfig.reverbHost;
+  static int get _reverbPort => AppConfig.reverbPort;
+  static bool get _isSecure => AppConfig.reverbUseSsl;
 
   // قائمة القنوات المشترك بها حالياً
   final Set<String> _subscribedChannels = {};

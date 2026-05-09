@@ -658,7 +658,7 @@ class AppController extends ChangeNotifier {
         loadProfileFromApi(),
         loadAbsenceRequestsFromApi(),
         loadLocationRequestsFromApi(),
-      ]).timeout(const Duration(seconds: 10), onTimeout: () => []);
+      ]).timeout(AppConfig.defaultTimeout, onTimeout: () => []);
 
       // Restore WebSocket
       if (_userId != null && _userId! > 0) {
@@ -1095,14 +1095,17 @@ class AppController extends ChangeNotifier {
   }
 
   /// Called by [NotificationService] whenever an FCM push arrives.
-  void addNotification(AppNotification notification) {
+  void addNotification(AppNotification notification, {bool isTap = false}) {
     // إشعارات الشات منفصلة عن الإشعارات العامة (لا تظهر في قائمة التنبيهات)
     if (notification.type == NotificationType.chat) {
       developer.log(
-        '💬 FCM: Chat notification received — skipping list addition',
+        '💬 FCM: Chat notification received — isTap: $isTap',
         name: 'NOTIFICATION',
       );
       _hasNewMessages = true;
+      if (isTap) {
+        setNavIndex(5); // Contacts/Chat Page
+      }
       notifyListeners();
       return;
     }
@@ -1113,29 +1116,72 @@ class AppController extends ChangeNotifier {
       final index = _students.indexWhere((s) => s.id == studentId);
       if (index != -1) {
         StudentStatus? newStatus;
-        if (notification.type == NotificationType.checkIn) {
-          newStatus = StudentStatus.onBus;
-        } else if (notification.type == NotificationType.checkOut) {
-          final direction = notification.data['direction']?.toString();
-          newStatus = (direction == 'to_school')
-              ? StudentStatus.atSchool
-              : StudentStatus.atHome;
+        switch (notification.type) {
+          case NotificationType.checkIn:
+            newStatus = StudentStatus.onBus;
+            break;
+          case NotificationType.checkOut:
+            final direction = notification.data['direction']?.toString();
+            newStatus = (direction == 'to_school')
+                ? StudentStatus.atSchool
+                : StudentStatus.arrivedHome;
+            break;
+          case NotificationType.arrival:
+            newStatus = StudentStatus.atSchool;
+            break;
+          case NotificationType.approach:
+            // Proximity logic: refresh tracking
+            _fetchTrackingFromApi();
+            break;
+          case NotificationType.absenceApproved:
+          case NotificationType.absenceRejected:
+            // Refresh absence requests to get updated status
+            loadAbsenceRequestsFromApi();
+            break;
+          case NotificationType.locationApproved:
+          case NotificationType.locationRejected:
+            // Refresh children to get updated location/status
+            loadChildrenFromApi();
+            loadLocationRequestsFromApi();
+            break;
+          default:
+            break;
         }
 
-        if (newStatus != null) {
+        if (newStatus != null && _students[index].status != newStatus) {
           _students[index] = _students[index].copyWith(status: newStatus);
-
-          // Tracking state is handled by _syncTripGroupsWithStudents and _updateBusTracking
-          developer.log(
-            '🔄 FCM: Student $studentId status updated',
-            name: 'NOTIFICATION',
-          );
+          _persistTimestamps(_students[index]);
 
           developer.log(
-            '🔄 FCM: Student $studentId status and tracking updated',
+            '🔄 FCM: Student $studentId status updated to $newStatus',
             name: 'NOTIFICATION',
           );
         }
+      }
+    }
+
+    // Handle navigation on Tap
+    if (isTap) {
+      switch (notification.type) {
+        case NotificationType.approach:
+        case NotificationType.arrival:
+        case NotificationType.checkIn:
+        case NotificationType.checkOut:
+          setNavIndex(2); // Bus Tracking Page
+          break;
+        case NotificationType.absenceApproved:
+        case NotificationType.absenceRejected:
+        case NotificationType.absence:
+          setNavIndex(10); // Absence History Page
+          break;
+        case NotificationType.locationApproved:
+        case NotificationType.locationRejected:
+        case NotificationType.locationRequest:
+          setNavIndex(11); // Location Requests Page
+          break;
+        default:
+          setNavIndex(4); // Notifications Page
+          break;
       }
     }
 

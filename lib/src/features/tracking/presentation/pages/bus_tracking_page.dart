@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:ui' as ui;
 
 import '../../../../app/state/app_controller.dart';
@@ -11,6 +11,7 @@ import '../../../../shared/localization/app_strings.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../domain/entities/bus_tracking.dart';
 import '../../domain/entities/bus_tracking_group.dart';
+import '../../../../shared/utils/marker_generator.dart';
 
 class BusTrackingPage extends StatefulWidget {
   const BusTrackingPage({super.key});
@@ -26,6 +27,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
   BitmapDescriptor? _busIcon;
   BitmapDescriptor? _homeIcon;
+  BitmapDescriptor? _schoolIcon;
+  final Map<String, BitmapDescriptor> _studentIcons = {};
+  List<Student>? _lastStudents;
 
   @override
   void initState() {
@@ -33,20 +37,86 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     _loadCustomMarkers();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = AppScope.of(context);
+    final selectedGroup = controller.selectedGroup;
+    final authToken = controller.token;
+
+    // Detect student list changes and update markers
+    if (_lastStudents != selectedGroup?.students) {
+      _lastStudents = selectedGroup?.students;
+      if (_lastStudents != null) {
+        _updateStudentMarkers(_lastStudents!, authToken);
+      }
+    }
+  }
+
   Future<void> _loadCustomMarkers() async {
     try {
-      _busIcon = await BitmapDescriptor.asset(
-        const ImageConfiguration(size: Size(48, 48)),
-        'assets/images/bus_marker.png',
+      // Generate a nice bus marker using our generator
+      _busIcon = await MarkerGenerator.createBusMarker(
+        color: AppColors.primary,
+        size: 40.0,
       );
+
       _homeIcon = await BitmapDescriptor.asset(
         const ImageConfiguration(size: Size(40, 40)),
         'assets/images/home_marker.png',
       );
+
+      // Generate a nice school marker using our generator
+      _schoolIcon = await MarkerGenerator.createSchoolMarker(
+        color: Colors.purple,
+        size: 30.0,
+      );
     } catch (e) {
-      debugPrint('Markers not found, using defaults');
+      debugPrint('Markers not found, using defaults: $e');
     }
     if (mounted) setState(() {});
+  }
+
+  LatLng? _parseLatLng(String? location) {
+    if (location == null || location.isEmpty) return null;
+    try {
+      final parts = location.split(',');
+      if (parts.length == 2) {
+        final lat = double.tryParse(parts[0].trim());
+        final lng = double.tryParse(parts[1].trim());
+        if (lat != null && lng != null) {
+          return LatLng(lat, lng);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing LatLng: $e');
+    }
+    return null;
+  }
+
+  Future<void> _updateStudentMarkers(
+    List<Student> students,
+    String authToken,
+  ) async {
+    for (final student in students) {
+      if (!_studentIcons.containsKey(student.id)) {
+        try {
+          // Create marker for student using our generator
+          final icon = await MarkerGenerator.createStudentMarker(
+            name: student.name,
+            imageUrl: student.avatarUrl,
+            authToken: authToken,
+            color: AppColors.accent,
+            size: 35.0, // Much smaller size as requested
+          );
+
+          _studentIcons[student.id] = icon;
+          if (mounted) setState(() {});
+        } catch (e) {
+          debugPrint('Error creating marker for ${student.name}: $e');
+        }
+      }
+    }
   }
 
   void _centerOnBus(BusTracking? tracking) {
@@ -60,28 +130,46 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     _mapController!.animateCamera(
       CameraUpdate.newLatLngZoom(
         LatLng(tracking.latitude, tracking.longitude),
-        15.5,
+        16.0,
       ),
     );
   }
 
-  Future<void> _centerOnMe() async {
-    if (_mapController == null) return;
-    try {
-      final position = await Geolocator.getCurrentPosition();
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(position.latitude, position.longitude),
-          15.5,
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t('failedToDetermineLocation'))),
-        );
+  void _fitMapBounds(BusTrackingGroup? group) {
+    if (_mapController == null || group == null || group.tracking == null) return;
+
+    final List<LatLng> points = [];
+    points.add(LatLng(group.tracking!.latitude, group.tracking!.longitude));
+
+    for (final student in group.students) {
+      if (student.hasLocation) {
+        points.add(student.homeLocation!);
+      }
+      final schoolPos = _parseLatLng(student.schoolLocation);
+      if (schoolPos != null) {
+        points.add(schoolPos);
       }
     }
+
+    if (points.length < 2) return;
+
+    double? minLat, maxLat, minLng, maxLng;
+    for (final point in points) {
+      if (minLat == null || point.latitude < minLat) minLat = point.latitude;
+      if (maxLat == null || point.latitude > maxLat) maxLat = point.latitude;
+      if (minLng == null || point.longitude < minLng) minLng = point.longitude;
+      if (maxLng == null || point.longitude > maxLng) maxLng = point.longitude;
+    }
+
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat!, minLng!),
+          northeast: LatLng(maxLat!, maxLng!),
+        ),
+        80.0, // padding
+      ),
+    );
   }
 
   void _toggleMapType() {
@@ -92,42 +180,20 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     });
   }
 
-  Future<void> _launchNavigation(BusTracking? tracking) async {
-    if (tracking == null) return;
-    final url =
-        'google.navigation:q=${tracking.latitude},${tracking.longitude}';
-    final fallbackUrl =
-        'https://www.google.com/maps/search/?api=1&query=${tracking.latitude},${tracking.longitude}';
-
-    try {
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url));
-      } else {
-        await launchUrl(
-          Uri.parse(fallbackUrl),
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } catch (e) {
-      debugPrint('Could not launch navigation: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final selectedGroup = controller.selectedGroup;
     final allGroups = controller.allTripGroups;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = isDark ? AppColors.dark : AppColors.light;
 
     return Directionality(
-      textDirection: controller.locale.languageCode == 'ar'
-          ? ui.TextDirection.rtl
-          : ui.TextDirection.ltr,
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Stack(
+      textDirection:
+          controller.locale.languageCode == 'ar'
+              ? TextDirection.rtl
+              : TextDirection.ltr,
+      child: Container(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: Stack(
           children: [
             _buildMap(selectedGroup),
             Positioned(
@@ -227,14 +293,39 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
               markerId: MarkerId('student_${student.id}'),
               position: pos,
               icon:
+                  _studentIcons[student.id] ??
                   _homeIcon ??
                   BitmapDescriptor.defaultMarkerWithHue(
                     BitmapDescriptor.hueOrange,
                   ),
-              infoWindow: InfoWindow(title: student.name),
+              infoWindow: InfoWindow(
+                title: student.name,
+                snippet: context.t('homeLocation'),
+              ),
             ),
           );
           routePoints.add(pos);
+        }
+
+        // Add School Marker if available
+        if (student.schoolLocation != null) {
+          final schoolPos = _parseLatLng(student.schoolLocation);
+          if (schoolPos != null) {
+            markers.add(
+              Marker(
+                markerId: MarkerId('school_${student.schoolId}'),
+                position: schoolPos,
+                icon:
+                    _schoolIcon ??
+                    BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueMagenta,
+                    ),
+                infoWindow: InfoWindow(
+                  title: student.schoolName ?? context.t('school'),
+                ),
+              ),
+            );
+          }
         }
       }
 
@@ -282,10 +373,14 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       ),
       onMapCreated: (c) {
         _mapController = c;
-        if (isDark) {
-          _setDarkMapStyle(c);
+        // Fit bounds on first load if we have a group
+        if (group != null) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _fitMapBounds(group);
+          });
         }
       },
+      style: isDark ? _darkMapStyle : null,
       markers: markers,
       polylines: polylines,
       mapType: _currentMapType,
@@ -295,8 +390,52 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     );
   }
 
-  void _setDarkMapStyle(GoogleMapController controller) {
-    const String darkStyle = '''
+
+
+  Widget _buildMapControls(BusTracking? tracking) {
+    return Positioned(
+      bottom: _isPanelExpanded ? 600 : 200,
+      left: 16,
+      right: 16,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Left: Centering Controls
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MapActionFab(
+                icon: Icons.directions_bus_filled,
+                label: context.t('bus'),
+                onPressed: () => _centerOnBus(tracking),
+              ),
+              const SizedBox(height: 12),
+              _MapActionFab(
+                icon: Icons.zoom_out_map,
+                label: context.t('showAll'),
+                onPressed: () => _fitMapBounds(AppScope.of(context).selectedGroup),
+              ),
+            ],
+          ),
+          // Right: Layer & Navigation Controls
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MapActionFab(
+                icon: _currentMapType == MapType.normal
+                    ? Icons.layers_outlined
+                    : Icons.layers,
+                onPressed: _toggleMapType,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const String _darkMapStyle = '''
 [
   {
     "elementType": "geometry",
@@ -347,48 +486,6 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   }
 ]
 ''';
-    controller.setMapStyle(darkStyle);
-  }
-
-  Widget _buildMapControls(BusTracking? tracking) {
-    return Positioned(
-      bottom: _isPanelExpanded ? 600 : 200,
-      left: 16,
-      right: 16,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Left: Centering Controls
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MapActionFab(
-                icon: Icons.directions_bus,
-                label: context.t('bus'),
-                onPressed: () => _centerOnBus(tracking),
-              ),
-            ],
-          ),
-          // Right: Layer & Navigation Controls
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MapActionFab(
-                icon: _currentMapType == MapType.normal
-                    ? Icons.layers_outlined
-                    : Icons.layers,
-                onPressed: _toggleMapType,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  static const String _mapStyle =
-      '[{"featureType":"poi","stylers":[{"visibility":"off"}]},{"featureType":"transit","stylers":[{"visibility":"off"}]}]';
 }
 
 class _DynamicBusSelector extends StatelessWidget {
@@ -429,33 +526,37 @@ class _DynamicBusSelector extends StatelessWidget {
             onTap: () => onSelect(group.busId),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 145,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              width: 155,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : colors.card,
-                borderRadius: BorderRadius.circular(15),
+                color: isSelected ? AppColors.primary : colors.card,
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
                     color: isSelected
-                        ? AppColors.primary.withAlpha(60)
+                        ? AppColors.primary.withAlpha(50)
                         : Colors.black.withAlpha(5),
-                    blurRadius: 10,
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.white.withAlpha(20)
+                      : (isDark ? Colors.white.withAlpha(10) : Colors.grey.shade100),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [
                   // Index Badge
                   Container(
-                    width: 22,
-                    height: 22,
+                    width: 24,
+                    height: 24,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.white.withAlpha(30)
+                          ? Colors.white.withAlpha(40)
                           : colors.surfaceContainer,
                       shape: BoxShape.circle,
                     ),
@@ -466,11 +567,11 @@ class _DynamicBusSelector extends StatelessWidget {
                             ? Colors.white
                             : colors.text,
                         fontWeight: FontWeight.bold,
-                        fontSize: 9,
+                        fontSize: 10,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   // Info Column
                   Expanded(
                     child: Column(
@@ -482,7 +583,7 @@ class _DynamicBusSelector extends StatelessWidget {
                             context.t('activeNow'),
                             style: const TextStyle(
                               color: Colors.greenAccent,
-                              fontSize: 7.5,
+                              fontSize: 8,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
@@ -495,7 +596,7 @@ class _DynamicBusSelector extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white.withAlpha(180)
                                 : colors.text70,
-                            fontSize: 7,
+                            fontSize: 8,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -506,7 +607,7 @@ class _DynamicBusSelector extends StatelessWidget {
                                 ? Colors.white
                                 : colors.text,
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 13,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -583,6 +684,16 @@ class _DataDrivenPanel extends StatelessWidget {
         ),
         child: Column(
           children: [
+            const SizedBox(height: 8),
+            // Handle Bar for UX
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withAlpha(80),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 12),
             // Fixed Header
             Padding(
@@ -761,78 +872,58 @@ class _DataDrivenPanel extends StatelessWidget {
 
   Widget _buildMetricsRow(BuildContext context) {
     final tracking = group?.tracking;
-    final total = group?.totalStudentsCount ?? 0;
-
-    // Guardian's children only for boarded/notBoarded
-    final myStudents = group?.students ?? [];
-    final boarded = myStudents
-        .where(
-          (s) =>
-              s.status == StudentStatus.onBusToSchool ||
-              s.status == StudentStatus.onBusToHome ||
-              s.status == StudentStatus.onBus,
-        )
-        .length;
-    final notBoarded = myStudents.length - boarded;
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = isDark ? AppColors.dark : AppColors.light;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surfaceContainer,
-        borderRadius: BorderRadius.circular(15),
+        color: isDark ? Colors.white.withAlpha(5) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withAlpha(10) : AppColors.border,
+          color: isDark ? Colors.white.withAlpha(10) : Colors.grey.shade200,
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _MetricItem(
-            icon: Icons.people_outline,
+            icon: Icons.group_outlined,
             label: context.t('totalStudents'),
             value:
                 (group?.totalStudentsCount != null &&
-                    group!.totalStudentsCount! > 0)
-                ? '${group?.totalStudentsCount}'
-                : '${group?.students.length ?? 0}',
+                        group!.totalStudentsCount! > 0)
+                    ? '${group?.totalStudentsCount}'
+                    : '${group?.students.length ?? 0}',
             iconColor: Colors.blue,
           ),
           _MetricItem(
-            icon: Icons.timer_outlined,
+            icon: Icons.schedule,
             label: context.t('startedAt'),
             value: group?.startTime != null
                 ? (() {
                     final hour = group!.startTime!.hour;
                     final minute = group!.startTime!.minute.toString().padLeft(
-                      2,
-                      "0",
-                    );
-                    final period = hour >= 12
-                        ? context.t('pm')
-                        : context.t('am');
-                    final displayHour = hour == 0
-                        ? 12
-                        : (hour > 12 ? hour - 12 : hour);
+                          2,
+                          "0",
+                        );
+                    final period = hour >= 12 ? context.t('pm') : context.t('am');
+                    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
                     return "$displayHour:$minute $period";
                   })()
                 : '--:--',
             iconColor: Colors.orange,
           ),
           _MetricItem(
-            icon: Icons.speed_outlined,
+            icon: Icons.speed,
             label: context.t('speed'),
             value: '${(tracking?.speed ?? 0).toInt()} ${context.t('kmh')}',
-            iconColor: Colors.redAccent,
+            iconColor: Colors.green,
           ),
           _MetricItem(
-            icon: Icons.auto_graph_outlined,
+            icon: Icons.auto_graph_rounded,
             label: context.t('etaLabel'),
             value: tracking?.etaMinutes != null
                 ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
                 : '--',
-            iconColor: Colors.purple,
+            iconColor: AppColors.primary,
           ),
         ],
       ),
@@ -889,34 +980,22 @@ class _DataDrivenPanel extends StatelessWidget {
   Widget _buildActionFooter(BuildContext context) {
     return Column(
       children: [
-        const Divider(height: 30),
+        const SizedBox(height: 16),
         Row(
           children: [
             _ActionTile(
-              icon: Icons.list_alt_rounded,
-              label: context.t('tripDetails'),
-              color: Colors.grey.shade100,
-              textColor: Colors.black,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.t('tripDetailsComingSoon'))),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            _ActionTile(
               icon: Icons.phone_in_talk_rounded,
               label: context.t('quickCall'),
-              color: const Color(0xFFE8F5E9),
+              color: Colors.green.withAlpha(15),
               textColor: Colors.green,
               onPressed: () => _showQuickCall(context, group),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             _ActionTile(
               icon: Icons.chat_bubble_rounded,
               label: context.t('chat'),
-              color: const Color(0xFFE3F2FD),
-              textColor: Colors.blue,
+              color: AppColors.primary.withAlpha(15),
+              textColor: AppColors.primary,
               onPressed: () {
                 AppScope.of(context).setNavIndex(5);
               },
@@ -1092,42 +1171,51 @@ class _StudentCard extends StatelessWidget {
     final colors = isDark ? AppColors.dark : AppColors.light;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: EdgeInsets.all(isCompact ? 6 : 8),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(10),
+        color: isDark ? Colors.white.withAlpha(5) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withAlpha(10) : AppColors.border,
+          color: isDark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(5),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: CachedNetworkImage(
-              imageUrl: student.avatarUrl ?? '',
-              width: isCompact ? 32 : 40,
-              height: isCompact ? 32 : 40,
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => Container(
-                color: colors.surfaceContainer,
-                child: Icon(
-                  Icons.person,
-                  color: Colors.grey,
-                  size: isCompact ? 18 : 22,
+          // Avatar with shadow
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: CachedNetworkImage(
+                imageUrl: student.avatarUrl ?? '',
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: colors.surfaceContainer,
+                  child: const Icon(Icons.person, color: Colors.grey, size: 24),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1136,15 +1224,16 @@ class _StudentCard extends StatelessWidget {
                   student.displayName,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: isCompact ? 11 : 13,
+                    fontSize: 14,
                     color: colors.text,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   student.grade,
                   style: TextStyle(
                     color: colors.text70,
-                    fontSize: isCompact ? 9 : 11,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -1154,40 +1243,40 @@ class _StudentCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: (hasBoarded ? Colors.green : Colors.orange).withAlpha(
-                    10,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
+                  color: (hasBoarded ? Colors.green : Colors.orange).withAlpha(15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      hasBoarded
-                          ? context.t('boarded')
-                          : context.t('notBoardedYet'),
+                      hasBoarded ? context.t('boarded') : context.t('notBoardedYet'),
                       style: TextStyle(
                         color: hasBoarded ? Colors.green : Colors.orange,
-                        fontSize: isCompact ? 9 : 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      hasBoarded ? Icons.check_circle : Icons.error_outline,
+                      hasBoarded ? Icons.check_circle_rounded : Icons.error_outline_rounded,
                       color: hasBoarded ? Colors.green : Colors.orange,
-                      size: isCompact ? 12 : 14,
+                      size: 14,
                     ),
                   ],
                 ),
               ),
-              if (!isCompact) const SizedBox(height: 2),
-              if (!isCompact)
-                Text(
-                  hasBoarded ? 'وقت الركوب 9:10 ص' : 'لم يتم الركوب بعد',
-                  style: TextStyle(color: colors.text70, fontSize: 10),
+              const SizedBox(height: 4),
+              Text(
+                hasBoarded ? 'وقت الركوب 9:10 ص' : context.t('waitingForBoarding'),
+                style: TextStyle(
+                  color: colors.text70,
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
                 ),
+              ),
             ],
           ),
         ],
@@ -1277,28 +1366,7 @@ class _CircleHeaderButton extends StatelessWidget {
   }
 }
 
-class _CircleIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-  const _CircleIconButton({required this.icon, required this.onPressed});
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = isDark ? AppColors.dark : AppColors.light;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainer,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: colors.text, size: 18),
-        onPressed: onPressed,
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(),
-      ),
-    );
-  }
-}
+
 
 class _MapActionFab extends StatelessWidget {
   final IconData icon;

@@ -28,6 +28,8 @@ enum NotificationType {
   delay,
   routeChange,
   absence,
+  absenceApproved,
+  absenceRejected,
   lateBoarding,
   schoolAlert,
   supervisorMessage,
@@ -54,6 +56,10 @@ extension NotificationTypeX on NotificationType {
         return arabic ? 'تغيير مسار' : 'Route change';
       case NotificationType.absence:
         return arabic ? 'غياب' : 'Absence';
+      case NotificationType.absenceApproved:
+        return arabic ? 'تمت الموافقة على الغياب' : 'Absence approved';
+      case NotificationType.absenceRejected:
+        return arabic ? 'تم رفض طلب الغياب' : 'Absence request rejected';
       case NotificationType.lateBoarding:
         return arabic ? 'تأخر في الصعود' : 'Late boarding';
       case NotificationType.schoolAlert:
@@ -491,6 +497,10 @@ class AppNotification {
         return NotificationType.routeChange;
       case 'student_absence':
         return NotificationType.absence;
+      case 'absence_approved':
+        return NotificationType.absenceApproved;
+      case 'absence_rejected':
+        return NotificationType.absenceRejected;
       case 'late_boarding':
         return NotificationType.lateBoarding;
       case 'school_alert':

@@ -29,9 +29,9 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
     final history = controller.absenceRequests;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? null : const Color(0xFFF8F9FD),
-      body: RefreshIndicator(
+    return Container(
+      color: isDark ? null : const Color(0xFFF8F9FD),
+      child: RefreshIndicator(
         onRefresh: () async {
           await controller.loadAbsenceRequestsFromApi();
         },
@@ -44,16 +44,6 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
           slivers: [
             AppSliverHeader(
               title: context.t('absenceLog'),
-              leading: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.menu_rounded,
-                    color: isDark ? Colors.white : AppColors.primary,
-                  ),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ),
             ),
             if (history.isEmpty)
               SliverFillRemaining(

@@ -78,7 +78,7 @@ class _AddressDisplayState extends State<AddressDisplay> {
           ),
           const SizedBox(width: 8),
           Text(
-            context.t('fetchingAddress') ?? 'Fetching address...',
+            context.t('fetchingAddress'),
             style:
                 widget.style ??
                 const TextStyle(color: AppColors.textSecondary, fontSize: 12),

@@ -18,6 +18,10 @@ extension NotificationTypeUI on NotificationType {
         return Icons.alt_route_rounded;
       case NotificationType.absence:
         return Icons.event_busy_rounded;
+      case NotificationType.absenceApproved:
+        return Icons.event_available_rounded;
+      case NotificationType.absenceRejected:
+        return Icons.event_busy_rounded;
       case NotificationType.lateBoarding:
         return Icons.warning_amber_rounded;
       case NotificationType.schoolAlert:

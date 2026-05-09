@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 
-/// Change password page — calls POST /api/auth/change-password.
+/// Unified Change password page.
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
 
@@ -54,14 +57,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       final msg = response.data['message'] ?? context.t('passwordUpdatedSuccess');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(msg, style: GoogleFonts.cairo(color: Colors.white)),
+          backgroundColor: Colors.green,
+        ),
       );
       Navigator.pop(context);
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      String errorMsg = 'حدث خطأ';
+      String errorMsg = context.t('fieldRequired');
       if (e.response?.data != null) {
         final data = e.response!.data;
         if (data is Map) {
@@ -77,7 +83,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(errorMsg, style: GoogleFonts.cairo(color: Colors.white)),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -87,156 +96,164 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          context.t('changePassword'),
-          style: TextStyle(
-            color: isDark ? Colors.white : AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          AppSliverHeader(
+            title: context.t('changePassword'),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_rounded,
-            color: isDark ? Colors.white : AppColors.primary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Icon
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.lock_reset_rounded,
-                  size: 40,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                context.t('signInToContinue'), // Or add a better key like 'changePasswordSubtitle'
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-
-              // Current Password
-              _buildPasswordField(
-                controller: _currentCtrl,
-                label: context.t('currentPassword'),
-                icon: Icons.lock_outline_rounded,
-                show: _showCurrent,
-                onToggle: () => setState(() => _showCurrent = !_showCurrent),
-                validator: (v) {
-                  if (v == null || v.isEmpty) {
-                    return context.t('fieldRequired');
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // New Password
-              _buildPasswordField(
-                controller: _newCtrl,
-                label: context.t('newPassword'),
-                icon: Icons.lock_rounded,
-                show: _showNew,
-                onToggle: () => setState(() => _showNew = !_showNew),
-                validator: (v) {
-                  if (v == null || v.isEmpty) {
-                    return context.t('fieldRequired');
-                  }
-                  if (v.length < 6) {
-                    return context.t('passwordLengthError');
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // Confirm Password
-              _buildPasswordField(
-                controller: _confirmCtrl,
-                label: context.t('confirmPassword'),
-                icon: Icons.lock_rounded,
-                show: _showConfirm,
-                onToggle: () => setState(() => _showConfirm = !_showConfirm),
-                validator: (v) {
-                  if (v != _newCtrl.text) {
-                    return context.t('passwordMismatch');
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-
-              // Submit Button
-              SizedBox(
-                height: 52,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.brandGradient,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withAlpha(90),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            sliver: SliverToBoxAdapter(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Icon with animation
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.brandGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
-                          )
-                        : Text(
-                            context.t('savePassword'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.lock_reset_rounded,
+                          size: 44,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ).animate().fadeIn(duration: 600.ms).scale(delay: 100.ms),
+                    
+                    const SizedBox(height: AppSpacing.xl),
+                    
+                    Text(
+                      context.t('signInToContinue'),
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.cairo(
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        fontSize: 15,
+                      ),
+                    ).animate().fadeIn(delay: 200.ms),
+                    
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    // Fields with animations
+                    _buildPasswordField(
+                      controller: _currentCtrl,
+                      label: context.t('currentPassword'),
+                      icon: Icons.lock_outline_rounded,
+                      show: _showCurrent,
+                      onToggle: () => setState(() => _showCurrent = !_showCurrent),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return context.t('fieldRequired');
+                        }
+                        return null;
+                      },
+                      isDark: isDark,
+                    ).animate().fadeIn(delay: 300.ms).moveY(begin: 20, end: 0),
+                    
+                    const SizedBox(height: AppSpacing.lg),
+
+                    _buildPasswordField(
+                      controller: _newCtrl,
+                      label: context.t('newPassword'),
+                      icon: Icons.lock_rounded,
+                      show: _showNew,
+                      onToggle: () => setState(() => _showNew = !_showNew),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return context.t('fieldRequired');
+                        }
+                        if (v.length < 6) {
+                          return context.t('passwordLengthError');
+                        }
+                        return null;
+                      },
+                      isDark: isDark,
+                    ).animate().fadeIn(delay: 400.ms).moveY(begin: 20, end: 0),
+                    
+                    const SizedBox(height: AppSpacing.lg),
+
+                    _buildPasswordField(
+                      controller: _confirmCtrl,
+                      label: context.t('confirmPassword'),
+                      icon: Icons.lock_rounded,
+                      show: _showConfirm,
+                      onToggle: () => setState(() => _showConfirm = !_showConfirm),
+                      validator: (v) {
+                        if (v != _newCtrl.text) {
+                          return context.t('passwordMismatch');
+                        }
+                        return null;
+                      },
+                      isDark: isDark,
+                    ).animate().fadeIn(delay: 500.ms).moveY(begin: 20, end: 0),
+                    
+                    const SizedBox(height: AppSpacing.xxxl),
+
+                    // Submit Button with animation
+                    SizedBox(
+                      height: 56,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: AppColors.brandGradient,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                  ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  context.t('savePassword'),
+                                  style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 600.ms).scale(),
+                    
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -254,34 +271,44 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       controller: controller,
       obscureText: !show,
       validator: validator,
+      style: GoogleFonts.cairo(
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.white : AppColors.textPrimary,
+      ),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: GoogleFonts.cairo(
+          color: isDark ? Colors.white70 : AppColors.textSecondary,
+        ),
         prefixIcon: Icon(icon, color: AppColors.primary),
         suffixIcon: IconButton(
           icon: Icon(
             show ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-            color: AppColors.textSecondary,
+            color: isDark ? Colors.white60 : AppColors.textSecondary,
           ),
           onPressed: onToggle,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: isDark ? Colors.white24 : Colors.grey.shade300,
+            color: isDark ? Colors.white10 : Colors.grey.shade200,
           ),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: isDark ? Colors.white24 : Colors.grey.shade300,
+            color: isDark ? Colors.white10 : Colors.grey.shade200,
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
         filled: true,
-        fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+        fillColor: isDark 
+          ? Colors.white.withValues(alpha: 0.05) 
+          : Colors.grey.withValues(alpha: 0.05),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       ),
     );
   }

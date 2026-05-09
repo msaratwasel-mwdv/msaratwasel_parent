@@ -20,7 +20,6 @@ Future<void> showAbsenceSheet(BuildContext context) async {
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetContext) {
-      final lang = controller.locale.languageCode;
 
       return Padding(
         padding: EdgeInsets.only(

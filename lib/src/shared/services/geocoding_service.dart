@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/core/config/api_keys.dart';
@@ -7,6 +8,14 @@ class GeocodingService {
   final String _apiKey = ApiKeys.googleMaps;
 
   GeocodingService({Dio? dio}) : _dio = dio ?? Dio();
+
+  /// Returns platform-specific headers for Google API key restrictions.
+  Map<String, String> get _platformHeaders {
+    if (Platform.isIOS) {
+      return {'X-Ios-Bundle-Identifier': 'com.msaratwasel.user'};
+    }
+    return {'X-Android-Package': 'com.msaratwasel.user'};
+  }
 
   /// Performs reverse geocoding with Address Descriptors (Landmarks).
   ///
@@ -28,7 +37,7 @@ class GeocodingService {
         },
         cancelToken: cancelToken,
         options: Options(
-          headers: {'X-Android-Package': 'com.msaratwasel.user'},
+          headers: _platformHeaders,
         ),
       );
 

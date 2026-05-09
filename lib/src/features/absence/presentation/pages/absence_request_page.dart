@@ -72,7 +72,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: DropdownButtonHideUnderline(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedStudentId,
+                  initialValue: _selectedStudentId,
                   hint: Text(context.t('selectStudentHint')),
                   items: AppScope.of(context).students
                       .map(

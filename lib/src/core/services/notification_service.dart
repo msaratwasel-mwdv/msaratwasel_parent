@@ -18,7 +18,10 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Callback type called whenever a push notification arrives.
-typedef OnNotificationReceived = void Function(AppNotification notification);
+typedef OnNotificationReceived = void Function(
+  AppNotification notification, {
+  bool isTap,
+});
 
 /// Service responsible for initialising Firebase Cloud Messaging (FCM) and
 /// bridging incoming push notifications into the app's state layer.
@@ -33,8 +36,8 @@ class NotificationService {
 
   // Notification Channel Constants
   static const String _channelId = 'msarat_wasel_high_importance_v2';
-  static const String _channelName = 'تنبيهات مسارات واصل';
-  static const String _channelDesc = 'تستخدم لإرسال تنبيهات الرحلات والرسائل الهامة';
+  static const String _channelName = 'إشعارات مسارات واصل الهامة';
+  static const String _channelDesc = 'هذه القناة مخصصة لإشعارات الحافلات والرسائل الهامة';
 
   /// Initialise FCM. Call once from [main] after Firebase.initializeApp().
   ///
@@ -80,9 +83,9 @@ class NotificationService {
       '@drawable/ic_notification',
     );
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
     const initSettings = InitializationSettings(
       android: androidInit,
@@ -101,6 +104,7 @@ class NotificationService {
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
     // ── 3. Setup Android Notification Channel ──────────────────────────────
+    // we use a new ID 'v2' to bypass any previous silent settings on the device
     const androidChannel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -129,7 +133,7 @@ class NotificationService {
       final notification = AppNotification.fromFcm(message);
       
       // Update app state
-      _onReceived?.call(notification);
+      _onReceived?.call(notification, isTap: false);
 
       // Show local notification to guarantee banner/sound in foreground
       _showLocalNotification(notification);
@@ -142,7 +146,7 @@ class NotificationService {
         name: 'FCM',
       );
       final notification = AppNotification.fromFcm(message);
-      _onReceived?.call(notification);
+      _onReceived?.call(notification, isTap: true);
     });
 
     // ── 7. Terminated State Tap Handler ───────────────────────────────────
@@ -153,19 +157,35 @@ class NotificationService {
         name: 'FCM',
       );
       final notification = AppNotification.fromFcm(initialMessage);
-      _onReceived?.call(notification);
+      _onReceived?.call(notification, isTap: true);
     }
 
     // ── 8. Token Management ────────────────────────────────────────────────
     if (Platform.isIOS || Platform.isMacOS) {
+      developer.log(
+        '🍎 iOS/macOS detected: waiting for APNS token...',
+        name: 'FCM',
+      );
       String? apnsToken;
       int retryCount = 0;
       while (apnsToken == null && retryCount < 10) {
         apnsToken = await _fcm.getAPNSToken();
         if (apnsToken == null) {
+          developer.log(
+            '⏳ APNS token not ready yet, retrying ($retryCount/10)...',
+            name: 'FCM',
+          );
           await Future.delayed(const Duration(milliseconds: 500));
           retryCount++;
         }
+      }
+      if (apnsToken == null) {
+        developer.log(
+          '⚠️ Warning: APNS token still null after retries. getToken() might fail.',
+          name: 'FCM',
+        );
+      } else {
+        developer.log('✅ APNS token ready: $apnsToken', name: 'FCM');
       }
     }
 
@@ -199,6 +219,7 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      sound: const RawResourceAndroidNotificationSound('default'),
       styleInformation: BigTextStyleInformation(notification.body),
     );
 
@@ -230,8 +251,8 @@ class NotificationService {
         final notification = AppNotification.fromJson(data);
         developer.log('👆 Local Notification Tapped: ${notification.id}', name: 'FCM');
         
-        // Notify the app about the tap event if needed
-        _onReceived?.call(notification);
+        // Notify the app about the tap event
+        _onReceived?.call(notification, isTap: true);
       } catch (e) {
         developer.log('❌ Error parsing notification tap payload: $e', name: 'FCM');
       }
