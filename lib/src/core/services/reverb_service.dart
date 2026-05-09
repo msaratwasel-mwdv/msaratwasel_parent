@@ -21,6 +21,7 @@ class ReverbService {
   final Dio _dio;
   final void Function(Map<String, dynamic> data) _onStudentStatusUpdated;
   final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
+  final void Function(Map<String, dynamic> data)? _onNotificationReceived;
 
   // إعدادات Reverb المستمدة من AppConfig
   static const String _reverbKey = AppConfig.reverbKey;
@@ -38,10 +39,12 @@ class ReverbService {
     required Dio dio,
     required void Function(Map<String, dynamic> data) onStudentStatusUpdated,
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
+    void Function(Map<String, dynamic> data)? onNotificationReceived,
   }) : _userId = userId,
        _dio = dio,
        _onStudentStatusUpdated = onStudentStatusUpdated,
-       _onBusLocationUpdated = onBusLocationUpdated;
+       _onBusLocationUpdated = onBusLocationUpdated,
+       _onNotificationReceived = onNotificationReceived;
 
   /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
@@ -95,8 +98,9 @@ class ReverbService {
           _lastSocketId = socketId;
           developer.log('✅ Connected! Socket ID: $socketId', name: 'REVERB');
 
-          // 1. الاشتراك في القناة الخاصة بولي الأمر تلقائياً
+          // 1. الاشتراك في القنوات الخاصة بولي الأمر تلقائياً
           subscribe('private-guardian.$_userId', socketId);
+          subscribe('private-App.Models.User.$_userId', socketId);
 
           // 2. معالجة الاشتراكات المعلقة
           if (_pendingSubscriptions.isNotEmpty) {
@@ -112,6 +116,15 @@ class ReverbService {
           developer.log('🔔 Event: student.status.updated', name: 'REVERB');
           final data = _parseData(message['data']);
           _onStudentStatusUpdated(data);
+          break;
+
+        case 'notification.pushed':
+        case 'NotificationPushed':
+          developer.log('🔔 Event: notification.pushed', name: 'REVERB');
+          final data = _parseData(message['data']);
+          if (_onNotificationReceived != null) {
+            _onNotificationReceived!(data);
+          }
           break;
 
         case 'driver.location.updated':

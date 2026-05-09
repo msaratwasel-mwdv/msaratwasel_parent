@@ -682,6 +682,7 @@ class AppController extends ChangeNotifier {
       dio: dio,
       onStudentStatusUpdated: _handleRealtimeStatusUpdate,
       onBusLocationUpdated: _handleRealtimeLocationUpdate,
+      onNotificationReceived: _handleRealtimeNotification,
     );
     _reverbService!.connect();
 
@@ -1085,17 +1086,40 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markNotificationsRead([List<String>? ids]) {
+  /// Marks specific notifications as read both locally and on the server.
+  Future<void> markNotificationsRead([List<String>? ids]) async {
+    // 1. Update local state for immediate UI response
     for (final item in _notifications) {
       if (ids == null || ids.contains(item.id)) {
         item.read = true;
       }
     }
     notifyListeners();
+
+    // 2. Sync with server
+    if (ids == null || ids.isEmpty) return;
+    
+    try {
+      final token = await _storage.readAccessToken();
+      if (token != null) {
+        final dio = Dio(BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          headers: {'Authorization': 'Bearer $token'},
+        ));
+        
+        for (final id in ids) {
+          await dio.post('/api/guardian/notifications/$id/read');
+        }
+      }
+    } catch (e) {
+      developer.log('Failed to sync notification read status to server: $e');
+    }
   }
 
   /// Called by [NotificationService] whenever an FCM push arrives.
   void addNotification(AppNotification notification, {bool isTap = false}) {
+    developer.log('🚨🚨🚨 NOTIFICATION RECEIVED IN AppController: ${notification.title}', name: 'NOTIF');
+
     // إشعارات الشات منفصلة عن الإشعارات العامة (لا تظهر في قائمة التنبيهات)
     if (notification.type == NotificationType.chat) {
       developer.log(
@@ -1107,6 +1131,12 @@ class AppController extends ChangeNotifier {
         setNavIndex(5); // Contacts/Chat Page
       }
       notifyListeners();
+      return;
+    }
+
+    // Check if duplicate
+    if (_notifications.any((n) => n.id == notification.id)) {
+      developer.log('⚠️ Skipping duplicate notification: ${notification.id}');
       return;
     }
 
@@ -1196,6 +1226,19 @@ class AppController extends ChangeNotifier {
       );
     }
   }
+
+  void _handleRealtimeNotification(Map<String, dynamic> data) {
+    developer.log('🌐 Realtime Notification via Reverb: ${data['title']}', name: 'REVERB');
+    final notification = AppNotification.fromMap(data);
+    addNotification(notification);
+  }
+
+  /// Clears all local notifications.
+  Future<void> clearNotifications() async {
+    _notifications.clear();
+    notifyListeners();
+  }
+
 
   /// Fetches the notification history from the Laravel API on app boot.
   Future<void> loadNotificationsFromApi() async {

@@ -129,6 +129,7 @@ class NotificationService {
         '📬 FCM [FG]: ${message.notification?.title} | data: ${message.data}',
         name: 'FCM',
       );
+      print('🔥🔥🔥 FIREBASE MESSAGE ARRIVED IN FOREGROUND: ${message.notification?.title}');
 
       final notification = AppNotification.fromFcm(message);
       

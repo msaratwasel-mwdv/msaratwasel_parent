@@ -435,6 +435,19 @@ class AppNotification {
   bool read;
   final Map<String, dynamic> data;
 
+  factory AppNotification.fromMap(Map<String, dynamic> data) {
+    return AppNotification(
+      id: data['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      title: data['title'] as String? ?? '',
+      body: data['message'] as String? ?? data['body'] as String? ?? '',
+      type: parseType(data['type'] as String?),
+      time: DateTime.tryParse(data['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      data: data,
+    );
+  }
+
   factory AppNotification.fromFcm(RemoteMessage message) {
     final data = message.data;
     final type = parseType(data['type'] as String?);
