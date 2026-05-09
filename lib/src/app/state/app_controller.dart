@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
+import 'package:msaratwasel_user/src/core/utils/device_utils.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -829,11 +830,13 @@ class AppController extends ChangeNotifier {
         ),
       );
 
+      final deviceName = await DeviceUtils.getDeviceName();
+      
       // تسجيل الدخول عبر الـ API باستخدام الرقم المدني ورقم الجوال
       final loginData = {
         'national_id': civilId.trim(),
         'password': password.trim(),
-        'device_name': 'device_1',
+        'device_name': deviceName,
         'app_context': 'parent',
       };
 
@@ -958,6 +961,8 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     try {
       final token = await _storage.readAccessToken();
+      final fcmToken = await _storage.prefs.then((p) => p.getString('fcm_token'));
+      
       if (token != null) {
         final dio = Dio(
           BaseOptions(
@@ -968,7 +973,9 @@ class AppController extends ChangeNotifier {
             },
           ),
         );
-        await dio.post('auth/logout');
+        await dio.post('auth/logout', data: {
+          if (fcmToken != null) 'fcm_token': fcmToken,
+        });
         AppLogger.d('✅ Logged out from backend');
       }
     } catch (e) {

@@ -1,4 +1,5 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../config/app_config.dart';
 
 enum StudentStatus {
@@ -428,6 +429,44 @@ class AppNotification {
   bool read;
   final Map<String, dynamic> data;
 
+  factory AppNotification.fromFcm(RemoteMessage message) {
+    final data = message.data;
+    final type = parseType(data['type'] as String?);
+
+    return AppNotification(
+      id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: message.notification?.title ?? data['title'] ?? '',
+      body: message.notification?.body ?? data['body'] ?? '',
+      type: type,
+      time: DateTime.now(),
+      data: data,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'body': body,
+      'type': type.toString().split('.').last,
+      'time': time.toIso8601String(),
+      'read': read,
+      'data': data,
+    };
+  }
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    return AppNotification(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      body: json['body'] as String,
+      type: parseType(json['type'] as String?),
+      time: DateTime.parse(json['time'] as String),
+      read: json['read'] as bool? ?? false,
+      data: json['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
   /// Maps the raw Laravel `type` string to [NotificationType].
   static NotificationType parseType(String? raw) {
     switch (raw) {
@@ -460,6 +499,7 @@ class AppNotification {
       case 'supervisor_message':
         return NotificationType.supervisorMessage;
       case 'new_message':
+      case 'chat':
         return NotificationType.chat;
       case 'location_request':
         return NotificationType.locationRequest;
