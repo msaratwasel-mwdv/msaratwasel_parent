@@ -51,6 +51,20 @@ class _RootShellState extends State<RootShell> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        // Handle Deep Linking / Notification Redirects
+        if (controller.pendingConversationId != null) {
+          final pendingId = controller.pendingConversationId!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            // 1. Move to Chat Tab (Index 5)
+            controller.setNavIndex(5);
+            
+            // 3. Since the Chat tab (ContactsPage) will be built/visible now, 
+            // we can pass the ID to it or use a global navigation if needed.
+            // But easier: setNavIndex triggers rebuild, and we can make ContactsPage 
+            // aware of the state in AppController.
+          });
+        }
+
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
         final page = _buildPage(currentIndex);
 
@@ -118,6 +132,8 @@ class _RootShellState extends State<RootShell> {
   }
 
   Widget _buildPage(int index) {
+    final controller = AppScope.of(context);
+    
     // Lazily instantiate pages to avoid initializing platform views (e.g., Google Maps) when not visible.
     _pages[index] ??= switch (index) {
       0 => const HomeScreen(),
@@ -125,7 +141,7 @@ class _RootShellState extends State<RootShell> {
       2 => const BusTrackingPage(),
       3 => const ChildrenStatusPage(), // New Page
       4 => const NotificationsPage(),
-      5 => const ContactsPage(),
+      5 => ContactsPage(initialConversationId: controller.pendingConversationId),
       6 => const RequestAbsencePage(),
       7 => const AttendanceHistoryPage(),
       8 => const ParentProfilePage(),

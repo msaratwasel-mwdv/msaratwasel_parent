@@ -33,6 +33,9 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static OnNotificationReceived? _onReceived;
+  static final Set<String> _processedCorrelationIds = {};
+
+  static OnNotificationReceived? get onReceived => _onReceived;
 
   // Notification Channel Constants
   static const String _channelId = 'msarat_wasel_high_importance_v2';
@@ -129,15 +132,32 @@ class NotificationService {
         '📬 FCM [FG]: ${message.notification?.title} | data: ${message.data}',
         name: 'FCM',
       );
+      
+      final notification = AppNotification.fromFcm(message);
+
+      // Deduplication check
+      if (notification.correlationId != null) {
+        if (_processedCorrelationIds.contains(notification.correlationId)) {
+          developer.log(
+            '♻️ FCM: Skipping duplicate notification (correlationId: ${notification.correlationId})',
+            name: 'FCM',
+          );
+          return;
+        }
+        _processedCorrelationIds.add(notification.correlationId!);
+        if (_processedCorrelationIds.length > 100) {
+          _processedCorrelationIds.remove(_processedCorrelationIds.first);
+        }
+      }
+      
       print('🔥🔥🔥 FIREBASE MESSAGE ARRIVED IN FOREGROUND: ${message.notification?.title}');
 
-      final notification = AppNotification.fromFcm(message);
-      
       // Update app state
       _onReceived?.call(notification, isTap: false);
 
-      // Show local notification to guarantee banner/sound in foreground
-      _showLocalNotification(notification);
+      // We REMOVED the automatic _showLocalNotification(notification) call here.
+      // Instead, AppController.addNotification will call showLocalNotification 
+      // with the correct localized title/body to fix the silent/Arabic popup issue.
     });
 
     // ── 6. Background Tap Handler ─────────────────────────────────────────
@@ -208,7 +228,14 @@ class NotificationService {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  static Future<void> _showLocalNotification(AppNotification notification) async {
+  /// Displays a heads-up notification (banner) while the app is in the foreground.
+  /// This is now called from AppController to ensure localized content (Ar/En) is used.
+  static Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    int? id,
+    String? payload,
+  }) async {
     final androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
@@ -220,8 +247,7 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
-      sound: const RawResourceAndroidNotificationSound('default'),
-      styleInformation: BigTextStyleInformation(notification.body),
+      styleInformation: BigTextStyleInformation(body),
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -237,11 +263,11 @@ class NotificationService {
     );
 
     await _localNotif.show(
-      notification.id.hashCode,
-      notification.title,
-      notification.body,
+      id ?? DateTime.now().millisecond,
+      title,
+      body,
       details,
-      payload: jsonEncode(notification.toJson()),
+      payload: payload,
     );
   }
 

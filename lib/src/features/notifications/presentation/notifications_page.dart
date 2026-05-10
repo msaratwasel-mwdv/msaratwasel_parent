@@ -168,7 +168,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
-                        final label = context.t('notification_${item.type.name}');
+                        final isEn = controller.locale.languageCode == 'en';
+                        final displayTitle = (item.type == NotificationType.schoolAlert ||
+                                item.type == NotificationType.supervisorMessage ||
+                                item.type == NotificationType.chat)
+                            ? item.getDisplayTitle(isEn)
+                            : context.t('notification_${item.type.name}');
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -188,8 +193,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                       : AppColors.primary,
                                 ),
                               ),
-                              title: Text(label),
-                              subtitle: Text(item.body),
+                              title: Text(displayTitle),
+                              subtitle: Text(item.getDisplayBody(isEn)),
                               trailing: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisAlignment: MainAxisAlignment.center,

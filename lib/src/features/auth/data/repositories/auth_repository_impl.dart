@@ -34,11 +34,17 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> requestPasswordReset({required String phoneOrUsername}) async {
-    // Backend doesn't seem to have a dedicated password/forgot yet in AuthController
-    // but we'll point it to the likely endpoint or keep it as placeholder
     await dio.post(
       'auth/password/reset-request',
       data: {'national_id': phoneOrUsername},
+    );
+  }
+
+  @override
+  Future<void> updateLanguage(String languageCode) async {
+    await dio.post(
+      'auth/profile/language',
+      data: {'language': languageCode},
     );
   }
 }

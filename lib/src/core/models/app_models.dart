@@ -420,27 +420,46 @@ class AppNotification {
   AppNotification({
     required this.id,
     required this.title,
+    this.titleEn,
     required this.body,
+    this.bodyEn,
+    this.senderName,
+    this.senderNameEn,
     required this.type,
     required this.time,
+    this.correlationId,
     this.read = false,
     this.data = const {},
   });
 
   final String id;
+  final String? correlationId;
   final String title;
+  final String? titleEn;
   final String body;
+  final String? bodyEn;
+  final String? senderName;
+  final String? senderNameEn;
   final NotificationType type;
   final DateTime time;
   bool read;
   final Map<String, dynamic> data;
 
+  String getDisplayTitle(bool isEn) => (isEn && titleEn != null && titleEn!.isNotEmpty) ? titleEn! : title;
+  String getDisplayBody(bool isEn) => (isEn && bodyEn != null && bodyEn!.isNotEmpty) ? bodyEn! : body;
+  String getDisplaySender(bool isEn) => (isEn && senderNameEn != null && senderNameEn!.isNotEmpty) ? senderNameEn! : (senderName ?? '');
+
   factory AppNotification.fromMap(Map<String, dynamic> data) {
     return AppNotification(
       id: data['id']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString(),
+      correlationId: data['correlation_id']?.toString(),
       title: data['title'] as String? ?? '',
+      titleEn: data['title_en'] as String?,
       body: data['message'] as String? ?? data['body'] as String? ?? '',
+      bodyEn: data['message_en'] as String? ?? data['body_en'] as String?,
+      senderName: data['sender_name'] as String? ?? data['from_user_name'] as String?,
+      senderNameEn: data['sender_name_en'] as String? ?? data['from_user_name_en'] as String?,
       type: parseType(data['type'] as String?),
       time: DateTime.tryParse(data['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -452,10 +471,20 @@ class AppNotification {
     final data = message.data;
     final type = parseType(data['type'] as String?);
 
+    // Prioritize the database ID for deduplication with real-time events
+    final dbId = data['notification_id']?.toString() ??
+        data['id']?.toString() ??
+        message.messageId;
+
     return AppNotification(
-      id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: dbId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      correlationId: data['correlation_id']?.toString(),
       title: message.notification?.title ?? data['title'] ?? '',
+      titleEn: data['title_en'] as String?,
       body: message.notification?.body ?? data['body'] ?? '',
+      bodyEn: data['message_en'] as String? ?? data['body_en'] as String?,
+      senderName: data['sender_name'] as String?,
+      senderNameEn: data['sender_name_en'] as String?,
       type: type,
       time: DateTime.now(),
       data: data,
@@ -465,8 +494,13 @@ class AppNotification {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'correlation_id': correlationId,
       'title': title,
+      'title_en': titleEn,
       'body': body,
+      'body_en': bodyEn,
+      'sender_name': senderName,
+      'sender_name_en': senderNameEn,
       'type': type.toString().split('.').last,
       'time': time.toIso8601String(),
       'read': read,
@@ -477,8 +511,13 @@ class AppNotification {
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
       id: json['id'] as String,
+      correlationId: json['correlation_id'] as String?,
       title: json['title'] as String,
+      titleEn: json['title_en'] as String?,
       body: json['body'] as String,
+      bodyEn: json['body_en'] as String?,
+      senderName: json['sender_name'] as String?,
+      senderNameEn: json['sender_name_en'] as String?,
       type: parseType(json['type'] as String?),
       time: DateTime.parse(json['time'] as String),
       read: json['read'] as bool? ?? false,

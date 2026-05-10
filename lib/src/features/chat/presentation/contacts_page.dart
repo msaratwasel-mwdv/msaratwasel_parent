@@ -12,7 +12,9 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 /// Displays contacts (drivers & supervisors) and existing conversations.
 /// Tapping a contact opens/creates a conversation → navigates to [ChatPage].
 class ContactsPage extends StatefulWidget {
-  const ContactsPage({super.key});
+  const ContactsPage({super.key, this.initialConversationId});
+
+  final String? initialConversationId;
 
   @override
   State<ContactsPage> createState() => _ContactsPageState();
@@ -59,6 +61,20 @@ class _ContactsPageState extends State<ContactsPage> {
               .toList();
           _isLoading = false;
         });
+
+        // Handle auto-opening if initialConversationId is provided
+        if (widget.initialConversationId != null) {
+          final targetId = widget.initialConversationId;
+          final conv = _conversations.cast<ChatConversation?>().firstWhere(
+            (c) => c?.id == targetId,
+            orElse: () => null,
+          );
+          if (conv != null) {
+            _openExistingConversation(conv);
+            // Clear from controller to prevent re-opening on next build
+            AppScope.of(context).clearPendingConversation();
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

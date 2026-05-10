@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/core/utils/device_utils.dart';
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
@@ -21,6 +24,7 @@ import 'package:msaratwasel_user/src/features/notifications/data/repositories/no
 import 'package:msaratwasel_user/src/core/services/notification_service.dart';
 import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking.dart';
 import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking_group.dart';
+import 'package:msaratwasel_user/src/features/auth/data/repositories/auth_repository_impl.dart';
 
 class AppController extends ChangeNotifier {
   AppController()
@@ -38,6 +42,8 @@ class AppController extends ChangeNotifier {
 
   late final Dio dio;
   final StorageService _storage = StorageService();
+  final Set<String> _processedCorrelationIds = {};
+  final Set<String> _subscribedChannels = {};
 
   void _initDio() {
     dio = Dio(
@@ -225,6 +231,16 @@ class AppController extends ChangeNotifier {
     // Persist to storage
     final repo = LanguageRepositoryImpl(storageService: StorageService());
     await repo.setLocale(newLocale.languageCode);
+
+    // Sync with server if authenticated
+    if (_isAuthenticated) {
+      try {
+        final authRepo = AuthRepositoryImpl(dio: dio);
+        await authRepo.updateLanguage(newLocale.languageCode);
+      } catch (e) {
+        AppLogger.w('⚠️ updateLocale sync failed: $e');
+      }
+    }
   }
 
   Future<({bool success, String? message})> submitAbsence({
@@ -316,7 +332,11 @@ class AppController extends ChangeNotifier {
         // 🚌 الاشتراك في قنوات الباصات للأبناء لتتبع مواقعهم لحظياً
         for (var student in _students) {
           if (student.bus.id.isNotEmpty && student.bus.id != '-') {
-            _reverbService?.subscribe('private-bus.${student.bus.id}');
+            final channel = 'private-bus.${student.bus.id}';
+            if (!_subscribedChannels.contains(channel)) {
+              _reverbService?.subscribe(channel);
+              _subscribedChannels.add(channel);
+            }
           }
         }
 
@@ -600,6 +620,11 @@ class AppController extends ChangeNotifier {
       _shouldShowOnboarding = !(prefs.getBool('has_seen_onboarding') ?? false);
       _userId = prefs.getInt('user_id');
 
+      final savedLang = prefs.getString('app_locale');
+      if (savedLang != null && savedLang.isNotEmpty) {
+        _locale = Locale(savedLang);
+      }
+
       if (savedToken != null && savedName.isNotEmpty) {
         _token = savedToken;
         _isAuthenticated = true;
@@ -665,6 +690,15 @@ class AppController extends ChangeNotifier {
         _initReverb(token);
       }
       
+      // Sync local language setting with backend for correct background FCM payloads
+      try {
+        final authRepo = AuthRepositoryImpl(dio: dio);
+        await authRepo.updateLanguage(_locale.languageCode);
+        developer.log('🌐 Synced preferred language (${_locale.languageCode}) with server.', name: 'BOOT');
+      } catch (e) {
+        AppLogger.w('⚠️ AppController: Failed to sync language on boot: $e');
+      }
+
       notifyListeners(); // Refresh UI with loaded data
     } catch (e) {
       AppLogger.w('⚠️ AppController: Background initialization partially failed: $e');
@@ -676,6 +710,7 @@ class AppController extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════════
   void _initReverb(String token) {
     _reverbService?.dispose();
+    _subscribedChannels.clear();
     _reverbService = ReverbService(
       token: token,
       userId: _userId!,
@@ -688,8 +723,12 @@ class AppController extends ChangeNotifier {
 
     // اشتراك في قنوات الباصات للأبناء الموجودين حالياً
     for (var student in _students) {
-      if (student.bus.id.isNotEmpty) {
-        _reverbService!.subscribe('private-bus.${student.bus.id}');
+      if (student.bus.id.isNotEmpty && student.bus.id != '-') {
+        final channel = 'private-bus.${student.bus.id}';
+        if (!_subscribedChannels.contains(channel)) {
+          _reverbService!.subscribe(channel);
+          _subscribedChannels.add(channel);
+        }
       }
     }
 
@@ -832,12 +871,14 @@ class AppController extends ChangeNotifier {
       );
 
       final deviceName = await DeviceUtils.getDeviceName();
+      final deviceId = await DeviceUtils.getDeviceId();
       
       // تسجيل الدخول عبر الـ API باستخدام الرقم المدني ورقم الجوال
       final loginData = {
         'national_id': civilId.trim(),
         'password': password.trim(),
         'device_name': deviceName,
+        'device_id': deviceId,
         'app_context': 'parent',
       };
 
@@ -948,9 +989,19 @@ class AppController extends ChangeNotifier {
     required String fcmToken,
   }) async {
     try {
+      final deviceName = await DeviceUtils.getDeviceName();
+      final deviceId = await DeviceUtils.getDeviceId();
+
       await dio.post(
         '/auth/fcm-token',
-        data: {'fcm_token': fcmToken},
+        data: {
+          'fcm_token': fcmToken,
+          'device_name': deviceName,
+          'device_id': deviceId,
+          'device_type': Platform.isAndroid ? 'android' : 'ios',
+          'app_bundle_id': 'com.msaratwasel.user',
+          'preferred_language': locale.languageCode,
+        },
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       AppLogger.d('✅ FCM: token registered → $fcmToken');
@@ -1001,6 +1052,14 @@ class AppController extends ChangeNotifier {
     _userAvatarUrl = '';
     _students = [];
     _navIndex = 0;
+    notifyListeners();
+  }
+
+  String? _pendingConversationId;
+  String? get pendingConversationId => _pendingConversationId;
+
+  void clearPendingConversation() {
+    _pendingConversationId = null;
     notifyListeners();
   }
 
@@ -1057,10 +1116,10 @@ class AppController extends ChangeNotifier {
   }
 
   void toggleLanguage() {
-    _locale = _locale.languageCode == 'ar'
+    final newLocale = _locale.languageCode == 'ar'
         ? const Locale('en')
         : const Locale('ar');
-    notifyListeners();
+    updateLocale(newLocale);
   }
 
   void toggleTheme(bool currentIsDark) {
@@ -1069,8 +1128,7 @@ class AppController extends ChangeNotifier {
   }
 
   void setLocale(Locale locale) {
-    _locale = locale;
-    notifyListeners();
+    updateLocale(locale);
   }
 
   void selectStudent(int index) {
@@ -1120,23 +1178,56 @@ class AppController extends ChangeNotifier {
   void addNotification(AppNotification notification, {bool isTap = false}) {
     developer.log('🚨🚨🚨 NOTIFICATION RECEIVED IN AppController: ${notification.title}', name: 'NOTIF');
 
-    // إشعارات الشات منفصلة عن الإشعارات العامة (لا تظهر في قائمة التنبيهات)
+    // 1. Check for global deduplication FIRST (before showing any popup)
+    if (notification.correlationId != null) {
+      if (_processedCorrelationIds.contains(notification.correlationId)) {
+        developer.log('♻️ Skipping duplicate notification (CID: ${notification.correlationId})');
+        return;
+      }
+      _processedCorrelationIds.add(notification.correlationId!);
+      if (_processedCorrelationIds.length > 100) {
+        _processedCorrelationIds.remove(_processedCorrelationIds.first);
+      }
+    }
+
+    // 2. Check for list-based duplicate (fallback)
+    final isDuplicate = _notifications.any((n) => n.id == notification.id);
+    if (isDuplicate) {
+      developer.log('⚠️ Skipping duplicate notification: ID=${notification.id}');
+      return;
+    }
+
+    // ── Foreground Display (Heads-up) ───────────────────────────────────
+    // Show localized popup banner ONLY after deduplication passes
+    if (!isTap) {
+      final isEn = locale.languageCode == 'en';
+      NotificationService.showLocalNotification(
+        title: notification.getDisplayTitle(isEn),
+        body: notification.getDisplayBody(isEn),
+        id: notification.id.hashCode,
+        payload: jsonEncode(notification.toJson()),
+      );
+    }
+
+    // 3. Handle Chat Notifications
     if (notification.type == NotificationType.chat) {
       developer.log(
         '💬 FCM: Chat notification received — isTap: $isTap',
         name: 'NOTIFICATION',
       );
       _hasNewMessages = true;
+      
       if (isTap) {
+        // Extract conversation_id from data payload
+        final convId = notification.data['conversation_id']?.toString();
+        if (convId != null) {
+          _pendingConversationId = convId;
+          developer.log('🔗 Setting pending conversation ID: $convId', name: 'CHAT');
+        }
         setNavIndex(5); // Contacts/Chat Page
       }
+      
       notifyListeners();
-      return;
-    }
-
-    // Check if duplicate
-    if (_notifications.any((n) => n.id == notification.id)) {
-      developer.log('⚠️ Skipping duplicate notification: ${notification.id}');
       return;
     }
 

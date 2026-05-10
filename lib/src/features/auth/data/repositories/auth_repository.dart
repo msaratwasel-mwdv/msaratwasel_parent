@@ -4,4 +4,6 @@ abstract class AuthRepository {
   Future<AuthUser> login({required String civilId, required String password});
 
   Future<void> requestPasswordReset({required String phoneOrUsername});
+
+  Future<void> updateLanguage(String languageCode);
 }

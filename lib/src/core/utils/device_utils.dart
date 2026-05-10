@@ -28,4 +28,22 @@ class DeviceUtils {
       return 'Unknown Device';
     }
   }
+
+  static Future<String?> getDeviceId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    try {
+      if (kIsWeb) return null;
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        return androidInfo.id; // stable ANDROID_ID
+      }
+      if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
 }
