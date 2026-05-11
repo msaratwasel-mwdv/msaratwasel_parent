@@ -1786,13 +1786,20 @@ class AppController extends ChangeNotifier {
               tracking: existingGroup.tracking!.copyWith(
                 lastUpdate: updatedAt,
                 etaMinutes: etaMinutes,
+                speed: speed,
+                heading: heading,
               ),
               tripStatus: tripStatus ?? existingGroup.tripStatus,
               startTime: startTime ?? existingGroup.startTime,
               totalStudentsCount:
                   totalStudents ?? existingGroup.totalStudentsCount,
+              totalStudentsOnBoard:
+                  totalOnBoard ?? existingGroup.totalStudentsOnBoard,
               driver: driver ?? existingGroup.driver,
               supervisor: supervisor ?? existingGroup.supervisor,
+              busNumber: busNumber ?? existingGroup.busNumber,
+              busPlate: busPlate ?? existingGroup.busPlate,
+              tripType: tripTypeStr ?? existingGroup.tripType,
             );
           } else {
             _tripGroups[busId] = existingGroup.copyWith(

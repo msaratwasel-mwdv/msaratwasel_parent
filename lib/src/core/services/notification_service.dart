@@ -15,6 +15,56 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     '📬 FCM [BG]: ${message.notification?.title} | data: ${message.data}',
     name: 'FCM',
   );
+
+  // Initialize Firebase for the background isolate
+  await Firebase.initializeApp();
+
+  // Create local notification in background
+  final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
+  
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@drawable/ic_notification');
+  
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: DarwinInitializationSettings(),
+  );
+
+  await localNotifications.initialize(initializationSettings);
+
+  final notification = message.notification;
+  final data = message.data;
+  final String title = notification?.title ?? data['title'] ?? 'رسالة جديدة';
+  final String body = notification?.body ?? data['body'] ?? data['message'] ?? '';
+
+  if (title.isNotEmpty || body.isNotEmpty) {
+    const String channelId = 'msarat_wasel_high_importance_v3';
+    const String channelName = 'إشعارات مسارات واصل الهامة';
+
+    await localNotifications.show(
+      message.messageId.hashCode,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          ticker: 'ticker',
+          playSound: true,
+          enableVibration: true,
+          icon: '@drawable/ic_notification',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: jsonEncode(message.data),
+    );
+  }
 }
 
 /// Callback type called whenever a push notification arrives.
@@ -38,7 +88,7 @@ class NotificationService {
   static OnNotificationReceived? get onReceived => _onReceived;
 
   // Notification Channel Constants
-  static const String _channelId = 'msarat_wasel_high_importance_v2';
+  static const String _channelId = 'msarat_wasel_high_importance_v3';
   static const String _channelName = 'إشعارات مسارات واصل الهامة';
   static const String _channelDesc = 'هذه القناة مخصصة لإشعارات الحافلات والرسائل الهامة';
 

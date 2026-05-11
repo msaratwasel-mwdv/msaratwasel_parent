@@ -91,13 +91,18 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                req.studentName ?? context.t('student'),
-                style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  req.studentName ?? context.t('student'),
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               _buildStatusBadge(context, req.status),
             ],
           ),

@@ -5,23 +5,23 @@ String formatTime(
   String pattern = 'h:mm a',
   String locale = 'ar',
 }) {
-  return DateFormat(pattern, locale).format(date);
+  return DateFormat(pattern, locale).format(date.toLocal());
 }
 
 String formatDateShort(DateTime date, {String locale = 'ar'}) {
-  return DateFormat('d MMM', locale).format(date);
+  return DateFormat('d MMM', locale).format(date.toLocal());
 }
 
 String formatDateLong(DateTime date, {String locale = 'ar'}) {
-  return DateFormat('EEEE, d MMMM', locale).format(date);
+  return DateFormat('EEEE, d MMMM', locale).format(date.toLocal());
 }
 
 String formatDate(DateTime date, {String locale = 'ar'}) {
-  return DateFormat('EEEE, d MMMM', locale).format(date);
+  return DateFormat('EEEE, d MMMM', locale).format(date.toLocal());
 }
 
 String timeOnly(DateTime date, {String locale = 'ar'}) {
-  return DateFormat('h:mm a', locale).format(date);
+  return DateFormat('h:mm a', locale).format(date.toLocal());
 }
 
 String timeAgo(DateTime date, {String locale = 'ar'}) {

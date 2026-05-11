@@ -445,21 +445,71 @@ class AppNotification {
   bool read;
   final Map<String, dynamic> data;
 
-  String getDisplayTitle(bool isEn) => (isEn && titleEn != null && titleEn!.isNotEmpty) ? titleEn! : title;
-  String getDisplayBody(bool isEn) => (isEn && bodyEn != null && bodyEn!.isNotEmpty) ? bodyEn! : body;
-  String getDisplaySender(bool isEn) => (isEn && senderNameEn != null && senderNameEn!.isNotEmpty) ? senderNameEn! : (senderName ?? '');
+  String _pickLanguage(String text, bool isEn) {
+    if (text.isEmpty) return text;
+
+    // Common separators used for bilingual text
+    final separators = [' / ', ' /', '/ ', '/', ' | ', ' |', '| ', '|'];
+    for (var sep in separators) {
+      if (text.contains(sep)) {
+        final parts = text.split(sep);
+        if (parts.length >= 2) {
+          // Typically: Index 0 is Arabic, Index 1 is English
+          // Return based on isEn flag
+          return isEn ? parts[1].trim() : parts[0].trim();
+        }
+      }
+    }
+    return text;
+  }
+
+  String getDisplayTitle(bool isEn) {
+    if (isEn && titleEn != null && titleEn!.isNotEmpty) return titleEn!;
+    return _pickLanguage(title, isEn);
+  }
+
+  String getDisplayBody(bool isEn) {
+    if (isEn && bodyEn != null && bodyEn!.isNotEmpty) return bodyEn!;
+
+    // Translation fallback for Absence notification from website/system
+    if (isEn && type == NotificationType.absence) {
+      if (body.contains('لم يحضر')) {
+        return body
+            .replaceAll('الطالب', 'Student')
+            .replaceAll('لم يحضر في الحافلة اليوم',
+                'did not attend the bus today');
+      }
+    }
+
+    return _pickLanguage(body, isEn);
+  }
+
+  String getDisplaySender(bool isEn) =>
+      (isEn && senderNameEn != null && senderNameEn!.isNotEmpty)
+          ? senderNameEn!
+          : (senderName ?? '');
 
   factory AppNotification.fromMap(Map<String, dynamic> data) {
     return AppNotification(
       id: data['id']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       correlationId: data['correlation_id']?.toString(),
-      title: data['title'] as String? ?? '',
-      titleEn: data['title_en'] as String?,
-      body: data['message'] as String? ?? data['body'] as String? ?? '',
-      bodyEn: data['message_en'] as String? ?? data['body_en'] as String?,
-      senderName: data['sender_name'] as String? ?? data['from_user_name'] as String?,
-      senderNameEn: data['sender_name_en'] as String? ?? data['from_user_name_en'] as String?,
+      title: data['title'] as String? ?? data['title_ar'] as String? ?? '',
+      titleEn: data['title_en'] as String? ?? data['titleEn'] as String?,
+      body: data['message'] as String? ??
+          data['body'] as String? ??
+          data['content'] as String? ??
+          data['content_ar'] as String? ??
+          '',
+      bodyEn: data['message_en'] as String? ??
+          data['body_en'] as String? ??
+          data['content_en'] as String? ??
+          data['bodyEn'] as String?,
+      senderName: data['sender_name'] as String? ??
+          data['from_user_name'] as String? ??
+          data['sender'] as String?,
+      senderNameEn: data['sender_name_en'] as String? ??
+          data['from_user_name_en'] as String?,
       type: parseType(data['type'] as String?),
       time: DateTime.tryParse(data['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -479,11 +529,21 @@ class AppNotification {
     return AppNotification(
       id: dbId ?? DateTime.now().millisecondsSinceEpoch.toString(),
       correlationId: data['correlation_id']?.toString(),
-      title: message.notification?.title ?? data['title'] ?? '',
-      titleEn: data['title_en'] as String?,
-      body: message.notification?.body ?? data['body'] ?? '',
-      bodyEn: data['message_en'] as String? ?? data['body_en'] as String?,
-      senderName: data['sender_name'] as String?,
+      title: message.notification?.title ??
+          data['title'] ??
+          data['title_ar'] ??
+          '',
+      titleEn: data['title_en'] as String? ?? data['titleEn'] as String?,
+      body: message.notification?.body ??
+          data['body'] ??
+          data['message'] ??
+          data['content'] ??
+          '',
+      bodyEn: data['message_en'] as String? ??
+          data['body_en'] as String? ??
+          data['content_en'] as String? ??
+          data['bodyEn'] as String?,
+      senderName: data['sender_name'] as String? ?? data['sender'] as String?,
       senderNameEn: data['sender_name_en'] as String?,
       type: type,
       time: DateTime.now(),

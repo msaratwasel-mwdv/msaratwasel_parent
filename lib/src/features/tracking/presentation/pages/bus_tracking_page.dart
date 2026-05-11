@@ -5,8 +5,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui' as ui;
 
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import '../../../../app/state/app_controller.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../shared/localization/app_strings.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../domain/entities/bus_tracking.dart';
@@ -31,6 +35,14 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   final Map<String, BitmapDescriptor> _studentIcons = {};
   List<Student>? _lastStudents;
 
+  // Road-following route state
+  List<LatLng> _activeRoutePoints = [];
+  String? _remainingDistance;
+  String? _remainingTime;
+  DateTime? _lastRouteFetchTime;
+  LatLng? _lastFetchTarget;
+  bool _isFetchingRoute = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +63,11 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         _updateStudentMarkers(_lastStudents!, authToken);
       }
     }
+
+    // Trigger road-following route update
+    if (selectedGroup?.tracking != null) {
+      _fetchRoadFollowingRoute();
+    }
   }
 
   Future<void> _loadCustomMarkers() async {
@@ -58,7 +75,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       // Generate a nice bus marker using our generator
       _busIcon = await MarkerGenerator.createBusMarker(
         color: AppColors.primary,
-        size: 40.0,
+        size: 30.0,
       );
 
       _homeIcon = await BitmapDescriptor.asset(
@@ -69,7 +86,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       // Generate a nice school marker using our generator
       _schoolIcon = await MarkerGenerator.createSchoolMarker(
         color: Colors.purple,
-        size: 30.0,
+        size: 25.0,
       );
     } catch (e) {
       debugPrint('Markers not found, using defaults: $e');
@@ -107,7 +124,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
             imageUrl: student.avatarUrl,
             authToken: authToken,
             color: AppColors.accent,
-            size: 35.0, // Much smaller size as requested
+            size: 22.0,
           );
 
           _studentIcons[student.id] = icon;
@@ -135,8 +152,80 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     );
   }
 
+  Future<void> _fetchRoadFollowingRoute() async {
+    if (_isFetchingRoute) return;
+
+    final controller = AppScope.of(context);
+    final group = controller.selectedGroup;
+    if (group == null || group.tracking == null) return;
+
+    final tracking = group.tracking!;
+    final busPos = LatLng(tracking.latitude, tracking.longitude);
+
+    // Determine target (final destination for this parent's perspective)
+    LatLng? target;
+    if (group.tripType == 'to_school') {
+      target =
+          group.students.isNotEmpty
+              ? _parseLatLng(group.students.first.schoolLocation)
+              : null;
+    } else {
+      target =
+          group.students.isNotEmpty ? group.students.first.homeLocation : null;
+    }
+
+    if (target == null) return;
+
+    // Throttle: Don't fetch more than once every 15 seconds unless target changed
+    final now = DateTime.now();
+    if (_lastRouteFetchTime != null &&
+        now.difference(_lastRouteFetchTime!).inSeconds < 15 &&
+        _lastFetchTarget == target) {
+      return;
+    }
+
+    _isFetchingRoute = true;
+
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        'https://maps.googleapis.com/maps/api/directions/json',
+        queryParameters: {
+          'origin': '${busPos.latitude},${busPos.longitude}',
+          'destination': '${target.latitude},${target.longitude}',
+          'key': AppConfig.googleMapsApiKey,
+          'mode': 'driving',
+        },
+      );
+
+      if (response.statusCode == 200 && response.data['status'] == 'OK') {
+        final route = response.data['routes'][0];
+        final leg = route['legs'][0];
+        final points = PolylinePoints.decodePolyline(
+          route['overview_polyline']['points'],
+        );
+
+        if (mounted) {
+          setState(() {
+            _activeRoutePoints =
+                points.map((p) => LatLng(p.latitude, p.longitude)).toList();
+            _remainingDistance = leg['distance']['text'];
+            _remainingTime = leg['duration']['text'];
+            _lastRouteFetchTime = now;
+            _lastFetchTarget = target;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [Tracking] Error fetching road route: $e');
+    } finally {
+      _isFetchingRoute = false;
+    }
+  }
+
   void _fitMapBounds(BusTrackingGroup? group) {
-    if (_mapController == null || group == null || group.tracking == null) return;
+    if (_mapController == null || group == null || group.tracking == null)
+      return;
 
     final List<LatLng> points = [];
     points.add(LatLng(group.tracking!.latitude, group.tracking!.longitude));
@@ -187,10 +276,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final allGroups = controller.allTripGroups;
 
     return Directionality(
-      textDirection:
-          controller.locale.languageCode == 'ar'
-              ? TextDirection.rtl
-              : TextDirection.ltr,
+      textDirection: controller.locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Stack(
@@ -222,6 +310,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
               onToggle: () =>
                   setState(() => _isPanelExpanded = !_isPanelExpanded),
               parentStudents: controller.students,
+              remainingTime: _remainingTime,
             ),
           ],
         ),
@@ -277,8 +366,8 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           icon:
               _busIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          anchor: const Offset(0.5, 0.5),
-          rotation: tracking.heading ?? 0,
+          anchor: const Offset(0.5, 0.9), // Anchor at the tip of the "nail"
+          rotation: 0, // Keep pin upright for clarity
         ),
       );
 
@@ -298,6 +387,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                   BitmapDescriptor.defaultMarkerWithHue(
                     BitmapDescriptor.hueOrange,
                   ),
+              anchor: const Offset(0.5, 0.9), // Anchor at the tip of the pin
               infoWindow: InfoWindow(
                 title: student.name,
                 snippet: context.t('homeLocation'),
@@ -329,14 +419,20 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         }
       }
 
-      if (routePoints.length > 1) {
+      final List<LatLng> finalPoints =
+          _activeRoutePoints.isNotEmpty ? _activeRoutePoints : routePoints;
+
+      if (finalPoints.length > 1) {
         polylines.add(
           Polyline(
             polylineId: const PolylineId('route'),
-            points: routePoints,
+            points: finalPoints,
             color: const Color(0xFF1A73E8), // Vibrant blue
             width: 6,
-            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+            patterns:
+                _activeRoutePoints.isNotEmpty
+                    ? [] // Solid line for real roads
+                    : [PatternItem.dash(20), PatternItem.gap(10)], // Dashed for straight lines
             jointType: JointType.round,
             startCap: Cap.roundCap,
             endCap: Cap.roundCap,
@@ -345,20 +441,20 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       }
 
       // Add School Marker if available (using first student's school as reference)
-      final firstStudent = group?.students.isNotEmpty == true ? group!.students.first : null;
+      final firstStudent = group?.students.isNotEmpty == true
+          ? group!.students.first
+          : null;
       if (firstStudent != null && firstStudent.schoolCoords != null) {
-          markers.add(
-            Marker(
-              markerId: const MarkerId('school'),
-              position: firstStudent.schoolCoords!,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueRed,
-              ),
-              infoWindow: InfoWindow(
-                title: firstStudent.schoolName ?? 'School',
-              ),
+        markers.add(
+          Marker(
+            markerId: const MarkerId('school'),
+            position: firstStudent.schoolCoords!,
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
             ),
-          );
+            infoWindow: InfoWindow(title: firstStudent.schoolName ?? 'School'),
+          ),
+        );
       }
     }
 
@@ -371,6 +467,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
             : const LatLng(15.3694, 44.1910),
         zoom: 14,
       ),
+      trafficEnabled: true,
       onMapCreated: (c) {
         _mapController = c;
         // Fit bounds on first load if we have a group
@@ -389,8 +486,6 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       mapToolbarEnabled: false,
     );
   }
-
-
 
   Widget _buildMapControls(BusTracking? tracking) {
     return Positioned(
@@ -414,7 +509,8 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
               _MapActionFab(
                 icon: Icons.zoom_out_map,
                 label: context.t('showAll'),
-                onPressed: () => _fitMapBounds(AppScope.of(context).selectedGroup),
+                onPressed: () =>
+                    _fitMapBounds(AppScope.of(context).selectedGroup),
               ),
             ],
           ),
@@ -503,7 +599,7 @@ class _DynamicBusSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     if (groups.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: 92,
+      height: 105, // Increased height to prevent overflow
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -526,7 +622,7 @@ class _DynamicBusSelector extends StatelessWidget {
             onTap: () => onSelect(group.busId),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 155,
+              width: 160, // Slightly wider
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : colors.card,
@@ -543,7 +639,9 @@ class _DynamicBusSelector extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? Colors.white.withAlpha(20)
-                      : (isDark ? Colors.white.withAlpha(10) : Colors.grey.shade100),
+                      : (isDark
+                            ? Colors.white.withAlpha(10)
+                            : Colors.grey.shade100),
                   width: 1,
                 ),
               ),
@@ -563,9 +661,7 @@ class _DynamicBusSelector extends StatelessWidget {
                     child: Text(
                       '${index + 1}',
                       style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : colors.text,
+                        color: isSelected ? Colors.white : colors.text,
                         fontWeight: FontWeight.bold,
                         fontSize: 10,
                       ),
@@ -578,15 +674,17 @@ class _DynamicBusSelector extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (isSelected) ...[
+                        if (group.isActiveTrip) ...[
                           Text(
                             context.t('activeNow'),
                             style: const TextStyle(
                               color: Colors.greenAccent,
-                              fontSize: 8,
+                              fontSize: 9,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 1),
                         ],
@@ -596,16 +694,16 @@ class _DynamicBusSelector extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white.withAlpha(180)
                                 : colors.text70,
-                            fontSize: 8,
+                            fontSize: 8.5,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${context.t('bus')} $busDisplayName',
                           style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : colors.text,
+                            color: isSelected ? Colors.white : colors.text,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -619,7 +717,7 @@ class _DynamicBusSelector extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white.withAlpha(200)
                                 : colors.text70,
-                            fontSize: 8.5,
+                            fontSize: 9,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -650,12 +748,14 @@ class _DataDrivenPanel extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
   final List<Student> parentStudents;
+  final String? remainingTime;
 
   const _DataDrivenPanel({
     required this.group,
     required this.isExpanded,
     required this.onToggle,
     required this.parentStudents,
+    this.remainingTime,
   });
 
   @override
@@ -667,7 +767,7 @@ class _DataDrivenPanel extends StatelessWidget {
       bottom: 0,
       left: 0,
       right: 0,
-      height: isExpanded ? 600 : 235,
+      height: isExpanded ? MediaQuery.of(context).size.height * 0.75 : 235,
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -748,14 +848,14 @@ class _DataDrivenPanel extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withAlpha(20),
+                      color: (isTripActive ? Colors.green : Colors.grey).withAlpha(20),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircleAvatar(
-                          backgroundColor: Colors.green,
+                        CircleAvatar(
+                          backgroundColor: isTripActive ? Colors.green : Colors.grey,
                           radius: 2,
                         ),
                         const SizedBox(width: 4),
@@ -763,8 +863,8 @@ class _DataDrivenPanel extends StatelessWidget {
                           isTripActive
                               ? context.t('activeNow')
                               : context.t('inactive'),
-                          style: const TextStyle(
-                            color: Colors.green,
+                          style: TextStyle(
+                            color: isTripActive ? Colors.green : Colors.grey,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
@@ -775,7 +875,11 @@ class _DataDrivenPanel extends StatelessWidget {
                   Text(
                     '${context.t('updated')}: ${tracking != null ? "${tracking.lastUpdate.hour > 12 ? tracking.lastUpdate.hour - 12 : tracking.lastUpdate.hour}:${tracking.lastUpdate.minute.toString().padLeft(2, "0")} ${tracking.lastUpdate.hour >= 12 ? context.t('pm') : context.t('am')}" : "---"}',
                     style: TextStyle(
-                      color: (Theme.of(context).brightness == Brightness.dark ? AppColors.dark : AppColors.light).text70,
+                      color:
+                          (Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.dark
+                                  : AppColors.light)
+                              .text70,
                       fontSize: 8.5,
                     ),
                     maxLines: 1,
@@ -789,7 +893,11 @@ class _DataDrivenPanel extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.directions_bus_filled,
-                    color: (Theme.of(context).brightness == Brightness.dark ? AppColors.dark : AppColors.light).text,
+                    color:
+                        (Theme.of(context).brightness == Brightness.dark
+                                ? AppColors.dark
+                                : AppColors.light)
+                            .text,
                     size: 22,
                   ),
                   const SizedBox(width: 8),
@@ -801,7 +909,11 @@ class _DataDrivenPanel extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: (Theme.of(context).brightness == Brightness.dark ? AppColors.dark : AppColors.light).text,
+                        color:
+                            (Theme.of(context).brightness == Brightness.dark
+                                    ? AppColors.dark
+                                    : AppColors.light)
+                                .text,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -889,9 +1001,9 @@ class _DataDrivenPanel extends StatelessWidget {
             label: context.t('totalStudents'),
             value:
                 (group?.totalStudentsCount != null &&
-                        group!.totalStudentsCount! > 0)
-                    ? '${group?.totalStudentsCount}'
-                    : '${group?.students.length ?? 0}',
+                    group!.totalStudentsCount! > 0)
+                ? '${group?.totalStudentsCount}'
+                : '${group?.students.length ?? 0}',
             iconColor: Colors.blue,
           ),
           _MetricItem(
@@ -901,11 +1013,15 @@ class _DataDrivenPanel extends StatelessWidget {
                 ? (() {
                     final hour = group!.startTime!.hour;
                     final minute = group!.startTime!.minute.toString().padLeft(
-                          2,
-                          "0",
-                        );
-                    final period = hour >= 12 ? context.t('pm') : context.t('am');
-                    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                      2,
+                      "0",
+                    );
+                    final period = hour >= 12
+                        ? context.t('pm')
+                        : context.t('am');
+                    final displayHour = hour == 0
+                        ? 12
+                        : (hour > 12 ? hour - 12 : hour);
                     return "$displayHour:$minute $period";
                   })()
                 : '--:--',
@@ -920,9 +1036,10 @@ class _DataDrivenPanel extends StatelessWidget {
           _MetricItem(
             icon: Icons.auto_graph_rounded,
             label: context.t('etaLabel'),
-            value: tracking?.etaMinutes != null
-                ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
-                : '--',
+            value: remainingTime ??
+                (tracking?.etaMinutes != null
+                    ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
+                    : '--'),
             iconColor: AppColors.primary,
           ),
         ],
@@ -964,15 +1081,14 @@ class _DataDrivenPanel extends StatelessWidget {
             child: Center(
               child: Text(
                 context.t('noStudentsOnBus'),
-                style: TextStyle(
-                  color: colors.text70,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: colors.text70, fontSize: 13),
               ),
             ),
           )
         else
-          ...students.map((s) => _StudentCard(student: s, isCompact: isCompact)),
+          ...students.map(
+            (s) => _StudentCard(student: s, isCompact: isCompact),
+          ),
       ],
     );
   }
@@ -1029,8 +1145,11 @@ class _DataDrivenPanel extends StatelessWidget {
                   ? CachedNetworkImage(
                       imageUrl: staff.imageUrl!,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) =>
-                          const Icon(Icons.person, size: 16, color: Colors.grey),
+                      placeholder: (context, url) => const Icon(
+                        Icons.person,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                       errorWidget: (context, url, error) =>
                           Icon(fallbackIcon, size: 16, color: Colors.grey),
                     )
@@ -1169,7 +1288,7 @@ class _StudentCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colors = isDark ? AppColors.dark : AppColors.light;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1231,10 +1350,7 @@ class _StudentCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   student.grade,
-                  style: TextStyle(
-                    color: colors.text70,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: colors.text70, fontSize: 11),
                 ),
               ],
             ),
@@ -1243,16 +1359,23 @@ class _StudentCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: (hasBoarded ? Colors.green : Colors.orange).withAlpha(15),
+                  color: (hasBoarded ? Colors.green : Colors.orange).withAlpha(
+                    15,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      hasBoarded ? context.t('boarded') : context.t('notBoardedYet'),
+                      hasBoarded
+                          ? context.t('boarded')
+                          : context.t('notBoardedYet'),
                       style: TextStyle(
                         color: hasBoarded ? Colors.green : Colors.orange,
                         fontSize: 11,
@@ -1261,7 +1384,9 @@ class _StudentCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      hasBoarded ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+                      hasBoarded
+                          ? Icons.check_circle_rounded
+                          : Icons.error_outline_rounded,
                       color: hasBoarded ? Colors.green : Colors.orange,
                       size: 14,
                     ),
@@ -1270,7 +1395,9 @@ class _StudentCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                hasBoarded ? 'وقت الركوب 9:10 ص' : context.t('waitingForBoarding'),
+                hasBoarded
+                    ? 'وقت الركوب 9:10 ص'
+                    : context.t('waitingForBoarding'),
                 style: TextStyle(
                   color: colors.text70,
                   fontSize: 10,
@@ -1355,18 +1482,12 @@ class _CircleHeaderButton extends StatelessWidget {
         ],
       ),
       child: IconButton(
-        icon: Icon(
-          icon,
-          color: colors.text,
-          size: 22,
-        ),
+        icon: Icon(icon, color: colors.text, size: 22),
         onPressed: onPressed,
       ),
     );
   }
 }
-
-
 
 class _MapActionFab extends StatelessWidget {
   final IconData icon;
@@ -1500,4 +1621,3 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
     ),
   );
 }
-

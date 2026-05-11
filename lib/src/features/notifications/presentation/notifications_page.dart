@@ -26,29 +26,56 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabicApp = controller.locale.languageCode == 'ar';
     final filtered = controller.notifications.where((n) {
+      bool matchesType = true;
       switch (_filter) {
         case _Filter.all:
-          return true;
+          matchesType = true;
+          break;
         case _Filter.bus:
-          return [
+          matchesType = [
             NotificationType.approach,
             NotificationType.arrival,
             NotificationType.delay,
             NotificationType.routeChange,
           ].contains(n.type);
+          break;
         case _Filter.student:
-          return [
+          matchesType = [
             NotificationType.checkIn,
             NotificationType.checkOut,
             NotificationType.lateBoarding,
             NotificationType.absence,
           ].contains(n.type);
+          break;
         case _Filter.school:
-          return n.type == NotificationType.schoolAlert;
+          matchesType = n.type == NotificationType.schoolAlert;
+          break;
         case _Filter.supervisor:
-          return n.type == NotificationType.supervisorMessage;
+          matchesType = n.type == NotificationType.supervisorMessage;
+          break;
       }
+
+      if (!matchesType) return false;
+
+      // Bilingual filtering for manual messages
+      if (n.type == NotificationType.schoolAlert ||
+          n.type == NotificationType.supervisorMessage) {
+        final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(n.title + n.body);
+        final hasEnglish = RegExp(r'[a-zA-Z]').hasMatch(n.title + n.body) ||
+            (n.titleEn != null && n.titleEn!.isNotEmpty);
+
+        if (isArabicApp) {
+          // In Arabic app, show only if it has Arabic content
+          if (!hasArabic) return false;
+        } else {
+          // In English app, show if it has English content OR no Arabic content
+          if (hasArabic && !hasEnglish) return false;
+        }
+      }
+
+      return true;
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
 
     // Convert filter chips to widget

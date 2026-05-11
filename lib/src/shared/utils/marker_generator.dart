@@ -15,12 +15,25 @@ class MarkerGenerator {
   }) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    
+
     // Use a higher resolution for the drawing
-    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
-    final double canvasSize = size * pixelRatio;
-    final double radius = (canvasSize * 0.8) / 2;
+    final double pixelRatio = 1.0;
+    final double canvasSize = size * 1.5; // Extra space for shadow and tail
+    final double radius = size / 2;
     final Offset center = Offset(canvasSize / 2, (canvasSize * 0.4));
+
+    // 0. Draw Shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withAlpha(50)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+
+    final shadowPath = Path();
+    shadowPath.moveTo(canvasSize / 2, canvasSize * 0.92);
+    shadowPath.lineTo(canvasSize / 2 - (radius * 0.5), canvasSize * 0.62);
+    shadowPath.lineTo(canvasSize / 2 + (radius * 0.5), canvasSize * 0.62);
+    shadowPath.close();
+    canvas.drawPath(shadowPath, shadowPaint);
+    canvas.drawCircle(center.translate(0, 1), radius, shadowPaint);
 
     // 1. Draw Tail (Triangle)
     final paint = Paint()..color = color;
@@ -33,12 +46,12 @@ class MarkerGenerator {
 
     // 2. Draw Main Circle
     canvas.drawCircle(center, radius, paint);
-    
+
     // 3. Draw White Border
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = radius * 0.1;
+      ..strokeWidth = radius * 0.12;
     canvas.drawCircle(center, radius, borderPaint);
 
     // 4. Draw Content (Image or Initial)
@@ -46,18 +59,27 @@ class MarkerGenerator {
     if (imageUrl != null && imageUrl.isNotEmpty) {
       try {
         final completer = Completer<ui.Image>();
-        final Map<String, String>? headers = authToken != null && authToken.isNotEmpty
+        final Map<String, String>? headers =
+            authToken != null && authToken.isNotEmpty
             ? {'Authorization': 'Bearer $authToken'}
             : null;
-            
-        final stream = NetworkImage(imageUrl, headers: headers).resolve(ImageConfiguration.empty);
-        final listener = ImageStreamListener((ImageInfo info, bool syncCall) {
-          if (!completer.isCompleted) completer.complete(info.image);
-        }, onError: (e, stack) {
-          if (!completer.isCompleted) completer.completeError(e);
-        });
+
+        final stream = NetworkImage(
+          imageUrl,
+          headers: headers,
+        ).resolve(ImageConfiguration.empty);
+        final listener = ImageStreamListener(
+          (ImageInfo info, bool syncCall) {
+            if (!completer.isCompleted) completer.complete(info.image);
+          },
+          onError: (e, stack) {
+            if (!completer.isCompleted) completer.completeError(e);
+          },
+        );
         stream.addListener(listener);
-        profileImage = await completer.future.timeout(AppConfig.markerImageTimeout);
+        profileImage = await completer.future.timeout(
+          AppConfig.markerImageTimeout,
+        );
         stream.removeListener(listener);
       } catch (e) {
         debugPrint('Failed to load marker image for $name: $e');
@@ -66,13 +88,24 @@ class MarkerGenerator {
 
     if (profileImage != null) {
       // Draw Circular Image
-      final Path clipPath = Path()..addOval(Rect.fromCircle(center: center, radius: radius * 0.9));
+      final Path clipPath = Path()
+        ..addOval(Rect.fromCircle(center: center, radius: radius * 0.9));
       canvas.save();
       canvas.clipPath(clipPath);
-      
-      final src = Rect.fromLTWH(0, 0, profileImage.width.toDouble(), profileImage.height.toDouble());
+
+      final src = Rect.fromLTWH(
+        0,
+        0,
+        profileImage.width.toDouble(),
+        profileImage.height.toDouble(),
+      );
       final dst = Rect.fromCircle(center: center, radius: radius * 0.9);
-      canvas.drawImageRect(profileImage, src, dst, Paint()..filterQuality = ui.FilterQuality.high);
+      canvas.drawImageRect(
+        profileImage,
+        src,
+        dst,
+        Paint()..filterQuality = ui.FilterQuality.high,
+      );
       canvas.restore();
     } else {
       // Draw Initial
@@ -91,7 +124,10 @@ class MarkerGenerator {
       textPainter.layout();
       textPainter.paint(
         canvas,
-        Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+        Offset(
+          center.dx - textPainter.width / 2,
+          center.dy - textPainter.height / 2,
+        ),
       );
     }
 
@@ -99,7 +135,7 @@ class MarkerGenerator {
     final picture = pictureRecorder.endRecording();
     final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    
+
     if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
@@ -111,7 +147,8 @@ class MarkerGenerator {
   }) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double pixelRatio =
+        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
     final double canvasSize = size * pixelRatio;
     final center = Offset(canvasSize / 2, canvasSize / 2);
     final radius = canvasSize / 2;
@@ -134,13 +171,16 @@ class MarkerGenerator {
     textPainter.layout();
     textPainter.paint(
       canvas,
-      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy - textPainter.height / 2,
+      ),
     );
 
     final picture = pictureRecorder.endRecording();
     final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    
+
     if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
@@ -152,27 +192,29 @@ class MarkerGenerator {
   }) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    final double pixelRatio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
-    final double canvasSize = size * pixelRatio;
-    final center = Offset(canvasSize / 2, canvasSize / 2);
-    final radius = canvasSize / 2;
+    final double pixelRatio = 1.0;
+    final double canvasSize = size * 1.5;
+    final double radius = size / 2;
+    final center = Offset(canvasSize / 2, canvasSize * 0.4);
 
-    // 1. Draw Outer Glow/Shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withAlpha(40)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(center, radius * 0.9, shadowPaint);
+    // 1. Draw Tail (Nail)
+    final paint = Paint()..color = color;
+    final path = Path();
+    path.moveTo(canvasSize / 2, canvasSize * 0.9); // Tip
+    path.lineTo(canvasSize / 2 - (radius * 0.4), canvasSize * 0.6);
+    path.lineTo(canvasSize / 2 + (radius * 0.4), canvasSize * 0.6);
+    path.close();
+    canvas.drawPath(path, paint);
 
     // 2. Draw Main Circle
-    final paint = Paint()..color = color;
-    canvas.drawCircle(center, radius * 0.85, paint);
+    canvas.drawCircle(center, radius, paint);
 
     // 3. Draw White Border
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = radius * 0.15;
-    canvas.drawCircle(center, radius * 0.85, borderPaint);
+    canvas.drawCircle(center, radius, borderPaint);
 
     // 4. Draw Bus Icon
     final textPainter = TextPainter(
@@ -190,13 +232,16 @@ class MarkerGenerator {
     textPainter.layout();
     textPainter.paint(
       canvas,
-      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy - textPainter.height / 2,
+      ),
     );
 
     final picture = pictureRecorder.endRecording();
     final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    
+
     if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }

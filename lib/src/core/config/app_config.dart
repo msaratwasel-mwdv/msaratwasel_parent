@@ -17,7 +17,8 @@ class AppConfig {
   static String get apiBaseUrl => isLocal ? _localUrl : _productionUrl;
 
   // ─── Reverb / WebSocket ──────────────────────────────────────────────────
-  static String get reverbHost => isLocal ? Uri.parse(_localUrl).host : 'masaratwasal.com';
+  static String get reverbHost =>
+      isLocal ? Uri.parse(_localUrl).host : 'masaratwasal.com';
   static int get reverbPort => isLocal ? 8080 : 443;
   static bool get reverbUseSsl => !isLocal;
   static const String reverbKey = 'masarat-wasel-key';
