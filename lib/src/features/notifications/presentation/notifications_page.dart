@@ -21,6 +21,103 @@ enum _Filter { all, bus, student, school, supervisor }
 
 class _NotificationsPageState extends State<NotificationsPage> {
   _Filter _filter = _Filter.all;
+  String? _lastHandledPendingId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // React to controller changes (e.g. new pendingNotificationId set while already on this page)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
+    });
+  }
+
+  void _checkPendingNotification() {
+    if (!mounted) return;
+    final controller = AppScope.of(context);
+    final pendingId = controller.pendingNotificationId;
+    if (pendingId != null && pendingId != _lastHandledPendingId) {
+      _lastHandledPendingId = pendingId;
+      final notification = controller.notifications.firstWhere(
+        (n) => n.id == pendingId,
+        orElse: () => controller.notifications.firstWhere(
+          (n) => n.id.hashCode.toString() == pendingId, // Fallback for ID mismatch
+          orElse: () => AppNotification(
+            id: 'temp',
+            title: '',
+            body: '',
+            type: NotificationType.schoolAlert,
+            time: DateTime.now(),
+          ),
+        ),
+      );
+
+      if (notification.id != 'temp') {
+        _showNotificationDetails(notification);
+      }
+      controller.clearPendingNotificationId();
+    }
+  }
+
+  void _showNotificationDetails(AppNotification notification) {
+    final controller = AppScope.of(context);
+    final isEn = controller.locale.languageCode == 'en';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Mark as read immediately
+    if (!notification.read) {
+      controller.markNotificationsRead([notification.id]);
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Column(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: AppColors.primary.withAlpha(30),
+              child: Icon(notification.type.icon, color: AppColors.primary, size: 30),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              notification.getDisplayTitle(isEn),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            notification.getDisplayBody(isEn),
+            textAlign: TextAlign.center,
+            style: const TextStyle(height: 1.5),
+          ),
+        ),
+        actions: [
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                context.t('close'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,18 +156,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       if (!matchesType) return false;
 
-      // Bilingual filtering for manual messages
-      if (n.type == NotificationType.schoolAlert ||
+      // 2. Language-based suppression for bilingual notifications
+      if (n.language != null && n.language!.isNotEmpty) {
+        // Strict match: if notification has a specific language, it must match app locale
+        if (!controller.locale.languageCode.startsWith(n.language!)) {
+          return false;
+        }
+      } else if (n.type == NotificationType.schoolAlert ||
+          n.type == NotificationType.adminAnnouncement ||
           n.type == NotificationType.supervisorMessage) {
+        // Fallback to character-based detection only if language field is missing
         final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(n.title + n.body);
         final hasEnglish = RegExp(r'[a-zA-Z]').hasMatch(n.title + n.body) ||
             (n.titleEn != null && n.titleEn!.isNotEmpty);
 
         if (isArabicApp) {
-          // In Arabic app, show only if it has Arabic content
-          if (!hasArabic) return false;
+          if (!hasArabic && hasEnglish) return false;
         } else {
-          // In English app, show if it has English content OR no Arabic content
           if (hasArabic && !hasEnglish) return false;
         }
       }
@@ -197,6 +299,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         final item = filtered[index];
                         final isEn = controller.locale.languageCode == 'en';
                         final displayTitle = (item.type == NotificationType.schoolAlert ||
+                                item.type == NotificationType.adminAnnouncement ||
                                 item.type == NotificationType.supervisorMessage ||
                                 item.type == NotificationType.chat)
                             ? item.getDisplayTitle(isEn)
@@ -247,8 +350,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     ),
                                 ],
                               ),
-                              onTap: () =>
-                                  controller.markNotificationsRead([item.id]),
+                              onTap: () => _showNotificationDetails(item),
                             ),
                           ),
                         );

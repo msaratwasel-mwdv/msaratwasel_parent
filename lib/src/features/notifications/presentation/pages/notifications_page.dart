@@ -6,8 +6,43 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 
-class NotificationsPage extends StatelessWidget {
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
+
+  @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends State<NotificationsPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Handle pending notification after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
+    });
+  }
+
+  void _checkPendingNotification() {
+    final controller = AppScope.of(context, listen: false);
+    final pendingId = controller.pendingNotificationId;
+    if (pendingId != null) {
+      // Find the notification in the list
+      final notification = controller.notifications.cast<AppNotification?>().firstWhere(
+            (n) => n?.id == pendingId,
+            orElse: () => null,
+          );
+
+      if (notification != null) {
+        // Mark it as read
+        controller.markNotificationsRead([notification.id]);
+        // Clear the pending ID so it doesn't trigger again
+        controller.clearPendingNotificationId();
+        
+        developer.log('🔔 Handled pending notification: $pendingId', name: 'NOTIF_PAGE');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +54,6 @@ class NotificationsPage extends StatelessWidget {
         title: Text(context.t('notifications')),
         centerTitle: true,
         actions: [
-          // Clear all button for better UX
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
             onPressed: () async {
@@ -51,7 +85,8 @@ class NotificationsPage extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           final notifications = controller.notifications;
-          
+          final pendingId = controller.pendingNotificationId;
+
           return RefreshIndicator(
             onRefresh: () async {
               await controller.loadNotificationsFromApi();
@@ -95,79 +130,104 @@ class NotificationsPage extends StatelessWidget {
                         const SizedBox(height: AppSpacing.md),
                     itemBuilder: (context, index) {
                       final notification = notifications[index];
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
+                      final isPending = notification.id == pendingId;
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeInOut,
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: AppColors.border.withValues(alpha: 0.1),
-                          ),
+                          boxShadow: isPending
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.3),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : null,
                         ),
-                        child: ListTile(
-                          onTap: () {
-                            controller.markNotificationsRead([notification.id]);
+                        child: Card(
+                          elevation: 0,
+                          margin: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isPending 
+                                  ? AppColors.primary.withValues(alpha: 0.5)
+                                  : AppColors.border.withValues(alpha: 0.1),
+                              width: isPending ? 2 : 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            onTap: () {
+                              controller.markNotificationsRead([notification.id]);
 
-                            if (notification.type ==
-                                    NotificationType.supervisorMessage ||
-                                notification.type == NotificationType.chat) {
-                              final rawId =
-                                  notification.data['conversation_id'] ??
-                                  notification.data['id'];
+                              if (notification.type ==
+                                      NotificationType.supervisorMessage ||
+                                  notification.type == NotificationType.chat) {
+                                final rawId =
+                                    notification.data['conversation_id'] ??
+                                    notification.data['id'];
 
-                              final convId = int.tryParse(rawId?.toString() ?? '');
+                                final convId = int.tryParse(rawId?.toString() ?? '');
 
-                              if (convId != null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatPage(
-                                      conversationId: convId,
-                                      contactName:
-                                          notification.data['sender_name']
-                                              ?.toString() ??
-                                          (notification.type ==
-                                                  NotificationType.supervisorMessage
-                                              ? context.t('supervisor')
-                                              : context.t('chat')),
-                                      contactRole:
-                                          notification.data['sender_role']
-                                              ?.toString() ??
-                                          (notification.type ==
-                                                  NotificationType.supervisorMessage
-                                              ? 'supervisor'
-                                              : ''),
+                                if (convId != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatPage(
+                                        conversationId: convId,
+                                        contactName:
+                                            notification.data['sender_name']
+                                                ?.toString() ??
+                                            (notification.type ==
+                                                    NotificationType.supervisorMessage
+                                                ? context.t('supervisor')
+                                                : context.t('chat')),
+                                        contactRole:
+                                            notification.data['sender_role']
+                                                ?.toString() ??
+                                            (notification.type ==
+                                                    NotificationType.supervisorMessage
+                                                ? 'supervisor'
+                                                : ''),
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
                               }
-                            }
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withValues(
-                              alpha: 0.1,
-                            ),
-                            child: const Icon(
-                              Icons.notifications,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          title: Text(
-                            notification.title,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(notification.body),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${notification.time.hour == 0 ? 12 : (notification.time.hour > 12 ? notification.time.hour - 12 : notification.time.hour)}:${notification.time.minute.toString().padLeft(2, '0')} ${notification.time.hour >= 12 ? context.t('pm') : context.t('am')}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
+                            },
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.1,
                               ),
-                            ],
+                              child: Icon(
+                                Icons.notifications,
+                                color: isPending ? AppColors.primary : AppColors.primary.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            title: Text(
+                              notification.title,
+                              style: TextStyle(
+                                fontWeight: isPending ? FontWeight.w900 : FontWeight.bold,
+                                color: isPending ? AppColors.primary : null,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(notification.body),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${notification.time.hour == 0 ? 12 : (notification.time.hour > 12 ? notification.time.hour - 12 : notification.time.hour)}:${notification.time.minute.toString().padLeft(2, '0')} ${notification.time.hour >= 12 ? context.t('pm') : context.t('am')}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

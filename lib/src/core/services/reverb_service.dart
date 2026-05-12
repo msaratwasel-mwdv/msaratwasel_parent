@@ -22,6 +22,7 @@ class ReverbService {
   final void Function(Map<String, dynamic> data) _onStudentStatusUpdated;
   final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
   final void Function(Map<String, dynamic> data)? _onNotificationReceived;
+  final void Function(Map<String, dynamic> data)? _onMessageReceived;
 
   // إعدادات Reverb المستمدة من AppConfig
   static const String _reverbKey = AppConfig.reverbKey;
@@ -40,11 +41,13 @@ class ReverbService {
     required void Function(Map<String, dynamic> data) onStudentStatusUpdated,
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
     void Function(Map<String, dynamic> data)? onNotificationReceived,
+    void Function(Map<String, dynamic> data)? onMessageReceived,
   }) : _userId = userId,
        _dio = dio,
        _onStudentStatusUpdated = onStudentStatusUpdated,
        _onBusLocationUpdated = onBusLocationUpdated,
-       _onNotificationReceived = onNotificationReceived;
+       _onNotificationReceived = onNotificationReceived,
+       _onMessageReceived = onMessageReceived;
 
   /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
@@ -138,6 +141,16 @@ class ReverbService {
           }
           break;
 
+        case 'message.sent':
+        case 'MessageSent':
+        case 'App\\Events\\MessageSent':
+          developer.log('💬 Event: message.sent', name: 'REVERB');
+          final data = _parseData(message['data']);
+          if (_onMessageReceived != null) {
+            _onMessageReceived!(data);
+          }
+          break;
+
         case 'pusher_internal:subscription_succeeded':
           developer.log(
             '✅ Subscription succeeded for: ${message['channel']}',
@@ -213,6 +226,25 @@ class ReverbService {
     } catch (e) {
       developer.log(
         '❌ Subscription failed for $channelName: $e',
+        name: 'REVERB',
+      );
+    }
+  }
+
+  /// إلغاء الاشتراك من قناة معينة
+  void unsubscribe(String channelName) {
+    if (!_subscribedChannels.contains(channelName)) return;
+
+    try {
+      _send({
+        'event': 'pusher:unsubscribe',
+        'data': {'channel': channelName},
+      });
+      _subscribedChannels.remove(channelName);
+      developer.log('🚫 Unsubscribed from: $channelName', name: 'REVERB');
+    } catch (e) {
+      developer.log(
+        '❌ Unsubscription failed for $channelName: $e',
         name: 'REVERB',
       );
     }

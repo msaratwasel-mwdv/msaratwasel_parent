@@ -38,14 +38,23 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   final String body = notification?.body ?? data['body'] ?? data['message'] ?? '';
 
   if (title.isNotEmpty || body.isNotEmpty) {
-    const String channelId = 'msarat_wasel_high_importance_v3';
-    const String channelName = 'إشعارات مسارات واصل الهامة';
+    String channelId = 'msarat_wasel_high_importance_v3';
+    String channelName = 'إشعارات مسارات واصل الهامة';
+    
+    final type = data['type']?.toString();
+    if (type == 'chat_message') {
+      channelId = 'chat_messages';
+      channelName = 'رسائل المحادثات';
+    } else if (type == 'admin_announcement') {
+      channelId = 'school_announcements';
+      channelName = 'إعلانات المدرسة';
+    }
 
     await localNotifications.show(
       message.messageId.hashCode,
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
           channelName,
@@ -56,7 +65,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
           enableVibration: true,
           icon: '@drawable/ic_notification',
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
@@ -167,11 +176,31 @@ class NotificationService {
       enableVibration: true,
       showBadge: true,
     );
-    await _localNotif
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(androidChannel);
+    const chatChannel = AndroidNotificationChannel(
+      'chat_messages',
+      'رسائل المحادثات',
+      description: 'إشعارات الرسائل الجديدة في المحادثات',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+    const schoolChannel = AndroidNotificationChannel(
+      'school_announcements',
+      'إعلانات المدرسة',
+      description: 'إشعارات وتنبيهات هامة من إدارة المدرسة',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+    
+    final plugin = _localNotif.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (plugin != null) {
+      await plugin.createNotificationChannel(androidChannel);
+      await plugin.createNotificationChannel(chatChannel);
+      await plugin.createNotificationChannel(schoolChannel);
+    }
 
     // ── 4. Background Message Handler ──────────────────────────────────────
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
@@ -285,10 +314,12 @@ class NotificationService {
     required String body,
     int? id,
     String? payload,
+    String? channelId,
+    String? channelName,
   }) async {
     final androidDetails = AndroidNotificationDetails(
-      _channelId,
-      _channelName,
+      channelId ?? _channelId,
+      channelName ?? _channelName,
       channelDescription: _channelDesc,
       icon: '@drawable/ic_notification',
       largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'),
@@ -324,14 +355,28 @@ class NotificationService {
   static void _handleNotificationTap(NotificationResponse response) {
     if (response.payload != null) {
       try {
-        final data = jsonDecode(response.payload!);
-        final notification = AppNotification.fromJson(data);
-        developer.log('👆 Local Notification Tapped: ${notification.id}', name: 'FCM');
+        final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+        
+        AppNotification notification;
+        
+        // Detect payload format: toJson() has 'time' key, raw FCM data does not
+        if (data.containsKey('time') && data.containsKey('read')) {
+          // Structured payload from foreground showLocalNotification (via toJson)
+          notification = AppNotification.fromJson(data);
+        } else {
+          // Raw FCM data payload from background handler
+          notification = AppNotification.fromMap(data);
+        }
+        
+        developer.log(
+          '👆 Local Notification Tapped: ${notification.id} (Type: ${notification.type})',
+          name: 'FCM',
+        );
         
         // Notify the app about the tap event
         _onReceived?.call(notification, isTap: true);
-      } catch (e) {
-        developer.log('❌ Error parsing notification tap payload: $e', name: 'FCM');
+      } catch (e, st) {
+        developer.log('❌ Error parsing notification tap payload: $e', name: 'FCM', stackTrace: st);
       }
     }
   }

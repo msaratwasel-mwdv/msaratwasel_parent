@@ -2,7 +2,7 @@ class AppConfig {
   const AppConfig._();
 
   // هذا هو المتغير الوحيد الذي ستغيره للربط بين المحلي والاستضافة
-  static const bool isLocal = false;
+  static const bool isLocal = true;
 
   // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
   static const String _localUrl = 'http://192.168.8.188:8001/api/';
@@ -26,4 +26,20 @@ class AppConfig {
   // ─── Timeouts ────────────────────────────────────────────────────────────
   static const Duration defaultTimeout = Duration(seconds: 30);
   static const Duration markerImageTimeout = Duration(seconds: 10);
+
+  // ─── Image Normalization ──────────────────────────────────────────────────
+  static String? normalizeImageUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http')) return url;
+
+    // Remove leading slash if present
+    final path = url.startsWith('/') ? url.substring(1) : url;
+
+    // Ensure it contains storage/ prefix if it's a relative path to a file
+    final fullPath = path.contains('storage/') ? path : 'storage/$path';
+
+    // Remove /api/ from the base URL to get the root domain
+    final rootUrl = apiBaseUrl.replaceAll('/api/', '');
+    return '$rootUrl/$fullPath';
+  }
 }

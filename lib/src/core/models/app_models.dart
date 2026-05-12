@@ -34,6 +34,7 @@ enum NotificationType {
   schoolAlert,
   supervisorMessage,
   chat,
+  adminAnnouncement,
   locationRequest,
   locationApproved,
   locationRejected,
@@ -68,6 +69,8 @@ extension NotificationTypeX on NotificationType {
         return arabic ? 'رسالة من المشرفة' : 'Supervisor message';
       case NotificationType.chat:
         return arabic ? 'محادثة جديدة' : 'New chat message';
+      case NotificationType.adminAnnouncement:
+        return arabic ? 'إعلان من المدرسة' : 'School announcement';
       case NotificationType.locationRequest:
         return arabic ? 'طلب تغيير موقع' : 'Location change request';
       case NotificationType.locationApproved:
@@ -103,7 +106,7 @@ class BusStaffInfo {
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String?,
-      imageUrl: json['image_url'] as String?,
+      imageUrl: AppConfig.normalizeImageUrl(json['image_url'] as String?),
     );
   }
 }
@@ -297,7 +300,7 @@ class Student {
         json['suggested_direction'] as String?,
       ),
       suggestedDirection: json['suggested_direction'] as String?,
-      avatarUrl: _fixImageUrl(json['image_url'] as String?),
+      avatarUrl: AppConfig.normalizeImageUrl(json['image_url'] as String?),
       tripCount: json['trip_count'] as int? ?? 0,
       attendancePercentage: json['attendance_percentage'] as int? ?? 0,
       homeLocation: (json['home_lat'] != null && json['home_lng'] != null)
@@ -325,18 +328,7 @@ class Student {
     );
   }
 
-  static String? _fixImageUrl(String? url) {
-    if (url == null || url.isEmpty) return null;
-    if (url.startsWith('http')) return url;
-    // Remove leading slash if present
-    final path = url.startsWith('/') ? url.substring(1) : url;
-    // Assume storage path if it doesn't contain storage/
-    final fullPath = path.contains('storage/') ? path : 'storage/$path';
 
-    // Use the base URL from AppConfig instead of a hardcoded one
-    final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api/', '');
-    return '$baseUrl/$fullPath';
-  }
 
   /// Derives the 5-state trip cycle status from API status + direction
   static StudentStatus deriveStudentStatus(
@@ -388,7 +380,7 @@ class Student {
     int? etaMinutes,
   }) {
     return Student(
-      id: id,
+      id: this.id,
       name: name ?? this.name,
       nameEn: nameEn ?? this.nameEn,
       grade: grade ?? this.grade,
@@ -429,6 +421,7 @@ class AppNotification {
     required this.time,
     this.correlationId,
     this.read = false,
+    this.language,
     this.data = const {},
   });
 
@@ -443,6 +436,7 @@ class AppNotification {
   final NotificationType type;
   final DateTime time;
   bool read;
+  final String? language;
   final Map<String, dynamic> data;
 
   String _pickLanguage(String text, bool isEn) {
@@ -513,6 +507,7 @@ class AppNotification {
       type: parseType(data['type'] as String?),
       time: DateTime.tryParse(data['created_at']?.toString() ?? '') ??
           DateTime.now(),
+      language: data['language']?.toString().toLowerCase(),
       data: data,
     );
   }
@@ -547,6 +542,7 @@ class AppNotification {
       senderNameEn: data['sender_name_en'] as String?,
       type: type,
       time: DateTime.now(),
+      language: data['language']?.toString().toLowerCase(),
       data: data,
     );
   }
@@ -564,6 +560,7 @@ class AppNotification {
       'type': type.toString().split('.').last,
       'time': time.toIso8601String(),
       'read': read,
+      'language': language,
       'data': data,
     };
   }
@@ -581,53 +578,77 @@ class AppNotification {
       type: parseType(json['type'] as String?),
       time: DateTime.parse(json['time'] as String),
       read: json['read'] as bool? ?? false,
+      language: json['language'] as String?,
       data: json['data'] as Map<String, dynamic>? ?? {},
     );
   }
 
   /// Maps the raw Laravel `type` string to [NotificationType].
+  /// Supports both snake_case (from backend) and camelCase (from toJson round-trip).
   static NotificationType parseType(String? raw) {
     switch (raw) {
       case 'bus_boarding_morning':
       case 'bus_boarding_afternoon':
       case 'bus_boarding':
       case 'student_boarded':
+      case 'checkIn':
         return NotificationType.checkIn;
       case 'student_alighted':
       case 'bus_alighting':
       case 'alighting':
+      case 'checkOut':
         return NotificationType.checkOut;
       case 'bus_proximity':
       case 'bus_approaching':
       case 'near_me':
+      case 'approach':
         return NotificationType.approach;
       case 'bus_arrived':
+      case 'arrival':
         return NotificationType.arrival;
       case 'bus_delay':
+      case 'delay':
         return NotificationType.delay;
       case 'bus_route_change':
+      case 'routeChange':
         return NotificationType.routeChange;
       case 'student_absence':
+      case 'absence':
         return NotificationType.absence;
       case 'absence_approved':
+      case 'absenceApproved':
         return NotificationType.absenceApproved;
       case 'absence_rejected':
+      case 'absenceRejected':
         return NotificationType.absenceRejected;
       case 'late_boarding':
+      case 'lateBoarding':
         return NotificationType.lateBoarding;
       case 'school_alert':
       case 'school_announcement':
+      case 'school_information':
+      case 'School Information':
+      case 'schoolAlert':
         return NotificationType.schoolAlert;
+      case 'admin_announcement':
+      case 'Admin Announcement':
+      case 'adminAnnouncement':
+        return NotificationType.adminAnnouncement;
       case 'supervisor_message':
+      case 'supervisorMessage':
         return NotificationType.supervisorMessage;
       case 'new_message':
       case 'chat':
+      case 'chat_message':
         return NotificationType.chat;
       case 'location_request':
+      case 'locationRequest':
         return NotificationType.locationRequest;
       case 'location_approved':
+      case 'locationApproved':
         return NotificationType.locationApproved;
       case 'location_rejected':
+      case 'locationRejected':
         return NotificationType.locationRejected;
       default:
         return NotificationType.schoolAlert;

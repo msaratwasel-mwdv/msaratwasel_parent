@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
@@ -8,7 +8,7 @@ import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
-
+import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
 /// Displays contacts (drivers & supervisors) and existing conversations.
 /// Tapping a contact opens/creates a conversation → navigates to [ChatPage].
 class ContactsPage extends StatefulWidget {
@@ -64,7 +64,8 @@ class _ContactsPageState extends State<ContactsPage> {
 
         // Handle auto-opening if initialConversationId is provided
         if (widget.initialConversationId != null) {
-          final targetId = widget.initialConversationId;
+          final targetIdStr = widget.initialConversationId;
+          final targetId = int.tryParse(targetIdStr ?? '');
           final conv = _conversations.cast<ChatConversation?>().firstWhere(
             (c) => c?.id == targetId,
             orElse: () => null,
@@ -72,7 +73,7 @@ class _ContactsPageState extends State<ContactsPage> {
           if (conv != null) {
             _openExistingConversation(conv);
             // Clear from controller to prevent re-opening on next build
-            AppScope.of(context).clearPendingConversation();
+            AppScope.of(context).clearPendingConversationId();
           }
         }
       }
@@ -109,6 +110,7 @@ class _ContactsPageState extends State<ContactsPage> {
             conversationId: conversation.id,
             contactName: contact.name,
             contactRole: contact.role,
+            avatarUrl: contact.avatarUrl,
           ),
         ),
       ).then((_) => _loadData()); // Refresh on return
@@ -122,7 +124,8 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   Future<void> _openExistingConversation(ChatConversation conv) async {
-    final other = conv.participants.isNotEmpty ? conv.participants.first : null;
+    final userId = AppScope.of(context).userId;
+    final other = conv.otherParticipant(userId ?? 0);
 
     // Optimistic UI update BEFORE navigation
     setState(() {
@@ -137,6 +140,7 @@ class _ContactsPageState extends State<ContactsPage> {
             conversationId: conv.id,
             contactName: other?.name ?? '',
             contactRole: other?.role ?? '',
+            avatarUrl: other?.avatarUrl,
           );
         },
       ),
@@ -335,10 +339,11 @@ class _ContactTile extends StatelessWidget {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: avatarColor.withValues(alpha: 0.15),
-          child: Icon(avatarIcon, color: avatarColor, size: 22),
+        leading: UserAvatar(
+          name: contact.name,
+          avatarUrl: contact.avatarUrl,
+          fallbackIcon: avatarIcon,
+          token: AppScope.of(context).token,
         ),
         title: Text(
           contact.name,
@@ -393,9 +398,8 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final other = conversation.participants.isNotEmpty
-        ? conversation.participants.first
-        : null;
+    final userId = AppScope.of(context).userId;
+    final other = conversation.otherParticipant(userId ?? 0);
     final name = other?.name ?? context.t('chat');
     final isDriver = other?.role == 'driver';
     final avatarIcon = isDriver
@@ -425,10 +429,11 @@ class _ConversationTile extends StatelessWidget {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: avatarColor.withValues(alpha: 0.15),
-          child: Icon(avatarIcon, color: avatarColor, size: 22),
+        leading: UserAvatar(
+          name: name,
+          avatarUrl: other?.avatarUrl,
+          fallbackIcon: avatarIcon,
+          token: AppScope.of(context).token,
         ),
         title: Text(
           name,

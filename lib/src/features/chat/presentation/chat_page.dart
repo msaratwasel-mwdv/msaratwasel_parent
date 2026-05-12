@@ -11,7 +11,9 @@ import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
-
+import 'package:msaratwasel_user/src/core/utils/active_conversation_tracker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
 /// Real-time chat page connected to the Laravel Chat API.
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -19,11 +21,13 @@ class ChatPage extends StatefulWidget {
     required this.conversationId,
     required this.contactName,
     required this.contactRole,
+    this.avatarUrl,
   });
 
   final int conversationId;
   final String contactName;
   final String contactRole;
+  final String? avatarUrl;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -39,6 +43,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _isSending = false;
   String? _error;
   Timer? _pollTimer;
+  StreamSubscription? _messageSubscription;
   bool _isInit = false;
   bool _isPolling = false;
 
@@ -46,23 +51,58 @@ class _ChatPageState extends State<ChatPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInit) {
-      _repo = ChatRepository(dio: AppScope.of(context).dio);
+      ActiveConversationTracker.setActiveConversation(widget.conversationId.toString());
+      final app = AppScope.of(context);
+      _repo = ChatRepository(dio: app.dio);
       _loadMessages();
+      
+      // Real-time: Subscribe to the conversation channel
+      app.subscribeToChat(widget.conversationId.toString());
+      
+      // Real-time: Listen for incoming messages from AppController
+      _messageSubscription = app.messageStream.listen((data) {
+        _handleWebSocketMessage(data);
+      });
+
       // Mark as read on open
       _repo.markAsRead(widget.conversationId);
-      // Schedule polling for new messages
+      // Schedule polling for new messages (as fallback)
       _schedulePoll();
       _isInit = true;
     }
   }
 
+  void _handleWebSocketMessage(Map<String, dynamic> data) {
+    final messageData = data['message'];
+    if (messageData == null) return;
+
+    final conversationId = messageData['conversation_id'];
+    if (conversationId != widget.conversationId) return;
+
+    final newMessage = ChatMessage.fromJson(messageData);
+    
+    // Avoid duplicates
+    if (!_messages.any((m) => m.id == newMessage.id)) {
+      developer.log('🚀 ChatPage: Received real-time message', name: 'CHAT');
+      setState(() {
+        _messages.insert(0, newMessage);
+      });
+      // Mark as read
+      _repo.markAsRead(widget.conversationId);
+    }
+  }
+
   void _schedulePoll() {
     _pollTimer?.cancel();
-    _pollTimer = Timer(const Duration(seconds: 3), _pollNewMessages);
+    _pollTimer = Timer(const Duration(seconds: 10), _pollNewMessages); // Increased interval since we have WS
   }
 
   @override
   void dispose() {
+    ActiveConversationTracker.clearActiveConversation();
+    final app = AppScope.of(context);
+    app.unsubscribeFromChat(widget.conversationId.toString());
+    _messageSubscription?.cancel();
     _pollTimer?.cancel();
     _textController.dispose();
     _scrollController.dispose();
@@ -154,26 +194,43 @@ class _ChatPageState extends State<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          children: [
-            Text(
-              widget.contactName,
-              style: TextStyle(
-                color: isDark ? Colors.white : AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
+        title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                UserAvatar(
+                  name: widget.contactName,
+                  avatarUrl: widget.avatarUrl,
+                  fallbackIcon: widget.contactRole == 'driver'
+                      ? Icons.directions_bus_rounded
+                      : Icons.support_agent_rounded,
+                  token: app.token,
+                  radius: 14,
+                  fontSize: 10,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.contactName,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      roleLabel,
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            Text(
-              roleLabel,
-              style: TextStyle(
-                color: isDark ? Colors.white60 : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
         centerTitle: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
@@ -435,8 +492,10 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMine = message.isMine;
+    final currentUserId = AppScope.of(context).userId;
+    final isMine = message.isMine || (currentUserId != null && message.sender.id == currentUserId);
     final alignment = isMine ? Alignment.centerRight : Alignment.centerLeft;
+
     final bubbleColor = isMine
         ? const Color(0xFF1E508E)
         : (isDark
@@ -463,14 +522,14 @@ class _MessageBubble extends StatelessWidget {
             if (!isMine)
               Padding(
                 padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
-                child: CircleAvatar(
+                child: UserAvatar(
+                  name: message.sender.name,
+                  avatarUrl: message.sender.avatarUrl,
+                  fallbackIcon: message.sender.role == 'driver'
+                      ? Icons.directions_bus_rounded
+                      : Icons.support_agent_rounded,
                   radius: 14,
-                  backgroundColor: AppColors.primary.withAlpha(71),
-                  child: const Icon(
-                    Icons.support_agent_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
+                  fontSize: 10,
                 ),
               ),
             Flexible(

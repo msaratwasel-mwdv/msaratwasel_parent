@@ -16,6 +16,7 @@ import '../../../../shared/theme/app_colors.dart';
 import '../../domain/entities/bus_tracking.dart';
 import '../../domain/entities/bus_tracking_group.dart';
 import '../../../../shared/utils/marker_generator.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class BusTrackingPage extends StatefulWidget {
   const BusTrackingPage({super.key});
@@ -1133,27 +1134,11 @@ class _DataDrivenPanel extends StatelessWidget {
         final colors = isDark ? AppColors.dark : AppColors.light;
         return Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: colors.surfaceContainer,
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: staff.imageUrl != null && staff.imageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: staff.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => const Icon(
-                        Icons.person,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      errorWidget: (context, url, error) =>
-                          Icon(fallbackIcon, size: 16, color: Colors.grey),
-                    )
-                  : Icon(fallbackIcon, size: 16, color: Colors.grey),
+            UserAvatar(
+              name: staff.name,
+              avatarUrl: staff.imageUrl,
+              radius: 16,
+              fontSize: 10,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1309,30 +1294,10 @@ class _StudentCard extends StatelessWidget {
       child: Row(
         children: [
           // Avatar with shadow
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(15),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: CachedNetworkImage(
-                imageUrl: student.avatarUrl ?? '',
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  color: colors.surfaceContainer,
-                  child: const Icon(Icons.person, color: Colors.grey, size: 24),
-                ),
-              ),
-            ),
+          UserAvatar(
+            name: student.displayName,
+            avatarUrl: student.avatarUrl,
+            radius: 22,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1568,9 +1533,10 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
           const SizedBox(height: 20),
           if (driver != null)
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.blue,
-                child: Icon(Icons.person, color: Colors.white),
+              leading: UserAvatar(
+                name: driver.name,
+                avatarUrl: driver.imageUrl,
+                token: AppScope.of(context).token,
               ),
               title: Text(
                 '${context.t('driver')}: ${driver.name}',
@@ -1589,9 +1555,10 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
             ),
           if (supervisor != null)
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.purple,
-                child: Icon(Icons.person, color: Colors.white),
+              leading: UserAvatar(
+                name: supervisor.name,
+                avatarUrl: supervisor.imageUrl,
+                token: AppScope.of(context).token,
               ),
               title: Text(
                 '${context.t('supervisor')}: ${supervisor.name}',

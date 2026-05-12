@@ -53,16 +53,12 @@ class _RootShellState extends State<RootShell> {
       builder: (context, _) {
         // Handle Deep Linking / Notification Redirects
         if (controller.pendingConversationId != null) {
-          final pendingId = controller.pendingConversationId!;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            // 1. Move to Chat Tab (Index 5)
-            controller.setNavIndex(5);
-            
-            // 3. Since the Chat tab (ContactsPage) will be built/visible now, 
-            // we can pass the ID to it or use a global navigation if needed.
-            // But easier: setNavIndex triggers rebuild, and we can make ContactsPage 
-            // aware of the state in AppController.
-          });
+          // Invalidate the cached ContactsPage so it is rebuilt with the new conversation ID
+          _pages[5] = null;
+        }
+        if (controller.pendingNotificationId != null) {
+          // Invalidate the cached NotificationsPage so it picks up the pending notification
+          _pages[4] = null;
         }
 
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);

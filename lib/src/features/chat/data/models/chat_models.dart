@@ -1,4 +1,5 @@
-/// Chat data models — mapped from Laravel Chat API responses.
+import 'package:dio/dio.dart';
+import '../../../../core/config/app_config.dart';
 
 class ChatContact {
   const ChatContact({
@@ -7,6 +8,7 @@ class ChatContact {
     required this.role,
     this.phone,
     this.chatDescription,
+    this.avatarUrl,
   });
 
   final int id;
@@ -14,6 +16,7 @@ class ChatContact {
   final String role;
   final String? phone;
   final String? chatDescription;
+  final String? avatarUrl;
 
   factory ChatContact.fromJson(Map<String, dynamic> json) {
     return ChatContact(
@@ -22,6 +25,7 @@ class ChatContact {
       role: json['role'] as String? ?? '',
       phone: json['phone'] as String?,
       chatDescription: json['chat_description'] as String?,
+      avatarUrl: AppConfig.normalizeImageUrl(json['avatar_url'] as String?),
     );
   }
 }
@@ -84,17 +88,20 @@ class ChatParticipant {
     required this.id,
     required this.name,
     required this.role,
+    this.avatarUrl,
   });
 
   final int id;
   final String name;
   final String role;
+  final String? avatarUrl;
 
   factory ChatParticipant.fromJson(Map<String, dynamic> json) {
     return ChatParticipant(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
       role: json['role'] as String? ?? '',
+      avatarUrl: AppConfig.normalizeImageUrl(json['avatar_url'] as String?),
     );
   }
 }
@@ -143,17 +150,20 @@ class ChatMessageSender {
     required this.id,
     required this.name,
     required this.role,
+    this.avatarUrl,
   });
 
   final int id;
   final String name;
   final String role;
+  final String? avatarUrl;
 
   factory ChatMessageSender.fromJson(Map<String, dynamic> json) {
     return ChatMessageSender(
       id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       role: json['role'] as String? ?? '',
+      avatarUrl: AppConfig.normalizeImageUrl(json['avatar_url'] as String?),
     );
   }
 }

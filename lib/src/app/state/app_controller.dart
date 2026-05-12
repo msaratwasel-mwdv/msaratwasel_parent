@@ -13,6 +13,8 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 // FCM token registration — see _registerFcmToken below
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
+import 'package:msaratwasel_user/src/core/routing/notification_router.dart';
+import 'package:msaratwasel_user/src/core/utils/active_conversation_tracker.dart';
 
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
 import 'package:msaratwasel_user/src/features/language/data/repositories/language_repository_impl.dart';
@@ -128,6 +130,11 @@ class AppController extends ChangeNotifier {
   int _trackingRequestVersion = 0;
   final List<AppNotification> _notifications; // mutable — fed by FCM & API
   final List<MessageItem> _messages;
+  final _messageStreamController = StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Stream of real-time chat messages from WebSocket
+  Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
+
   bool _hasNewMessages = false;
 
   bool get hasNewMessages => _hasNewMessages;
@@ -144,6 +151,9 @@ class AppController extends ChangeNotifier {
   bool _isLoadingChildren = false;
   bool _isLocationRequestsLoading = false;
   int? _userId;
+
+  int? get userId => _userId;
+
 
   List<LocationChangeRequest> get locationRequests =>
       List.unmodifiable(_locationRequests);
@@ -284,8 +294,35 @@ class AppController extends ChangeNotifier {
   String get userNationalId => _userNationalId;
   bool get isLoadingChildren => _isLoadingChildren;
 
+  String? _pendingNotificationId;
+  String? _pendingConversationId;
+
+  String? get pendingNotificationId => _pendingNotificationId;
+  String? get pendingConversationId => _pendingConversationId;
+
+  void setPendingNotificationId(String? id) {
+    _pendingNotificationId = id;
+    notifyListeners();
+  }
+
+  void setPendingConversationId(String? id) {
+    _pendingConversationId = id;
+    notifyListeners();
+  }
+
+  void clearPendingNotificationId() {
+    _pendingNotificationId = null;
+    notifyListeners();
+  }
+
+  void clearPendingConversationId() {
+    _pendingConversationId = null;
+    notifyListeners();
+  }
+
   void setNavIndex(int index) {
-    if (_navIndex == index) return;
+    final hasPending = _pendingNotificationId != null || _pendingConversationId != null;
+    if (_navIndex == index && !hasPending) return;
     _navIndex = index;
     _navHistory.add(index);
     if (_navHistory.length > 20) _navHistory.removeAt(0); // Limit history size
@@ -699,7 +736,21 @@ class AppController extends ChangeNotifier {
         AppLogger.w('⚠️ AppController: Failed to sync language on boot: $e');
       }
 
-      notifyListeners(); // Refresh UI with loaded data
+      // ── Re-trigger pending notification routing ─────────────────────────
+      // In the Terminated state, getInitialMessage() fires before API data loads.
+      // The notification is queued via setPendingNotificationId, but the Notifications
+      // page may not find the item because _notifications was empty at routing time.
+      // Now that data is loaded, we fire a notifyListeners() so RootShell rebuilds
+      // and NotificationsPage re-checks its pending ID with a full list available.
+      if (_pendingNotificationId != null) {
+        developer.log(
+          '🔁 Re-notifying for pending notification after data load: $_pendingNotificationId',
+          name: 'ROUTER',
+        );
+        notifyListeners(); // triggers RootShell → NotificationsPage._checkPendingNotification
+      } else {
+        notifyListeners(); // Refresh UI with loaded data
+      }
     } catch (e) {
       AppLogger.w('⚠️ AppController: Background initialization partially failed: $e');
     }
@@ -718,6 +769,7 @@ class AppController extends ChangeNotifier {
       onStudentStatusUpdated: _handleRealtimeStatusUpdate,
       onBusLocationUpdated: _handleRealtimeLocationUpdate,
       onNotificationReceived: _handleRealtimeNotification,
+      onMessageReceived: _handleIncomingMessage,
     );
     _reverbService!.connect();
 
@@ -1055,13 +1107,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? _pendingConversationId;
-  String? get pendingConversationId => _pendingConversationId;
 
-  void clearPendingConversation() {
-    _pendingConversationId = null;
-    notifyListeners();
-  }
 
   /// تحميل بيانات الملف الشخصي من API
   Future<void> loadProfileFromApi() async {
@@ -1088,7 +1134,9 @@ class AppController extends ChangeNotifier {
         _userPhone = data['phone'] as String? ?? _userPhone;
         _userEmail = data['email'] as String? ?? _userEmail;
         _userNationalId = data['national_id'] as String? ?? _userNationalId;
+        _userId = data['id'] as int? ?? _userId;
         _userAvatarUrl = data['image_url'] as String? ?? _userAvatarUrl;
+
 
         // تحديث البيانات المحلية
         await prefs.setString('user_name', _userName);
@@ -1176,12 +1224,26 @@ class AppController extends ChangeNotifier {
 
   /// Called by [NotificationService] whenever an FCM push arrives.
   void addNotification(AppNotification notification, {bool isTap = false}) {
-    developer.log('🚨🚨🚨 NOTIFICATION RECEIVED IN AppController: ${notification.title}', name: 'NOTIF');
+    final String currentLang = locale.languageCode;
+    final String? payloadLang = notification.data['language']?.toString().toLowerCase();
+
+    developer.log('🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload Lang: $payloadLang, App Lang: $currentLang, isTap: $isTap', name: 'NOTIFICATION');
+
+    // 0. Language Filtering: Suppress if payload has a language and it doesn't match current app locale
+    // We only filter if it's NOT a tap (we want to handle taps even if language changed)
+    // and if payloadLang is specified.
+    if (!isTap && payloadLang != null && payloadLang.isNotEmpty) {
+      // Robust comparison: check if currentLang starts with payloadLang (e.g. 'en_US' starts with 'en')
+      if (!currentLang.startsWith(payloadLang)) {
+        developer.log('🌍 Suppressing notification due to language mismatch (Payload: $payloadLang vs App: $currentLang)', name: 'NOTIFICATION');
+        return;
+      }
+    }
 
     // 1. Check for global deduplication FIRST (before showing any popup)
     if (notification.correlationId != null) {
       if (_processedCorrelationIds.contains(notification.correlationId)) {
-        developer.log('♻️ Skipping duplicate notification (CID: ${notification.correlationId})');
+        developer.log('♻️ Skipping duplicate notification (CID: ${notification.correlationId})', name: 'NOTIFICATION');
         return;
       }
       _processedCorrelationIds.add(notification.correlationId!);
@@ -1193,38 +1255,64 @@ class AppController extends ChangeNotifier {
     // 2. Check for list-based duplicate (fallback)
     final isDuplicate = _notifications.any((n) => n.id == notification.id);
     if (isDuplicate) {
-      developer.log('⚠️ Skipping duplicate notification: ID=${notification.id}');
+      developer.log('⚠️ Skipping duplicate notification: ID=${notification.id}', name: 'NOTIFICATION');
       return;
     }
 
     // ── Foreground Display (Heads-up) ───────────────────────────────────
     // Show localized popup banner ONLY after deduplication passes
     if (!isTap) {
-      final isEn = locale.languageCode == 'en';
-      NotificationService.showLocalNotification(
-        title: notification.getDisplayTitle(isEn),
-        body: notification.getDisplayBody(isEn),
-        id: notification.id.hashCode,
-        payload: jsonEncode(notification.toJson()),
-      );
+      // Suppress chat notification banner if user is actively in the chat screen
+      bool isChatMessage = notification.type == NotificationType.chat || 
+                           notification.type == NotificationType.supervisorMessage;
+
+      bool shouldSuppress = false;
+      if (isChatMessage) {
+        final convId = notification.data['conversation_id']?.toString();
+        if (convId != null &&
+            convId == ActiveConversationTracker.activeConversationId) {
+          shouldSuppress = true;
+          developer.log('🚫 Suppressing chat notification banner because conversation $convId is active', name: 'NOTIFICATION');
+        }
+      }
+
+      if (!shouldSuppress) {
+        final isEn = locale.languageCode == 'en';
+        
+        String? channelId;
+        String? channelName;
+        
+        if (isChatMessage) {
+          channelId = 'chat_messages';
+          channelName = 'رسائل المحادثات';
+        } else if (notification.type == NotificationType.adminAnnouncement || 
+                   notification.type == NotificationType.schoolAlert) {
+          channelId = 'school_announcements';
+          channelName = 'إعلانات المدرسة';
+        }
+
+        NotificationService.showLocalNotification(
+          title: notification.getDisplayTitle(isEn),
+          body: notification.getDisplayBody(isEn),
+          id: notification.id.hashCode,
+          payload: jsonEncode(notification.toJson()),
+          channelId: channelId,
+          channelName: channelName,
+        );
+      }
     }
 
     // 3. Handle Chat Notifications
-    if (notification.type == NotificationType.chat) {
+    if (notification.type == NotificationType.chat || 
+        notification.type == NotificationType.supervisorMessage) {
       developer.log(
-        '💬 FCM: Chat notification received — isTap: $isTap',
+        '💬 FCM: Chat notification received (${notification.type}) — isTap: $isTap',
         name: 'NOTIFICATION',
       );
       _hasNewMessages = true;
       
       if (isTap) {
-        // Extract conversation_id from data payload
-        final convId = notification.data['conversation_id']?.toString();
-        if (convId != null) {
-          _pendingConversationId = convId;
-          developer.log('🔗 Setting pending conversation ID: $convId', name: 'CHAT');
-        }
-        setNavIndex(5); // Contacts/Chat Page
+        NotificationRouter.route(this, notification);
       }
       
       notifyListeners();
@@ -1281,40 +1369,21 @@ class AppController extends ChangeNotifier {
       }
     }
 
-    // Handle navigation on Tap
-    if (isTap) {
-      switch (notification.type) {
-        case NotificationType.approach:
-        case NotificationType.arrival:
-        case NotificationType.checkIn:
-        case NotificationType.checkOut:
-          setNavIndex(2); // Bus Tracking Page
-          break;
-        case NotificationType.absenceApproved:
-        case NotificationType.absenceRejected:
-        case NotificationType.absence:
-          setNavIndex(10); // Absence History Page
-          break;
-        case NotificationType.locationApproved:
-        case NotificationType.locationRejected:
-        case NotificationType.locationRequest:
-          setNavIndex(11); // Location Requests Page
-          break;
-        default:
-          setNavIndex(4); // Notifications Page
-          break;
-      }
-    }
-
-    // Avoid duplicates (can happen if the tap callback fires twice)
+    // Add to list FIRST (before routing, so the page can find it)
     final exists = _notifications.any((n) => n.id == notification.id);
     if (!exists) {
       _notifications.insert(0, notification);
-      notifyListeners();
       developer.log(
         '🔔 AppController: notification added — type: ${notification.type}',
         name: 'NOTIFICATION',
       );
+    }
+
+    // Handle navigation on Tap (AFTER adding to list)
+    if (isTap) {
+      NotificationRouter.route(this, notification);
+    } else {
+      notifyListeners();
     }
   }
 
@@ -1322,6 +1391,44 @@ class AppController extends ChangeNotifier {
     developer.log('🌐 Realtime Notification via Reverb: ${data['title']}', name: 'REVERB');
     final notification = AppNotification.fromMap(data);
     addNotification(notification);
+  }
+
+  void _handleIncomingMessage(Map<String, dynamic> data) {
+    developer.log('💬 Realtime Message via Reverb: ${data['message']}', name: 'REVERB');
+    
+    // Parse the message data
+    // The payload usually looks like: { message: { id, content, created_at, from_user_id, sender_name, ... }, conversation_id: ... }
+    final msgData = data['message'];
+    if (msgData == null) return;
+
+    final conversationId = data['conversation_id']?.toString();
+    final senderId = msgData['from_user_id']?.toString();
+    
+    // Check if it's an incoming message (not from current user)
+    // Actually, we usually want to add it even if it's from us (for multi-device sync), 
+    // but here we check if it's incoming relative to the parent app.
+    final bool isIncoming = senderId != _userId?.toString();
+
+    final newMessage = MessageItem(
+      id: msgData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      sender: msgData['sender_name'] as String? ?? (isIncoming ? 'المدرسة' : 'أنت'),
+      text: (msgData['content'] as String? ?? '').trim(),
+      time: DateTime.tryParse(msgData['created_at']?.toString() ?? '') ?? DateTime.now(),
+      incoming: isIncoming,
+      mediaUrl: msgData['media_url'] as String?,
+    );
+
+    // If we are currently viewing this conversation, add to list
+    // We don't have a direct "currentConversationId" here, but we can update the _messages list
+    // and the MessagesPage will rebuild if it's listening.
+    // To be safe, we only add if it's not already there
+    if (!_messages.any((m) => m.id == newMessage.id)) {
+      _messages.add(newMessage);
+      notifyListeners();
+    }
+
+    // Broadcast the raw data so specific pages (like ChatPage) can handle it
+    _messageStreamController.add(data);
   }
 
   /// Clears all local notifications.
@@ -1358,7 +1465,8 @@ class AppController extends ChangeNotifier {
 
       // تصفية إشعارات الشات حتى لا تظهر في القائمة العامة
       final filteredFetched = fetched
-          .where((n) => n.type != NotificationType.chat)
+          .where((n) => n.type != NotificationType.chat && 
+                        n.type != NotificationType.supervisorMessage)
           .toList();
 
       // Prepend fetched items, keeping any push-delivered ones already present
@@ -1509,6 +1617,20 @@ class AppController extends ChangeNotifier {
       ),
     );
     notifyListeners();
+  }
+
+  void subscribeToChat(String conversationId) {
+    if (_reverbService == null) return;
+    final channel = 'private-chat.conversation.$conversationId';
+    _reverbService!.subscribe(channel);
+    developer.log('📡 Subscribing to chat channel: $channel', name: 'CHAT');
+  }
+
+  void unsubscribeFromChat(String conversationId) {
+    if (_reverbService == null) return;
+    final channel = 'private-chat.conversation.$conversationId';
+    _reverbService!.unsubscribe(channel);
+    developer.log('🚫 Unsubscribing from chat channel: $channel', name: 'CHAT');
   }
 
   void addAbsence({
@@ -1947,6 +2069,13 @@ class AppController extends ChangeNotifier {
         _tripGroups.isNotEmpty) {
       _selectedBusId = _tripGroups.keys.first;
     }
+  }
+
+  @override
+  void dispose() {
+    _reverbService?.dispose();
+    _messageStreamController.close();
+    super.dispose();
   }
 }
 

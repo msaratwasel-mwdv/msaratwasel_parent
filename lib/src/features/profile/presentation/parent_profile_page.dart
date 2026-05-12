@@ -11,7 +11,7 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
-
+import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
 class ParentProfilePage extends StatefulWidget {
   const ParentProfilePage({super.key});
 
@@ -616,30 +616,11 @@ class _ChildQuickCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          UserAvatar(
+            name: name,
+            avatarUrl: avatarUrl,
             radius: 24,
-            backgroundImage: hasAvatar
-                ? CachedNetworkImageProvider(
-                    avatarUrl!,
-                    headers: AppScope.of(context).token.isNotEmpty
-                        ? {
-                            'Authorization':
-                                'Bearer ${AppScope.of(context).token}',
-                          }
-                        : null,
-                  )
-                : null,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-            child: !hasAvatar
-                ? Text(
-                    name.isNotEmpty ? name[0] : '?',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  )
-                : null,
+            token: AppScope.of(context).token,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

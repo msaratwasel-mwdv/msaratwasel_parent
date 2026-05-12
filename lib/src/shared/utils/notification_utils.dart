@@ -25,6 +25,7 @@ extension NotificationTypeUI on NotificationType {
       case NotificationType.lateBoarding:
         return Icons.warning_amber_rounded;
       case NotificationType.schoolAlert:
+      case NotificationType.adminAnnouncement:
         return Icons.campaign_rounded;
       case NotificationType.supervisorMessage:
         return Icons.support_agent_rounded;
