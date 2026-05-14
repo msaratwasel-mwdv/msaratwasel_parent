@@ -825,35 +825,35 @@ class _ChildDetailsSheet extends StatelessWidget {
                                     }
 
                                     if (location != null) {
-                                      final success = await AppScope.of(context)
+                                      // Show loading indicator
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (context) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      );
+
+                                      final message = await AppScope.of(context)
                                           .updateHomeLocationApi(
                                             location,
                                             studentId: student.id,
                                             address: label,
                                             note: note,
                                           );
-                                      if (success && context.mounted) {
+
+                                      if (context.mounted) {
+                                        Navigator.pop(context); // Remove loading
+                                      }
+
+                                      if (message != null && context.mounted) {
+                                        final isError = message.contains('خطأ') || message.contains('فشل');
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
                                           SnackBar(
-                                            content: Text(
-                                              context.t(
-                                                'locationUpdateRequestSent',
-                                              ),
-                                            ),
-                                            backgroundColor: Colors.blue,
-                                          ),
-                                        );
-                                      } else if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              context.t('failedToLoadMessages'),
-                                            ),
-                                            backgroundColor: Colors.red,
+                                            content: Text(message),
+                                            backgroundColor: isError ? Colors.red : Colors.green,
                                           ),
                                         );
                                       }

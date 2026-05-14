@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 
 /// Background message handler — must be a top-level function.
@@ -18,8 +19,39 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 
   // Initialize Firebase for the background isolate
   await Firebase.initializeApp();
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
 
-  // Create local notification in background
+  final data = message.data;
+  final String? cid = data['correlation_id']?.toString() ?? 
+                     data['notification_id']?.toString() ?? 
+                     data['message_id']?.toString() ?? 
+                     message.messageId;
+
+  // ── Persistent Deduplication ──────────────────────────────────────────
+  if (cid != null) {
+    final List<String> processedCids = prefs.getStringList('processed_cids') ?? [];
+    if (processedCids.contains(cid)) {
+      developer.log('♻️ [BG] Skipping persistent duplicate (CID: $cid)', name: 'FCM');
+      return;
+    }
+    // Update the list
+    processedCids.add(cid);
+    if (processedCids.length > 100) processedCids.removeAt(0);
+    await prefs.setStringList('processed_cids', processedCids);
+  }
+
+  // On Android, if the FCM message contains a `notification` object,
+  // the system tray automatically displays it. We must NOT show a
+  // second local notification, or the user sees duplicates.
+  if (message.notification != null) {
+    developer.log(
+      '📬 FCM [BG]: System will auto-display notification, skipping local show',
+      name: 'FCM',
+    );
+    return;
+  }
+
+  // Create local notification for data-only messages
   final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
   
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -32,12 +64,27 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 
   await localNotifications.initialize(initializationSettings);
 
-  final notification = message.notification;
-  final data = message.data;
-  final String title = notification?.title ?? data['title'] ?? 'رسالة جديدة';
-  final String body = notification?.body ?? data['body'] ?? data['message'] ?? '';
+  final String? savedLocale = prefs.getString('app_locale');
+  final bool isEnglish = savedLocale == 'en';
 
-  if (title.isNotEmpty || body.isNotEmpty) {
+  // ── Robust Content Extraction ──────────────────────────────────────────
+  String? pick(List<dynamic> options) {
+    for (final opt in options) {
+      final str = opt?.toString();
+      if (str != null && str.trim().isNotEmpty) return str;
+    }
+    return null;
+  }
+
+  final String titleAr = pick([data['title_ar'], data['title'], data['sender_name']]) ?? 'إشعار جديد';
+  final String titleEn = pick([data['title_en'], data['titleEn'], data['sender_name_en'], data['title']]) ?? 'New Notification';
+  final String bodyAr = pick([data['message_ar'], data['message'], data['body'], data['messagePreview']]) ?? '';
+  final String bodyEn = pick([data['message_en'], data['messageEn'], data['body_en'], data['message'], data['body']]) ?? '';
+
+  final String displayTitle = isEnglish ? titleEn : titleAr;
+  final String displayBody = isEnglish ? bodyEn : bodyAr;
+
+  if (displayTitle.isNotEmpty || displayBody.isNotEmpty) {
     String channelId = 'msarat_wasel_high_importance_v3';
     String channelName = 'إشعارات مسارات واصل الهامة';
     
@@ -52,8 +99,8 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 
     await localNotifications.show(
       message.messageId.hashCode,
-      title,
-      body,
+      displayTitle,
+      displayBody,
       NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
@@ -92,7 +139,10 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static OnNotificationReceived? _onReceived;
-  static final Set<String> _processedCorrelationIds = {};
+  /// Guard to prevent registering FCM listeners multiple times.
+  /// init() may be called from both bootstrap() and login(), but
+  /// listeners must only be attached ONCE.
+  static bool _initialized = false;
 
   static OnNotificationReceived? get onReceived => _onReceived;
 
@@ -117,7 +167,28 @@ class NotificationService {
       return null;
     }
 
+    // Always update the callback (login may set a fresh one)
     _onReceived = onNotificationReceived;
+
+    // ─── GUARD: Only register listeners ONCE ─────────────────────────────
+    // init() is called from both bootstrap() and login(). Firebase listeners
+    // are additive — calling .listen() again adds a SECOND listener, causing
+    // every notification to be processed twice. We register listeners only
+    // on the first call and just update _onReceived on subsequent calls.
+    if (_initialized) {
+      developer.log(
+        '✅ NotificationService: already initialized, updated callback only',
+        name: 'FCM',
+      );
+      // Still return the token so login() can register it
+      try {
+        return await _fcm.getToken();
+      } catch (e) {
+        developer.log('❌ FCM: failed to get token: $e', name: 'FCM');
+        return null;
+      }
+    }
+    _initialized = true;
 
     // ── 1. Request Permissions ──────────────────────────────────────────
     final settings = await _fcm.requestPermission(
@@ -127,10 +198,12 @@ class NotificationService {
       provisional: false,
     );
 
-    // Enable foreground notification banners on iOS
+    // Disable foreground notification banners handled by the OS.
+    // We will show them manually via showLocalNotification to allow for 
+    // intelligent deduplication and suppression (e.g. when already on chat screen).
     await FirebaseMessaging.instance
         .setForegroundNotificationPresentationOptions(
-          alert: true,
+          alert: false, // 🚫 No OS banner in foreground
           badge: true,
           sound: true,
         );
@@ -166,7 +239,6 @@ class NotificationService {
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
     // ── 3. Setup Android Notification Channel ──────────────────────────────
-    // we use a new ID 'v2' to bypass any previous silent settings on the device
     const androidChannel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -194,18 +266,28 @@ class NotificationService {
       enableVibration: true,
       showBadge: true,
     );
+    const statusChannel = AndroidNotificationChannel(
+      'student_status',
+      'حالة الطلاب',
+      description: 'إشعارات ركوب ونزول الطلاب',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
     
     final plugin = _localNotif.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (plugin != null) {
       await plugin.createNotificationChannel(androidChannel);
       await plugin.createNotificationChannel(chatChannel);
       await plugin.createNotificationChannel(schoolChannel);
+      await plugin.createNotificationChannel(statusChannel);
     }
 
     // ── 4. Background Message Handler ──────────────────────────────────────
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
-    // ── 5. Foreground Message Handler ──────────────────────────────────────
+    // ── 5. Foreground Message Handler (REGISTERED ONCE) ───────────────────
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       developer.log(
         '📬 FCM [FG]: ${message.notification?.title} | data: ${message.data}',
@@ -214,29 +296,12 @@ class NotificationService {
       
       final notification = AppNotification.fromFcm(message);
 
-      // Deduplication check
-      if (notification.correlationId != null) {
-        if (_processedCorrelationIds.contains(notification.correlationId)) {
-          developer.log(
-            '♻️ FCM: Skipping duplicate notification (correlationId: ${notification.correlationId})',
-            name: 'FCM',
-          );
-          return;
-        }
-        _processedCorrelationIds.add(notification.correlationId!);
-        if (_processedCorrelationIds.length > 100) {
-          _processedCorrelationIds.remove(_processedCorrelationIds.first);
-        }
-      }
-      
-      print('🔥🔥🔥 FIREBASE MESSAGE ARRIVED IN FOREGROUND: ${message.notification?.title}');
+      // Deduplication is handled centrally in AppController.addNotification()
+      // via correlationId and notification ID checks. No need for a separate
+      // dedup set here — it was causing inconsistencies.
 
-      // Update app state
+      // Update app state (calls addNotification which handles dedup + popup)
       _onReceived?.call(notification, isTap: false);
-
-      // We REMOVED the automatic _showLocalNotification(notification) call here.
-      // Instead, AppController.addNotification will call showLocalNotification 
-      // with the correct localized title/body to fix the silent/Arabic popup issue.
     });
 
     // ── 6. Background Tap Handler ─────────────────────────────────────────

@@ -11,9 +11,11 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // FCM token registration — see _registerFcmToken below
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/core/routing/notification_router.dart';
+import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 import 'package:msaratwasel_user/src/core/utils/active_conversation_tracker.dart';
 
 import 'package:msaratwasel_user/src/core/storage/storage_service.dart';
@@ -21,6 +23,8 @@ import 'package:msaratwasel_user/src/features/language/data/repositories/languag
 import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:msaratwasel_user/src/features/absence/data/repositories/absence_repository_impl.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
+import 'package:msaratwasel_user/src/features/chat/data/repositories/chat_repository.dart';
 import 'package:msaratwasel_user/src/core/services/reverb_service.dart';
 import 'package:msaratwasel_user/src/features/notifications/data/repositories/notification_repository_impl.dart';
 import 'package:msaratwasel_user/src/core/services/notification_service.dart';
@@ -35,6 +39,7 @@ class AppController extends ChangeNotifier {
       _notifications = [],
 
       _messages = [],
+      _conversations = [],
       _attendance = [],
       _trips = [],
       _locationRequests = [] {
@@ -46,6 +51,66 @@ class AppController extends ChangeNotifier {
   final StorageService _storage = StorageService();
   final Set<String> _processedCorrelationIds = {};
   final Set<String> _subscribedChannels = {};
+
+  // ── Global Navigator Key ──────────────────────────────────────────────
+  /// Used by NotificationRouter to push ChatPage directly without going
+  /// through ContactsPage. Wired to MaterialApp.navigatorKey in app.dart.
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  // ── Cold-start guard ──────────────────────────────────────────────────
+  /// Prevents getInitialMessage from firing twice on hot reload/rebuild.
+  bool _handledInitialMessage = false;
+  bool get handledInitialMessage => _handledInitialMessage;
+  void markInitialMessageHandled() => _handledInitialMessage = true;
+
+  // ── Pending Chat Route (queued when navigator not yet ready) ──────────
+  int? _pendingChatConversationId;
+  String? _pendingChatSenderName;
+  String? _pendingChatSenderRole;
+
+  bool get hasPendingChatRoute => _pendingChatConversationId != null;
+
+  void setPendingChatRoute({
+    required int conversationId,
+    required String senderName,
+    required String senderRole,
+  }) {
+    _pendingChatConversationId = conversationId;
+    _pendingChatSenderName = senderName;
+    _pendingChatSenderRole = senderRole;
+  }
+
+  /// Called once the navigator is mounted. Pushes the queued ChatPage.
+  void flushPendingChatRoute() {
+    if (_pendingChatConversationId == null) return;
+
+    final navState = navigatorKey.currentState;
+    if (navState == null) return;
+
+    final convId = _pendingChatConversationId!;
+    final name = _pendingChatSenderName ?? '';
+    final role = _pendingChatSenderRole ?? '';
+
+    // Clear BEFORE navigation to prevent re-flush
+    _pendingChatConversationId = null;
+    _pendingChatSenderName = null;
+    _pendingChatSenderRole = null;
+
+    developer.log(
+      '🚀 Flushing pending chat route → conversation $convId',
+      name: 'ROUTER',
+    );
+
+    navState.push(
+      MaterialPageRoute(
+        builder: (_) => ChatPage(
+          conversationId: convId,
+          contactName: name,
+          contactRole: role,
+        ),
+      ),
+    );
+  }
 
   void _initDio() {
     dio = Dio(
@@ -130,10 +195,13 @@ class AppController extends ChangeNotifier {
   int _trackingRequestVersion = 0;
   final List<AppNotification> _notifications; // mutable — fed by FCM & API
   final List<MessageItem> _messages;
-  final _messageStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  final List<ChatConversation> _conversations;
+  final _messageStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   /// Stream of real-time chat messages from WebSocket
-  Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
+  Stream<Map<String, dynamic>> get messageStream =>
+      _messageStreamController.stream;
 
   bool _hasNewMessages = false;
 
@@ -142,6 +210,33 @@ class AppController extends ChangeNotifier {
   void clearNewMessages() {
     _hasNewMessages = false;
     notifyListeners();
+  }
+
+  // --- Unread Counts Provider ---
+  int get chatUnreadCount {
+    if (_conversations.isEmpty && _hasNewMessages) return 1;
+    return _conversations.fold(0, (sum, c) => sum + c.unreadCount);
+  }
+
+  int get notificationsUnreadCount {
+    return _notifications.where((n) => !n.read).length;
+  }
+
+  int get absenceUnreadCount {
+    return _notifications
+        .where((n) => !n.read && (n.category == 'absences' || n.category == 'absence' || n.targetScreen == 'absence_history'))
+        .length;
+  }
+
+  int get locationUnreadCount {
+    return _notifications
+        .where((n) =>
+            !n.read &&
+            (n.category == 'location_request' ||
+                n.category == 'location_requests' ||
+                n.targetScreen == 'location_requests' ||
+                n.targetScreen == 'location_request_details'))
+        .length;
   }
 
   final List<AttendanceEntry> _attendance;
@@ -154,12 +249,15 @@ class AppController extends ChangeNotifier {
 
   int? get userId => _userId;
 
-
   List<LocationChangeRequest> get locationRequests =>
       List.unmodifiable(_locationRequests);
   bool get isLocationRequestsLoading => _isLocationRequestsLoading;
   ReverbService? _reverbService;
   String _token = '';
+
+  /// Synchronous memory set for immediate deduplication of incoming notification CIDs.
+  /// This prevents race conditions when FCM and WebSocket arrive simultaneously.
+  final Set<String> _processedCidsMemory = {};
 
   Locale get locale => _locale;
   String get token => _token;
@@ -175,6 +273,7 @@ class AppController extends ChangeNotifier {
 
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
   List<MessageItem> get messages => List.unmodifiable(_messages);
+  List<ChatConversation> get conversations => List.unmodifiable(_conversations);
   List<AttendanceEntry> get attendance => List.unmodifiable(_attendance);
   List<TripEntry> get trips => List.unmodifiable(_trips);
   List<AbsenceRequest> get absenceRequests =>
@@ -295,18 +394,11 @@ class AppController extends ChangeNotifier {
   bool get isLoadingChildren => _isLoadingChildren;
 
   String? _pendingNotificationId;
-  String? _pendingConversationId;
 
   String? get pendingNotificationId => _pendingNotificationId;
-  String? get pendingConversationId => _pendingConversationId;
 
   void setPendingNotificationId(String? id) {
     _pendingNotificationId = id;
-    notifyListeners();
-  }
-
-  void setPendingConversationId(String? id) {
-    _pendingConversationId = id;
     notifyListeners();
   }
 
@@ -315,13 +407,8 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearPendingConversationId() {
-    _pendingConversationId = null;
-    notifyListeners();
-  }
-
   void setNavIndex(int index) {
-    final hasPending = _pendingNotificationId != null || _pendingConversationId != null;
+    final hasPending = _pendingNotificationId != null || hasPendingChatRoute;
     if (_navIndex == index && !hasPending) return;
     _navIndex = index;
     _navHistory.add(index);
@@ -338,6 +425,26 @@ class AppController extends ChangeNotifier {
       _navIndex = 0;
       _navHistory.clear();
       _navHistory.add(0);
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadConversationsFromApi() async {
+    try {
+      final repo = ChatRepository(dio: dio);
+      final rawConvs = await repo.getConversations();
+      _conversations.clear();
+      _conversations.addAll(rawConvs);
+      notifyListeners();
+    } catch (e) {
+      AppLogger.w('⚠️ AppController: Failed to load conversations: $e');
+    }
+  }
+
+  void markConversationAsRead(int conversationId) {
+    final idx = _conversations.indexWhere((c) => c.id == conversationId);
+    if (idx != -1 && _conversations[idx].unreadCount > 0) {
+      _conversations[idx] = _conversations[idx].copyWith(unreadCount: 0);
       notifyListeners();
     }
   }
@@ -653,7 +760,7 @@ class AppController extends ChangeNotifier {
       final prefs = await _storage.prefs;
       final savedToken = await _storage.readAccessToken();
       final savedName = prefs.getString('user_name') ?? '';
-      
+
       _shouldShowOnboarding = !(prefs.getBool('has_seen_onboarding') ?? false);
       _userId = prefs.getInt('user_id');
 
@@ -668,7 +775,7 @@ class AppController extends ChangeNotifier {
         _userName = savedName;
         _userNameEn = prefs.getString('user_name_en') ?? savedName;
         _userAvatarUrl = prefs.getString('user_avatar_url') ?? '';
-        
+
         // 🔥 Non-blocking background initialization
         _backgroundInitialize(savedToken);
       } else {
@@ -679,7 +786,6 @@ class AppController extends ChangeNotifier {
       // Signal core boot completion so UI can render
       _bootCompleted = true;
       notifyListeners();
-
     } catch (e, stack) {
       AppLogger.e('❌ AppController: Bootstrap sequence failed: $e');
       developer.log('Bootstrap Error', error: e, stackTrace: stack);
@@ -688,14 +794,16 @@ class AppController extends ChangeNotifier {
     } finally {
       // Immediate splash removal
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        try { 
-          FlutterNativeSplash.remove(); 
+        try {
+          FlutterNativeSplash.remove();
         } catch (_) {}
       });
-      
+
       // Secondary safety removal
       Future.delayed(const Duration(milliseconds: 500), () {
-        try { FlutterNativeSplash.remove(); } catch (_) {}
+        try {
+          FlutterNativeSplash.remove();
+        } catch (_) {}
       });
     }
   }
@@ -709,8 +817,11 @@ class AppController extends ChangeNotifier {
       ).timeout(const Duration(seconds: 5), onTimeout: () => null);
 
       if (fcmToken != null) {
-        _registerFcmToken(dio: dio, token: token, fcmToken: fcmToken)
-            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        _registerFcmToken(
+          dio: dio,
+          token: token,
+          fcmToken: fcmToken,
+        ).timeout(const Duration(seconds: 5), onTimeout: () => null);
       }
 
       // Load API data in parallel
@@ -720,18 +831,22 @@ class AppController extends ChangeNotifier {
         loadProfileFromApi(),
         loadAbsenceRequestsFromApi(),
         loadLocationRequestsFromApi(),
+        loadConversationsFromApi(),
       ]).timeout(AppConfig.defaultTimeout, onTimeout: () => []);
 
       // Restore WebSocket
       if (_userId != null && _userId! > 0) {
         _initReverb(token);
       }
-      
+
       // Sync local language setting with backend for correct background FCM payloads
       try {
         final authRepo = AuthRepositoryImpl(dio: dio);
         await authRepo.updateLanguage(_locale.languageCode);
-        developer.log('🌐 Synced preferred language (${_locale.languageCode}) with server.', name: 'BOOT');
+        developer.log(
+          '🌐 Synced preferred language (${_locale.languageCode}) with server.',
+          name: 'BOOT',
+        );
       } catch (e) {
         AppLogger.w('⚠️ AppController: Failed to sync language on boot: $e');
       }
@@ -752,7 +867,9 @@ class AppController extends ChangeNotifier {
         notifyListeners(); // Refresh UI with loaded data
       }
     } catch (e) {
-      AppLogger.w('⚠️ AppController: Background initialization partially failed: $e');
+      AppLogger.w(
+        '⚠️ AppController: Background initialization partially failed: $e',
+      );
     }
   }
 
@@ -924,7 +1041,7 @@ class AppController extends ChangeNotifier {
 
       final deviceName = await DeviceUtils.getDeviceName();
       final deviceId = await DeviceUtils.getDeviceId();
-      
+
       // تسجيل الدخول عبر الـ API باستخدام الرقم المدني ورقم الجوال
       final loginData = {
         'national_id': civilId.trim(),
@@ -964,6 +1081,7 @@ class AppController extends ChangeNotifier {
       final email = userData?['email'] as String? ?? '';
       final nationalId = userData?['national_id'] as String? ?? '';
       final imageUrl = userData?['image_url'] as String? ?? '';
+      final prefLang = userData?['preferred_language'] as String?;
 
       _userName = name;
       _userNameEn = nameEn;
@@ -971,6 +1089,9 @@ class AppController extends ChangeNotifier {
       _userEmail = email;
       _userNationalId = nationalId;
       _userAvatarUrl = imageUrl;
+      if (prefLang != null && prefLang.isNotEmpty) {
+        _locale = Locale(prefLang);
+      }
       developer.log(
         '👤 Logged in as: $name | Phone: $phone | Email: $email',
         name: 'AUTH',
@@ -985,6 +1106,9 @@ class AppController extends ChangeNotifier {
       await prefs.setString('user_email', email);
       await prefs.setString('user_national_id', nationalId);
       await prefs.setString('user_avatar_url', imageUrl);
+      if (prefLang != null && prefLang.isNotEmpty) {
+        await prefs.setString('app_locale', prefLang);
+      }
 
       // تسجيل FCM Token في الـ backend حتى تصل إشعارات Push
       final fcmToken = await NotificationService.init(
@@ -1065,8 +1189,10 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     try {
       final token = await _storage.readAccessToken();
-      final fcmToken = await _storage.prefs.then((p) => p.getString('fcm_token'));
-      
+      final fcmToken = await _storage.prefs.then(
+        (p) => p.getString('fcm_token'),
+      );
+
       if (token != null) {
         final dio = Dio(
           BaseOptions(
@@ -1077,9 +1203,10 @@ class AppController extends ChangeNotifier {
             },
           ),
         );
-        await dio.post('auth/logout', data: {
-          if (fcmToken != null) 'fcm_token': fcmToken,
-        });
+        await dio.post(
+          'auth/logout',
+          data: {if (fcmToken != null) 'fcm_token': fcmToken},
+        );
         AppLogger.d('✅ Logged out from backend');
       }
     } catch (e) {
@@ -1106,8 +1233,6 @@ class AppController extends ChangeNotifier {
     _navIndex = 0;
     notifyListeners();
   }
-
-
 
   /// تحميل بيانات الملف الشخصي من API
   Future<void> loadProfileFromApi() async {
@@ -1137,6 +1262,11 @@ class AppController extends ChangeNotifier {
         _userId = data['id'] as int? ?? _userId;
         _userAvatarUrl = data['image_url'] as String? ?? _userAvatarUrl;
 
+        final prefLang = data['preferred_language'] as String?;
+        if (prefLang != null && prefLang.isNotEmpty && _locale.languageCode != prefLang) {
+          _locale = Locale(prefLang);
+          await prefs.setString('app_locale', prefLang);
+        }
 
         // تحديث البيانات المحلية
         await prefs.setString('user_name', _userName);
@@ -1204,15 +1334,17 @@ class AppController extends ChangeNotifier {
 
     // 2. Sync with server
     if (ids == null || ids.isEmpty) return;
-    
+
     try {
       final token = await _storage.readAccessToken();
       if (token != null) {
-        final dio = Dio(BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {'Authorization': 'Bearer $token'},
-        ));
-        
+        final dio = Dio(
+          BaseOptions(
+            baseUrl: AppConfig.apiBaseUrl,
+            headers: {'Authorization': 'Bearer $token'},
+          ),
+        );
+
         for (final id in ids) {
           await dio.post('/api/guardian/notifications/$id/read');
         }
@@ -1222,49 +1354,110 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> markNotificationsReadByCategory(String category) async {
+    final targetIds = _notifications
+        .where((n) =>
+            !n.read && (n.category == category || n.targetScreen == category))
+        .map((n) => n.id)
+        .toList();
+    if (targetIds.isNotEmpty) {
+      await markNotificationsRead(targetIds);
+    }
+  }
+
+  /// Checks if a correlation ID has been processed, using both memory and persistent storage.
+  Future<bool> _isCidProcessed(String? cid) async {
+    if (cid == null) return false;
+    
+    // 1. Check memory first (fast)
+    if (_processedCorrelationIds.contains(cid)) return true;
+    
+    // Optimistically add to memory to prevent async race conditions
+    _processedCorrelationIds.add(cid);
+    if (_processedCorrelationIds.length > 100) {
+      _processedCorrelationIds.remove(_processedCorrelationIds.first);
+    }
+    
+    // 2. Check SharedPreferences (persistent, syncs with background isolate)
+    try {
+      final prefs = await _storage.prefs;
+      final List<String> processedCids = prefs.getStringList('processed_cids') ?? [];
+      
+      if (processedCids.contains(cid)) {
+        return true;
+      }
+      
+      // 3. Mark as processed in persistent storage
+      processedCids.add(cid);
+      if (processedCids.length > 100) processedCids.removeAt(0);
+      await prefs.setStringList('processed_cids', processedCids);
+    } catch (e) {
+      developer.log('⚠️ Failed to check persistent CIDs: $e', name: 'NOTIFICATION');
+    }
+    
+    return false;
+  }
+
   /// Called by [NotificationService] whenever an FCM push arrives.
-  void addNotification(AppNotification notification, {bool isTap = false}) {
+  Future<void> addNotification(AppNotification notification, {bool isTap = false}) async {
     final String currentLang = locale.languageCode;
-    final String? payloadLang = notification.data['language']?.toString().toLowerCase();
+    final String? payloadLang = notification.data['language']
+        ?.toString()
+        .toLowerCase();
 
-    developer.log('🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload Lang: $payloadLang, App Lang: $currentLang, isTap: $isTap', name: 'NOTIFICATION');
+    developer.log(
+      '🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload CID: ${notification.correlationId}, isTap: $isTap',
+      name: 'NOTIFICATION',
+    );
 
-    // 0. Language Filtering: Suppress if payload has a language and it doesn't match current app locale
-    // We only filter if it's NOT a tap (we want to handle taps even if language changed)
-    // and if payloadLang is specified.
-    if (!isTap && payloadLang != null && payloadLang.isNotEmpty) {
-      // Robust comparison: check if currentLang starts with payloadLang (e.g. 'en_US' starts with 'en')
-      if (!currentLang.startsWith(payloadLang)) {
-        developer.log('🌍 Suppressing notification due to language mismatch (Payload: $payloadLang vs App: $currentLang)', name: 'NOTIFICATION');
+    // 1. Check for global deduplication FIRST
+    // Check memory set first (Synchronous, ultra-fast)
+    final cid = notification.correlationId;
+    if (!isTap && cid != null && cid.isNotEmpty) {
+      if (_processedCidsMemory.contains(cid)) {
+        developer.log(
+          '♻️ Skipping duplicate notification (Memory Match: $cid)',
+          name: 'NOTIFICATION',
+        );
         return;
+      }
+      // Add to memory set immediately
+      _processedCidsMemory.add(cid);
+      // Prune memory set if it gets too large
+      if (_processedCidsMemory.length > 500) {
+        _processedCidsMemory.remove(_processedCidsMemory.first);
       }
     }
 
-    // 1. Check for global deduplication FIRST (before showing any popup)
-    if (notification.correlationId != null) {
-      if (_processedCorrelationIds.contains(notification.correlationId)) {
-        developer.log('♻️ Skipping duplicate notification (CID: ${notification.correlationId})', name: 'NOTIFICATION');
-        return;
-      }
-      _processedCorrelationIds.add(notification.correlationId!);
-      if (_processedCorrelationIds.length > 100) {
-        _processedCorrelationIds.remove(_processedCorrelationIds.first);
-      }
+    // Check persistent storage (Asynchronous, robust)
+    if (!isTap && await _isCidProcessed(notification.correlationId)) {
+      developer.log(
+        '♻️ Skipping duplicate notification (Storage Match: ${notification.correlationId})',
+        name: 'NOTIFICATION',
+      );
+      return;
     }
 
     // 2. Check for list-based duplicate (fallback)
     final isDuplicate = _notifications.any((n) => n.id == notification.id);
     if (isDuplicate) {
-      developer.log('⚠️ Skipping duplicate notification: ID=${notification.id}', name: 'NOTIFICATION');
+      developer.log(
+        '⚠️ Skipping duplicate notification: ID=${notification.id}',
+        name: 'NOTIFICATION',
+      );
       return;
     }
 
     // ── Foreground Display (Heads-up) ───────────────────────────────────
-    // Show localized popup banner ONLY after deduplication passes
-    if (!isTap) {
+    // Only show local notification banner if app is active (Foreground)
+    // and this is NOT a tap event.
+    final bool isForeground = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+    if (!isTap && isForeground) {
       // Suppress chat notification banner if user is actively in the chat screen
-      bool isChatMessage = notification.type == NotificationType.chat || 
-                           notification.type == NotificationType.supervisorMessage;
+      bool isChatMessage =
+          notification.type == NotificationType.chat ||
+          notification.type == NotificationType.supervisorMessage;
 
       bool shouldSuppress = false;
       if (isChatMessage) {
@@ -1272,23 +1465,31 @@ class AppController extends ChangeNotifier {
         if (convId != null &&
             convId == ActiveConversationTracker.activeConversationId) {
           shouldSuppress = true;
-          developer.log('🚫 Suppressing chat notification banner because conversation $convId is active', name: 'NOTIFICATION');
+          developer.log(
+            '🚫 Suppressing chat notification banner because conversation $convId is active',
+            name: 'NOTIFICATION',
+          );
         }
       }
 
       if (!shouldSuppress) {
         final isEn = locale.languageCode == 'en';
-        
+
         String? channelId;
         String? channelName;
-        
+
         if (isChatMessage) {
           channelId = 'chat_messages';
           channelName = 'رسائل المحادثات';
-        } else if (notification.type == NotificationType.adminAnnouncement || 
-                   notification.type == NotificationType.schoolAlert) {
+        } else if (notification.type == NotificationType.adminAnnouncement ||
+            notification.type == NotificationType.schoolAlert) {
           channelId = 'school_announcements';
           channelName = 'إعلانات المدرسة';
+        } else if (notification.type == NotificationType.checkIn ||
+            notification.type == NotificationType.checkOut ||
+            notification.type == NotificationType.arrival) {
+          channelId = 'student_status';
+          channelName = 'حالة الطلاب';
         }
 
         NotificationService.showLocalNotification(
@@ -1300,21 +1501,27 @@ class AppController extends ChangeNotifier {
           channelName: channelName,
         );
       }
+    } else if (!isTap && !isForeground) {
+      developer.log(
+        '🔇 App in background: suppressing local banner for ${notification.id}. '
+        'FCM System Notification or Background Handler should manage the tray.',
+        name: 'NOTIFICATION',
+      );
     }
 
     // 3. Handle Chat Notifications
-    if (notification.type == NotificationType.chat || 
+    if (notification.type == NotificationType.chat ||
         notification.type == NotificationType.supervisorMessage) {
       developer.log(
         '💬 FCM: Chat notification received (${notification.type}) — isTap: $isTap',
         name: 'NOTIFICATION',
       );
       _hasNewMessages = true;
-      
+
       if (isTap) {
-        NotificationRouter.route(this, notification);
+        NotificationRouter.handleNotificationTap(this, notification);
       }
-      
+
       notifyListeners();
       return;
     }
@@ -1327,7 +1534,10 @@ class AppController extends ChangeNotifier {
         StudentStatus? newStatus;
         switch (notification.type) {
           case NotificationType.checkIn:
-            newStatus = StudentStatus.onBus;
+            final direction = notification.data['direction']?.toString();
+            newStatus = (direction == 'to_school')
+                ? StudentStatus.onBusToSchool
+                : StudentStatus.onBusToHome;
             break;
           case NotificationType.checkOut:
             final direction = notification.data['direction']?.toString();
@@ -1336,7 +1546,10 @@ class AppController extends ChangeNotifier {
                 : StudentStatus.arrivedHome;
             break;
           case NotificationType.arrival:
-            newStatus = StudentStatus.atSchool;
+            final direction = notification.data['direction']?.toString();
+            newStatus = (direction == 'to_school')
+                ? StudentStatus.atSchool
+                : StudentStatus.arrivedHome;
             break;
           case NotificationType.approach:
             // Proximity logic: refresh tracking
@@ -1381,54 +1594,91 @@ class AppController extends ChangeNotifier {
 
     // Handle navigation on Tap (AFTER adding to list)
     if (isTap) {
-      NotificationRouter.route(this, notification);
-    } else {
-      notifyListeners();
+      developer.log('👆 AppController: Notification tap detected, routing...', name: 'NOTIFICATION');
+      NotificationRouter.handleNotificationTap(this, notification);
     }
-  }
-
-  void _handleRealtimeNotification(Map<String, dynamic> data) {
-    developer.log('🌐 Realtime Notification via Reverb: ${data['title']}', name: 'REVERB');
-    final notification = AppNotification.fromMap(data);
-    addNotification(notification);
-  }
-
-  void _handleIncomingMessage(Map<String, dynamic> data) {
-    developer.log('💬 Realtime Message via Reverb: ${data['message']}', name: 'REVERB');
     
+    notifyListeners();
+  }
+
+  Future<void> _handleRealtimeNotification(Map<String, dynamic> data) async {
+    developer.log(
+      '🌐 Realtime Notification via Reverb: ${data['title']} | Data: $data',
+      name: 'REVERB',
+    );
+    final notification = AppNotification.fromMap(data);
+    await addNotification(notification);
+  }
+
+  Future<void> _handleIncomingMessage(Map<String, dynamic> data) async {
     // Parse the message data
-    // The payload usually looks like: { message: { id, content, created_at, from_user_id, sender_name, ... }, conversation_id: ... }
     final msgData = data['message'];
     if (msgData == null) return;
 
-    final conversationId = data['conversation_id']?.toString();
+    // ── 0. Correlation ID Deduplication ──────────────────────────────────
+    final correlationId = msgData['correlation_id']?.toString();
+    if (correlationId != null && await _isCidProcessed(correlationId)) {
+      developer.log(
+        '♻️ Skipping duplicate message via Reverb (CID: $correlationId)',
+        name: 'REVERB',
+      );
+      return;
+    }
+
+    developer.log(
+      '💬 Realtime Message via Reverb: ${msgData['content']}',
+      name: 'REVERB',
+    );
+
     final senderId = msgData['from_user_id']?.toString();
-    
     // Check if it's an incoming message (not from current user)
-    // Actually, we usually want to add it even if it's from us (for multi-device sync), 
-    // but here we check if it's incoming relative to the parent app.
     final bool isIncoming = senderId != _userId?.toString();
 
+    // ── 1. Create MessageItem for immediate UI update in ChatPage ────────
     final newMessage = MessageItem(
-      id: msgData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      sender: msgData['sender_name'] as String? ?? (isIncoming ? 'المدرسة' : 'أنت'),
+      id:
+          msgData['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      sender:
+          msgData['sender_name'] as String? ?? (isIncoming ? 'المدرسة' : 'أنت'),
       text: (msgData['content'] as String? ?? '').trim(),
-      time: DateTime.tryParse(msgData['created_at']?.toString() ?? '') ?? DateTime.now(),
+      time:
+          DateTime.tryParse(msgData['created_at']?.toString() ?? '') ??
+          DateTime.now(),
       incoming: isIncoming,
       mediaUrl: msgData['media_url'] as String?,
     );
 
-    // If we are currently viewing this conversation, add to list
-    // We don't have a direct "currentConversationId" here, but we can update the _messages list
-    // and the MessagesPage will rebuild if it's listening.
-    // To be safe, we only add if it's not already there
     if (!_messages.any((m) => m.id == newMessage.id)) {
       _messages.add(newMessage);
-      notifyListeners();
-    }
 
-    // Broadcast the raw data so specific pages (like ChatPage) can handle it
-    _messageStreamController.add(data);
+      // Mark that new messages exist (for badge indicators)
+      if (isIncoming) {
+        _hasNewMessages = true;
+        
+        final convIdStr = msgData['conversation_id']?.toString();
+        if (convIdStr != null) {
+          final convId = int.tryParse(convIdStr);
+          if (convId != null) {
+            final idx = _conversations.indexWhere((c) => c.id == convId);
+            if (idx != -1) {
+              _conversations[idx] = _conversations[idx].copyWith(
+                unreadCount: _conversations[idx].unreadCount + 1,
+              );
+            } else {
+              // If we didn't find the conversation, fetch from API later
+              loadConversationsFromApi();
+            }
+          }
+        }
+      }
+
+      notifyListeners();
+
+      // ── 2. Broadcast the raw data so specific pages (like ChatPage) can handle it
+      // ONLY if it's a new message that we successfully added to the list.
+      _messageStreamController.add(data);
+    }
   }
 
   /// Clears all local notifications.
@@ -1436,7 +1686,6 @@ class AppController extends ChangeNotifier {
     _notifications.clear();
     notifyListeners();
   }
-
 
   /// Fetches the notification history from the Laravel API on app boot.
   Future<void> loadNotificationsFromApi() async {
@@ -1465,8 +1714,11 @@ class AppController extends ChangeNotifier {
 
       // تصفية إشعارات الشات حتى لا تظهر في القائمة العامة
       final filteredFetched = fetched
-          .where((n) => n.type != NotificationType.chat && 
-                        n.type != NotificationType.supervisorMessage)
+          .where(
+            (n) =>
+                n.type != NotificationType.chat &&
+                n.type != NotificationType.supervisorMessage,
+          )
           .toList();
 
       // Prepend fetched items, keeping any push-delivered ones already present
@@ -1673,7 +1925,7 @@ class AppController extends ChangeNotifier {
   }
 
   /// Updates the home location in the backend (for the guardian or a specific student).
-  Future<bool> updateHomeLocationApi(
+  Future<String?> updateHomeLocationApi(
     LatLng location, {
     String? studentId,
     String? address,
@@ -1681,7 +1933,7 @@ class AppController extends ChangeNotifier {
   }) async {
     try {
       final token = await _storage.readAccessToken();
-      if (token == null) return false;
+      if (token == null) return null;
 
       final endpoint = studentId != null
           ? 'parent/student/location/update'
@@ -1700,20 +1952,25 @@ class AppController extends ChangeNotifier {
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
-      // Debug feedback requested by user
-      print('Update response: ${response.data}');
+      developer.log('📍 Update response: ${response.data}', name: 'LOCATION');
 
-      if (response.statusCode == 200) {
+      if (response.data['success'] == true) {
         // Refresh local data to ensure everything is in sync
         await loadChildrenFromApi();
         await loadProfileFromApi();
         await loadLocationRequestsFromApi();
-        return true;
+        return response.data['message'] as String?;
       }
-      return false;
+      return response.data['message'] as String? ?? 'حدث خطأ غير متوقع';
+    } on DioException catch (e) {
+      developer.log('❌ UPDATE_LOCATION_DIO_ERROR: ${e.response?.data}', name: 'LOCATION');
+      if (e.response?.data != null && e.response?.data is Map) {
+        return e.response?.data['message'] as String?;
+      }
+      return 'حدث خطأ في الاتصال بالسيرفر';
     } catch (e) {
       developer.log('❌ UPDATE_LOCATION_ERROR: $e', name: 'LOCATION');
-      return false;
+      return 'حدث خطأ غير متوقع';
     }
   }
 

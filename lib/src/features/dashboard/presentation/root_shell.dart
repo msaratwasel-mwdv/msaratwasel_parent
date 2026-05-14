@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
-
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/pages/children_status_page.dart';
 import 'package:msaratwasel_user/src/features/attendance/presentation/pages/request_absence_page.dart';
@@ -20,6 +19,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/shared/presentation/widgets/section_badge.dart';
 
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
@@ -52,16 +52,13 @@ class _RootShellState extends State<RootShell> {
       animation: controller,
       builder: (context, _) {
         // Handle Deep Linking / Notification Redirects
-        if (controller.pendingConversationId != null) {
-          // Invalidate the cached ContactsPage so it is rebuilt with the new conversation ID
-          _pages[5] = null;
-        }
         if (controller.pendingNotificationId != null) {
           // Invalidate the cached NotificationsPage so it picks up the pending notification
           _pages[4] = null;
         }
 
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
+        AppLogger.d('🏠 RootShell: current index = $currentIndex');
         final page = _buildPage(currentIndex);
 
         return PopScope(
@@ -128,8 +125,6 @@ class _RootShellState extends State<RootShell> {
   }
 
   Widget _buildPage(int index) {
-    final controller = AppScope.of(context);
-    
     // Lazily instantiate pages to avoid initializing platform views (e.g., Google Maps) when not visible.
     _pages[index] ??= switch (index) {
       0 => const HomeScreen(),
@@ -137,7 +132,7 @@ class _RootShellState extends State<RootShell> {
       2 => const BusTrackingPage(),
       3 => const ChildrenStatusPage(), // New Page
       4 => const NotificationsPage(),
-      5 => ContactsPage(initialConversationId: controller.pendingConversationId),
+      5 => const ContactsPage(),
       6 => const RequestAbsencePage(),
       7 => const AttendanceHistoryPage(),
       8 => const ParentProfilePage(),
@@ -189,290 +184,298 @@ class CustomDrawer extends StatelessWidget {
           end: Radius.circular(30),
         ),
       ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ---------------- HEADER ----------------
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.xxl + 10,
-              ),
-              // Unified Background: No gradient, matches drawerBg
-              decoration: BoxDecoration(
-                color: drawerBg,
-                borderRadius: const BorderRadiusDirectional.only(
-                  bottomEnd: Radius.circular(30),
-                ),
-                // Optional: Subtle separation if needed, or completely flat
-                // border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.1))),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    InkWell(
-                      onTap: () => onSelect(8), // Profile (Updated Index)
-                      child: Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              // Border color adapted
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white24
-                                    : AppColors.primary.withValues(alpha: 0.2),
-                                width: 2,
-                              ),
-                            ),
-                            child: CircleAvatar(
-                              radius: 42,
-                              backgroundColor: AppColors.primary.withValues(
-                                alpha: 0.2,
-                              ),
-                              backgroundImage:
-                                  controller.userAvatarUrl.isNotEmpty
-                                  ? CachedNetworkImageProvider(
-                                      controller.userAvatarUrl,
-                                      headers: controller.token.isNotEmpty
-                                          ? {
-                                              'Authorization':
-                                                  'Bearer ${controller.token}',
-                                            }
-                                          : null,
-                                    )
-                                  : null,
-                              child: controller.userAvatarUrl.isEmpty
-                                  ? Text(
-                                      controller.userName.isNotEmpty
-                                          ? controller.userName.characters.first
-                                          : '?',
-                                      style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : AppColors.primary,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: AppColors.accent,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.edit_rounded,
-                              size: 14,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      controller.userName,
-                      style: TextStyle(
-                        color: textColor, // Adaptive Color
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : Colors.grey.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        context.t('guardianRole'),
-                        style: TextStyle(
-                          color: subTextColor, // Adaptive Color
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ---------------- HEADER ----------------
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xxl + 10,
             ),
-
-            // ---------------- MENU ----------------
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  vertical: AppSpacing.xl,
-                  horizontal: AppSpacing.md,
-                ),
+            // Unified Background: No gradient, matches drawerBg
+            decoration: BoxDecoration(
+              color: drawerBg,
+              borderRadius: const BorderRadiusDirectional.only(
+                bottomEnd: Radius.circular(30),
+              ),
+              // Optional: Subtle separation if needed, or completely flat
+              // border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : Colors.grey.withValues(alpha: 0.1))),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
                 children: [
-                  _DrawerItem(
-                    title: context.t('home'),
-                    icon: Icons.home_rounded,
-                    isSelected: currentIndex == 0,
-                    isDark: isDark,
-                    onTap: () => onSelect(0),
+                  InkWell(
+                    onTap: () => onSelect(8), // Profile (Updated Index)
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            // Border color adapted
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white24
+                                  : AppColors.primary.withValues(alpha: 0.2),
+                              width: 2,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 42,
+                            backgroundColor: AppColors.primary.withValues(
+                              alpha: 0.2,
+                            ),
+                            backgroundImage: controller.userAvatarUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                    controller.userAvatarUrl,
+                                    headers: controller.token.isNotEmpty
+                                        ? {
+                                            'Authorization':
+                                                'Bearer ${controller.token}',
+                                          }
+                                        : null,
+                                  )
+                                : null,
+                            child: controller.userAvatarUrl.isEmpty
+                                ? Text(
+                                    controller.userName.isNotEmpty
+                                        ? controller.userName.characters.first
+                                        : '?',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : AppColors.primary,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.edit_rounded,
+                            size: 14,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _DrawerItem(
-                    title: context.t('myKids'),
-                    icon: Icons.family_restroom_rounded,
-                    isSelected: currentIndex == 1,
-                    isDark: isDark,
-                    onTap: () => onSelect(1),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    controller.userName,
+                    style: TextStyle(
+                      color: textColor, // Adaptive Color
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                  _DrawerItem(
-                    title: context.t('busTracking'),
-                    icon: Icons.directions_bus_rounded,
-                    isSelected: currentIndex == 2,
-                    isDark: isDark,
-                    onTap: () => onSelect(2),
-                  ),
-                  _DrawerItem(
-                    title: context.t('childrenStatus'),
-                    icon: Icons.timeline_rounded,
-                    isSelected: currentIndex == 3,
-                    isDark: isDark,
-                    onTap: () => onSelect(3),
-                  ),
-                  _DrawerItem(
-                    title: context.t('notifications'),
-                    icon: Icons.notifications_active_rounded,
-                    isSelected: currentIndex == 4, // Shifted from 3
-                    isDark: isDark,
-                    onTap: () => onSelect(4),
-                  ),
-                  _DrawerItem(
-                    title: context.t('chat'),
-                    icon: Icons.chat_bubble_rounded,
-                    isSelected: currentIndex == 5, // Shifted from 4
-                    isDark: isDark,
-                    onTap: () => onSelect(5),
-                  ),
-                  _DrawerItem(
-                    title: context.t('requestAbsence'),
-                    icon: Icons.edit_calendar_rounded,
-                    isSelected: currentIndex == 6, // Shifted from 5
-                    isDark: isDark,
-                    onTap: () => onSelect(6),
-                  ),
-                  _DrawerItem(
-                    title: context.t('attendanceHistory'),
-                    icon: Icons.history_rounded,
-                    isSelected: currentIndex == 7, // Shifted from 6
-                    isDark: isDark,
-                    onTap: () => onSelect(7),
-                  ),
-                  _DrawerItem(
-                    title: context.t('absenceRequests'),
-                    icon: Icons.assignment_turned_in_rounded,
-                    isSelected: currentIndex == 10,
-                    isDark: isDark,
-                    onTap: () => onSelect(10),
-                  ),
-                  _DrawerItem(
-                    title: context.t('locationRequests'),
-                    icon: Icons.location_history_rounded,
-                    isSelected: currentIndex == 11,
-                    isDark: isDark,
-                    onTap: () => onSelect(11),
-                  ),
-                  _DrawerItem(
-                    title: context.t('settings'),
-                    icon: Icons.settings_rounded,
-                    isSelected: currentIndex == 9, // Shifted from 8
-                    isDark: isDark,
-                    onTap: () => onSelect(9),
+                  const SizedBox(height: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.grey.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      context.t('guardianRole'),
+                      style: TextStyle(
+                        color: subTextColor, // Adaptive Color
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
+          ),
 
-            // ---------------- LOGOUT ----------------
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: SafeArea(
-                top: false,
-                child: TextButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(context.t('logout')),
-                        content: Text(context.t('logoutConfirmationRequest')),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text(context.t('cancel')),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context); // Close dialog
-                              controller.logout();
-                            },
-                            child: Text(
-                              context.t('logout'),
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
+          // ---------------- MENU ----------------
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.xl,
+                horizontal: AppSpacing.md,
+              ),
+              children: [
+                _DrawerItem(
+                  title: context.t('home'),
+                  icon: Icons.home_rounded,
+                  isSelected: currentIndex == 0,
+                  isDark: isDark,
+                  onTap: () => onSelect(0),
+                ),
+                _DrawerItem(
+                  title: context.t('myKids'),
+                  icon: Icons.family_restroom_rounded,
+                  isSelected: currentIndex == 1,
+                  isDark: isDark,
+                  onTap: () => onSelect(1),
+                ),
+                _DrawerItem(
+                  title: context.t('busTracking'),
+                  icon: Icons.directions_bus_rounded,
+                  isSelected: currentIndex == 2,
+                  isDark: isDark,
+                  onTap: () => onSelect(2),
+                ),
+                _DrawerItem(
+                  title: context.t('childrenStatus'),
+                  icon: Icons.timeline_rounded,
+                  isSelected: currentIndex == 3,
+                  isDark: isDark,
+                  onTap: () => onSelect(3),
+                ),
+                _DrawerItem(
+                  title: context.t('notifications'),
+                  icon: Icons.notifications_active_rounded,
+                  isSelected: currentIndex == 4, // Shifted from 3
+                  isDark: isDark,
+                  badgeCount: controller.notificationsUnreadCount,
+                  onTap: () => onSelect(4),
+                ),
+                _DrawerItem(
+                  title: context.t('chat'),
+                  icon: Icons.chat_bubble_rounded,
+                  isSelected: currentIndex == 5, // Shifted from 4
+                  isDark: isDark,
+                  badgeCount: controller.chatUnreadCount,
+                  onTap: () => onSelect(5),
+                ),
+                _DrawerItem(
+                  title: context.t('requestAbsence'),
+                  icon: Icons.edit_calendar_rounded,
+                  isSelected: currentIndex == 6, // Shifted from 5
+                  isDark: isDark,
+                  onTap: () => onSelect(6),
+                ),
+                _DrawerItem(
+                  title: context.t('attendanceHistory'),
+                  icon: Icons.history_rounded,
+                  isSelected: currentIndex == 7, // Shifted from 6
+                  isDark: isDark,
+                  onTap: () => onSelect(7),
+                ),
+                _DrawerItem(
+                  title: context.t('absenceRequests'),
+                  icon: Icons.assignment_turned_in_rounded,
+                  isSelected: currentIndex == 10,
+                  isDark: isDark,
+                  badgeCount: controller.absenceUnreadCount,
+                  onTap: () {
+                    onSelect(10);
+                    controller.markNotificationsReadByCategory('absence_history');
                   },
-                  style: TextButton.styleFrom(
-                    foregroundColor: isDark
-                        ? Colors.redAccent[100]
-                        : AppColors.error,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color:
-                            (isDark ? Colors.redAccent[100]! : AppColors.error)
-                                .withValues(alpha: 0.2),
-                        width: 1,
-                      ),
+                ),
+                _DrawerItem(
+                  title: context.t('locationRequests'),
+                  icon: Icons.location_history_rounded,
+                  isSelected: currentIndex == 11,
+                  isDark: isDark,
+                  badgeCount: controller.locationUnreadCount,
+                  onTap: () {
+                    onSelect(11);
+                    controller.markNotificationsReadByCategory('location_requests');
+                  },
+                ),
+                _DrawerItem(
+                  title: context.t('settings'),
+                  icon: Icons.settings_rounded,
+                  isSelected: currentIndex == 9, // Shifted from 8
+                  isDark: isDark,
+                  onTap: () => onSelect(9),
+                ),
+              ],
+            ),
+          ),
+
+          // ---------------- LOGOUT ----------------
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: SafeArea(
+              top: false,
+              child: TextButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(context.t('logout')),
+                      content: Text(context.t('logoutConfirmationRequest')),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(context.t('cancel')),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // Close dialog
+                            controller.logout();
+                          },
+                          child: Text(
+                            context.t('logout'),
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
                     ),
-                    backgroundColor: isDark
-                        ? Colors.red.withValues(alpha: 0.1)
-                        : Colors.transparent,
+                  );
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: isDark
+                      ? Colors.redAccent[100]
+                      : AppColors.error,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: (isDark ? Colors.redAccent[100]! : AppColors.error)
+                          .withValues(alpha: 0.2),
+                      width: 1,
+                    ),
                   ),
-                  icon: const Icon(Icons.logout_rounded, size: 22),
-                  label: Text(
-                    context.t('logout'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
+                  backgroundColor: isDark
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : Colors.transparent,
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 22),
+                label: Text(
+                  context.t('logout'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-      );
-    }
+          ),
+        ],
+      ),
+    );
   }
+}
 
 class _DrawerItem extends StatelessWidget {
   const _DrawerItem({
@@ -481,6 +484,7 @@ class _DrawerItem extends StatelessWidget {
     required this.isSelected,
     required this.isDark,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final String title;
@@ -488,6 +492,7 @@ class _DrawerItem extends StatelessWidget {
   final bool isSelected;
   final bool isDark;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +549,9 @@ class _DrawerItem extends StatelessWidget {
             ),
           ),
           // Clean: No trailing icon needed if the distinct color change is there
-          trailing: isSelected
+          trailing: badgeCount > 0
+              ? SectionBadge(count: badgeCount)
+              : isSelected
               ? Container(
                   width: 6,
                   height: 6,

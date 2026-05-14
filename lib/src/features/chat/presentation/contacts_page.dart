@@ -12,9 +12,7 @@ import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
 /// Displays contacts (drivers & supervisors) and existing conversations.
 /// Tapping a contact opens/creates a conversation → navigates to [ChatPage].
 class ContactsPage extends StatefulWidget {
-  const ContactsPage({super.key, this.initialConversationId});
-
-  final String? initialConversationId;
+  const ContactsPage({super.key});
 
   @override
   State<ContactsPage> createState() => _ContactsPageState();
@@ -24,7 +22,6 @@ class _ContactsPageState extends State<ContactsPage> {
   late final ChatRepository _repo;
 
   List<ChatContact> _contacts = [];
-  List<ChatConversation> _conversations = [];
   bool _isLoading = true;
   String? _error;
 
@@ -33,7 +30,6 @@ class _ContactsPageState extends State<ContactsPage> {
     super.didChangeDependencies();
     if (_isLoading &&
         _contacts.isEmpty &&
-        _conversations.isEmpty &&
         _error == null) {
       _repo = ChatRepository(dio: AppScope.of(context).dio);
       _loadData();
@@ -44,9 +40,10 @@ class _ContactsPageState extends State<ContactsPage> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
+      final appController = AppScope.of(context);
       final results = await Future.wait<dynamic>([
         _repo.getContacts(),
-        _repo.getConversations(),
+        appController.loadConversationsFromApi(),
       ]);
 
       if (mounted) {
@@ -54,28 +51,8 @@ class _ContactsPageState extends State<ContactsPage> {
           _contacts = (results[0] as List<ChatContact>)
               .where((c) => c.role != 'field_supervisor')
               .toList();
-          _conversations = (results[1] as List<ChatConversation>)
-              .where(
-                (c) => !c.participants.any((p) => p.role == 'field_supervisor'),
-              )
-              .toList();
           _isLoading = false;
         });
-
-        // Handle auto-opening if initialConversationId is provided
-        if (widget.initialConversationId != null) {
-          final targetIdStr = widget.initialConversationId;
-          final targetId = int.tryParse(targetIdStr ?? '');
-          final conv = _conversations.cast<ChatConversation?>().firstWhere(
-            (c) => c?.id == targetId,
-            orElse: () => null,
-          );
-          if (conv != null) {
-            _openExistingConversation(conv);
-            // Clear from controller to prevent re-opening on next build
-            AppScope.of(context).clearPendingConversationId();
-          }
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -124,13 +101,12 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   Future<void> _openExistingConversation(ChatConversation conv) async {
-    final userId = AppScope.of(context).userId;
+    final controller = AppScope.of(context);
+    final userId = controller.userId;
     final other = conv.otherParticipant(userId ?? 0);
 
     // Optimistic UI update BEFORE navigation
-    setState(() {
-      conv.unreadCount = 0;
-    });
+    controller.markConversationAsRead(conv.id);
 
     Navigator.push(
       context,
@@ -150,8 +126,16 @@ class _ContactsPageState extends State<ContactsPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final controller = AppScope.of(context);
 
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final conversations = controller.conversations
+            .where((c) => !c.participants.any((p) => p.role == 'field_supervisor'))
+            .toList();
+
+        return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -193,14 +177,14 @@ class _ContactsPageState extends State<ContactsPage> {
                           ),
                         ],
                         // ── Conversations Section ──
-                        if (_conversations.isNotEmpty) ...[
+                        if (conversations.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.lg),
                           _SectionHeader(
                             title: context.t('recentChats'),
                             icon: Icons.chat_rounded,
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          ..._conversations.map(
+                          ...conversations.map(
                             (conv) => _ConversationTile(
                               conversation: conv,
                               isDark: isDark,
@@ -208,7 +192,7 @@ class _ContactsPageState extends State<ContactsPage> {
                             ),
                           ),
                         ],
-                        if (_contacts.isEmpty && _conversations.isEmpty)
+                        if (_contacts.isEmpty && conversations.isEmpty)
                           _buildEmpty(),
                       ]),
                     ),
@@ -216,6 +200,8 @@ class _ContactsPageState extends State<ContactsPage> {
                 ],
               ),
             ),
+        );
+      },
     );
   }
 

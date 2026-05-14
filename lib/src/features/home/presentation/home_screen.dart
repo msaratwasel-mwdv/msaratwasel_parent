@@ -90,29 +90,54 @@ class _HomeScreenState extends State<HomeScreen> {
                     location = result['location'] as LatLng?;
                   }
 
-                  if (location != null) {
-                    String? address;
-                    if (result is Map) {
-                      // Prioritize user-typed note, then reverse geocoded label
-                      address = result['note']?.toString().isNotEmpty == true
-                          ? result['note']
-                          : result['label'];
-                    }
+                    if (location != null) {
+                      String? address;
+                      if (result is Map) {
+                        address = result['note']?.toString().isNotEmpty == true
+                            ? result['note']
+                            : result['label'];
+                      }
 
-                    final success = await AppScope.of(
-                      context,
-                    ).updateHomeLocationApi(location, address: address);
-                    if (success && mounted) {
-                      Navigator.pop(context);
-                    } else if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(context.t('locationUpdateFailed')),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      final controller = AppScope.of(context);
+                      final missingLocStudents =
+                          controller.students.where((s) => !s.hasLocation).toList();
+
+                      String? lastMessage;
+
+                      if (missingLocStudents.isEmpty) {
+                        lastMessage = await controller.updateHomeLocationApi(
+                          location,
+                          address: address,
+                        );
+                      } else {
+                        for (final student in missingLocStudents) {
+                          lastMessage = await controller.updateHomeLocationApi(
+                            location,
+                            studentId: student.id,
+                            address: address,
+                          );
+                        }
+                      }
+
+                      if (mounted) {
+                        if (lastMessage != null && !lastMessage.contains('خطأ') && !lastMessage.contains('فشل')) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(lastMessage),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(lastMessage ?? context.t('locationUpdateFailed')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
                     }
-                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -185,7 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Summary Stats
                 _SummaryStats(
                   students: students,
-                  notifications: notifications,
                   isDark: isDark,
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -357,16 +381,15 @@ class _WelcomeHeader extends StatelessWidget {
 class _SummaryStats extends StatelessWidget {
   const _SummaryStats({
     required this.students,
-    required this.notifications,
     required this.isDark,
   });
 
   final List<Student> students;
-  final List<AppNotification> notifications;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
     final onBusCount = students
         .where(
           (s) =>
@@ -375,7 +398,7 @@ class _SummaryStats extends StatelessWidget {
               s.status == StudentStatus.onBusToHome,
         )
         .length;
-    final unreadCount = notifications.where((n) => !n.read).length;
+    final unreadCount = controller.notificationsUnreadCount;
 
     return Row(
       children: [

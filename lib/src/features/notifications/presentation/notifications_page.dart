@@ -9,6 +9,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/utils/date_utils.dart'
     as date_utils;
 import 'package:msaratwasel_user/src/shared/utils/notification_utils.dart';
+import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -77,6 +78,36 @@ class _NotificationsPageState extends State<NotificationsPage> {
       controller.markNotificationsRead([notification.id]);
     }
 
+    // ── Chat notifications: navigate directly to ChatPage ────────────
+    if (notification.type == NotificationType.chat ||
+        notification.type == NotificationType.supervisorMessage) {
+      final convIdStr = notification.data['conversation_id']?.toString() ??
+          notification.data['conversationId']?.toString() ??
+          notification.data['conv_id']?.toString();
+      final convId = int.tryParse(convIdStr ?? '');
+      if (convId != null) {
+        final senderName = notification.senderName ??
+            notification.data['sender_name']?.toString() ??
+            '';
+        final senderRole = notification.data['sender_role']?.toString() ??
+            (notification.type == NotificationType.supervisorMessage
+                ? 'supervisor'
+                : 'driver');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatPage(
+              conversationId: convId,
+              contactName: senderName,
+              contactRole: senderRole,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // ── Non-chat notifications: show detail dialog ───────────────────
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,7 +154,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isArabicApp = controller.locale.languageCode == 'ar';
     final filtered = controller.notifications.where((n) {
       bool matchesType = true;
       switch (_filter) {
@@ -156,26 +186,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       if (!matchesType) return false;
 
-      // 2. Language-based suppression for bilingual notifications
-      if (n.language != null && n.language!.isNotEmpty) {
-        // Strict match: if notification has a specific language, it must match app locale
-        if (!controller.locale.languageCode.startsWith(n.language!)) {
-          return false;
-        }
-      } else if (n.type == NotificationType.schoolAlert ||
-          n.type == NotificationType.adminAnnouncement ||
-          n.type == NotificationType.supervisorMessage) {
-        // Fallback to character-based detection only if language field is missing
-        final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(n.title + n.body);
-        final hasEnglish = RegExp(r'[a-zA-Z]').hasMatch(n.title + n.body) ||
-            (n.titleEn != null && n.titleEn!.isNotEmpty);
-
-        if (isArabicApp) {
-          if (!hasArabic && hasEnglish) return false;
-        } else {
-          if (hasArabic && !hasEnglish) return false;
-        }
-      }
+      // Language filtering removed: bilingual fields (titleEn/bodyEn) handle
+      // language display via getDisplayTitle(isEn) / getDisplayBody(isEn).
+      // All notifications are always shown regardless of language.
 
       return true;
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
@@ -298,10 +311,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
                         final isEn = controller.locale.languageCode == 'en';
-                        final displayTitle = (item.type == NotificationType.schoolAlert ||
-                                item.type == NotificationType.adminAnnouncement ||
-                                item.type == NotificationType.supervisorMessage ||
-                                item.type == NotificationType.chat)
+                        // Always use bilingual display method
+                        final displayTitle = item.getDisplayTitle(isEn).isNotEmpty
                             ? item.getDisplayTitle(isEn)
                             : context.t('notification_${item.type.name}');
 

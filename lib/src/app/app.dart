@@ -58,6 +58,7 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
             splitScreenMode: true,
             builder: (context, child) {
               return MaterialApp(
+                navigatorKey: _controller.navigatorKey,
                 title: locale.languageCode == 'ar'
                     ? 'مسارات واصل'
                     : 'Msarat Wasel',
@@ -120,6 +121,39 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
       return LoginScreen(controller: _controller);
     }
 
-    return const RootShell();
+    return _FlushPendingChatWrapper(
+      controller: _controller,
+      child: const RootShell(),
+    );
   }
+}
+
+/// Wrapper widget that flushes any queued chat navigation once the
+/// navigator is mounted (cold-start scenario).
+class _FlushPendingChatWrapper extends StatefulWidget {
+  const _FlushPendingChatWrapper({
+    required this.controller,
+    required this.child,
+  });
+
+  final AppController controller;
+  final Widget child;
+
+  @override
+  State<_FlushPendingChatWrapper> createState() =>
+      _FlushPendingChatWrapperState();
+}
+
+class _FlushPendingChatWrapperState extends State<_FlushPendingChatWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    // Flush after the first frame when the navigator is guaranteed to be mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.controller.flushPendingChatRoute();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

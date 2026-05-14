@@ -64,8 +64,9 @@ class _ChatPageState extends State<ChatPage> {
         _handleWebSocketMessage(data);
       });
 
-      // Mark as read on open
+      // Mark as read on open (API + central state)
       _repo.markAsRead(widget.conversationId);
+      app.markConversationAsRead(widget.conversationId);
       // Schedule polling for new messages (as fallback)
       _schedulePoll();
       _isInit = true;
@@ -87,8 +88,9 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _messages.insert(0, newMessage);
       });
-      // Mark as read
+      // Mark as read (API + central state)
       _repo.markAsRead(widget.conversationId);
+      AppScope.of(context).markConversationAsRead(widget.conversationId);
     }
   }
 
@@ -143,8 +145,9 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       if (messages.length != _messages.length) {
         setState(() => _messages = messages);
-        // Also mark as read on the server if we got new messages while polling
+        // Also mark as read on the server + central state
         _repo.markAsRead(widget.conversationId);
+        AppScope.of(context).markConversationAsRead(widget.conversationId);
       }
     } catch (_) {
       // Silently ignore poll errors

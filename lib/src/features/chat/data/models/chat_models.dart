@@ -81,6 +81,24 @@ class ChatConversation {
       return participants.isNotEmpty ? participants.first : null;
     }
   }
+
+  ChatConversation copyWith({
+    int? id,
+    String? type,
+    List<ChatParticipant>? participants,
+    ChatMessage? lastMessage,
+    int? unreadCount,
+    DateTime? updatedAt,
+  }) {
+    return ChatConversation(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      participants: participants ?? this.participants,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
 
 class ChatParticipant {

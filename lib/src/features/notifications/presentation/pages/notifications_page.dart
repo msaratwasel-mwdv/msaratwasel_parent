@@ -24,7 +24,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   void _checkPendingNotification() {
-    final controller = AppScope.of(context, listen: false);
+    final controller = AppScope.of(context);
     final pendingId = controller.pendingNotificationId;
     if (pendingId != null) {
       // Find the notification in the list
@@ -39,7 +39,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         // Clear the pending ID so it doesn't trigger again
         controller.clearPendingNotificationId();
         
-        developer.log('🔔 Handled pending notification: $pendingId', name: 'NOTIF_PAGE');
+        debugPrint('🔔 Handled pending notification: $pendingId');
       }
     }
   }

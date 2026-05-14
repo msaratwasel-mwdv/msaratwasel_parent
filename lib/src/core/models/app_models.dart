@@ -238,6 +238,7 @@ class Student {
     this.onBusToHomeTime,
     this.arrivedHomeTime,
     this.etaMinutes,
+    this.pendingLocation,
   });
 
   final String id;
@@ -259,6 +260,7 @@ class Student {
   final String? schoolName;
   final String? schoolLocation;
   final LatLng? schoolCoords;
+  final Map<String, dynamic>? pendingLocation;
 
   /// Returns true if the student has a valid home location (non-null and non-zero)
   bool get hasLocation =>
@@ -325,6 +327,7 @@ class Student {
       onBusToHomeTime: null,
       arrivedHomeTime: null,
       etaMinutes: json['eta_minutes'] as int?,
+      pendingLocation: json['pending_location'] as Map<String, dynamic>?,
     );
   }
 
@@ -378,6 +381,7 @@ class Student {
     DateTime? onBusToHomeTime,
     DateTime? arrivedHomeTime,
     int? etaMinutes,
+    Map<String, dynamic>? pendingLocation,
   }) {
     return Student(
       id: this.id,
@@ -404,6 +408,7 @@ class Student {
       onBusToHomeTime: onBusToHomeTime ?? this.onBusToHomeTime,
       arrivedHomeTime: arrivedHomeTime ?? this.arrivedHomeTime,
       etaMinutes: etaMinutes ?? this.etaMinutes,
+      pendingLocation: pendingLocation ?? this.pendingLocation,
     );
   }
 }
@@ -422,6 +427,8 @@ class AppNotification {
     this.correlationId,
     this.read = false,
     this.language,
+    this.category,
+    this.targetScreen,
     this.data = const {},
   });
 
@@ -437,6 +444,10 @@ class AppNotification {
   final DateTime time;
   bool read;
   final String? language;
+  /// Backend payload: notification category (e.g. bus_tracking, chat, student_status)
+  final String? category;
+  /// Backend payload: target screen for deep-linking (e.g. map_page, chat_details)
+  final String? targetScreen;
   final Map<String, dynamic> data;
 
   String _pickLanguage(String text, bool isEn) {
@@ -458,24 +469,33 @@ class AppNotification {
   }
 
   String getDisplayTitle(bool isEn) {
-    if (isEn && titleEn != null && titleEn!.isNotEmpty) return titleEn!;
-    return _pickLanguage(title, isEn);
+    if (isEn) {
+      if (titleEn != null && titleEn!.isNotEmpty) return titleEn!;
+      // If we are in English mode but titleEn is missing, try to pick it from title if title is bilingual
+      return _pickLanguage(title, true);
+    }
+    // Arabic mode
+    return _pickLanguage(title, false);
   }
 
   String getDisplayBody(bool isEn) {
-    if (isEn && bodyEn != null && bodyEn!.isNotEmpty) return bodyEn!;
-
-    // Translation fallback for Absence notification from website/system
-    if (isEn && type == NotificationType.absence) {
-      if (body.contains('لم يحضر')) {
-        return body
-            .replaceAll('الطالب', 'Student')
-            .replaceAll('لم يحضر في الحافلة اليوم',
-                'did not attend the bus today');
+    if (isEn) {
+      if (bodyEn != null && bodyEn!.isNotEmpty) return bodyEn!;
+      
+      // Translation fallback for Absence notification from website/system
+      if (type == NotificationType.absence) {
+        if (body.contains('لم يحضر')) {
+          return body
+              .replaceAll('الطالب', 'Student')
+              .replaceAll('لم يحضر في الحافلة اليوم',
+                  'did not attend the bus today');
+        }
       }
+      
+      return _pickLanguage(body, true);
     }
-
-    return _pickLanguage(body, isEn);
+    // Arabic mode
+    return _pickLanguage(body, false);
   }
 
   String getDisplaySender(bool isEn) =>
@@ -484,65 +504,110 @@ class AppNotification {
           : (senderName ?? '');
 
   factory AppNotification.fromMap(Map<String, dynamic> data) {
+    Map<String, dynamic>? nestedData;
+    if (data['data'] is Map) {
+      nestedData = Map<String, dynamic>.from(data['data']);
+    } else if (data['data'] is String) {
+      try {
+        final decoded = jsonDecode(data['data']);
+        if (decoded is Map) {
+          nestedData = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    
+    final notificationId = data['notification_id']?.toString() ??
+        nestedData?['notification_id']?.toString() ??
+        data['message_id']?.toString() ??
+        data['id']?.toString();
+
+    // Extract category/target_screen from nested data or top-level
+    final category = data['category']?.toString() ??
+        nestedData?['category']?.toString() ??
+        data['type']?.toString();
+    final targetScreen = data['target_screen']?.toString() ??
+        nestedData?['target_screen']?.toString();
+
+    // Safe extraction helper
+    String? pick(List<dynamic> options) {
+      for (final opt in options) {
+        final str = opt?.toString();
+        if (str != null && str.trim().isNotEmpty) return str;
+      }
+      return null;
+    }
+
+    final String titleAr = pick([data['title_ar'], data['title'], data['sender_name'], nestedData?['title_ar'], nestedData?['title'], nestedData?['sender_name']]) ?? '';
+    final String? titleEn = pick([data['title_en'], data['titleEn'], data['sender_name_en'], nestedData?['title_en'], nestedData?['titleEn'], nestedData?['sender_name_en']]);
+
+    final String messageAr = pick([data['message_ar'], data['message'], data['body'], data['messagePreview'], nestedData?['message_ar'], nestedData?['message'], nestedData?['body']]) ?? '';
+    final String? messageEn = pick([data['message_en'], data['messageEn'], data['body_en'], data['message_en'], nestedData?['message_en'], nestedData?['messageEn']]);
+
     return AppNotification(
-      id: data['id']?.toString() ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      correlationId: data['correlation_id']?.toString(),
-      title: data['title'] as String? ?? data['title_ar'] as String? ?? '',
-      titleEn: data['title_en'] as String? ?? data['titleEn'] as String?,
-      body: data['message'] as String? ??
-          data['body'] as String? ??
-          data['content'] as String? ??
-          data['content_ar'] as String? ??
-          '',
-      bodyEn: data['message_en'] as String? ??
-          data['body_en'] as String? ??
-          data['content_en'] as String? ??
-          data['bodyEn'] as String?,
-      senderName: data['sender_name'] as String? ??
-          data['from_user_name'] as String? ??
-          data['sender'] as String?,
-      senderNameEn: data['sender_name_en'] as String? ??
-          data['from_user_name_en'] as String?,
-      type: parseType(data['type'] as String?),
-      time: DateTime.tryParse(data['created_at']?.toString() ?? '') ??
-          DateTime.now(),
-      language: data['language']?.toString().toLowerCase(),
+      id: notificationId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      correlationId: data['correlation_id']?.toString() ?? 
+                    nestedData?['correlation_id']?.toString() ?? 
+                    notificationId,
+      title: titleAr,
+      titleEn: titleEn,
+      body: messageAr,
+      bodyEn: messageEn,
+      senderName: data['sender_name']?.toString() ??
+          data['from_user_name']?.toString() ??
+          nestedData?['sender_name']?.toString(),
+      senderNameEn: data['sender_name_en']?.toString() ??
+          data['from_user_name_en']?.toString() ??
+          nestedData?['sender_name_en']?.toString(),
+      type: parseType(data['type']?.toString() ?? nestedData?['type']?.toString()),
+      time: DateTime.tryParse(data['created_at']?.toString() ?? '') ?? DateTime.now(),
+      language: data['language']?.toString().toLowerCase() ?? nestedData?['language']?.toString().toLowerCase(),
+      category: category,
+      targetScreen: targetScreen,
       data: data,
     );
   }
 
   factory AppNotification.fromFcm(RemoteMessage message) {
     final data = message.data;
-    final type = parseType(data['type'] as String?);
+    final type = parseType(data['type']?.toString());
 
-    // Prioritize the database ID for deduplication with real-time events
     final dbId = data['notification_id']?.toString() ??
         data['id']?.toString() ??
+        data['message_id']?.toString() ??
         message.messageId;
+
+    // Safe extraction helper
+    String? pick(List<dynamic> options) {
+      for (final opt in options) {
+        final str = opt?.toString();
+        if (str != null && str.trim().isNotEmpty) return str;
+      }
+      return null;
+    }
+
+    final String titleAr = pick([data['title_ar'], data['title'], data['sender_name'], message.notification?.title]) ?? '';
+    final String? titleEn = pick([data['title_en'], data['titleEn'], data['sender_name_en'], message.notification?.title]);
+
+    final String messageAr = pick([data['message_ar'], data['message'], data['body'], data['messagePreview'], message.notification?.body]) ?? '';
+    final String? messageEn = pick([data['message_en'], data['messageEn'], data['body_en'], data['message_en'], message.notification?.body]);
 
     return AppNotification(
       id: dbId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      correlationId: data['correlation_id']?.toString(),
-      title: message.notification?.title ??
-          data['title'] ??
-          data['title_ar'] ??
-          '',
-      titleEn: data['title_en'] as String? ?? data['titleEn'] as String?,
-      body: message.notification?.body ??
-          data['body'] ??
-          data['message'] ??
-          data['content'] ??
-          '',
-      bodyEn: data['message_en'] as String? ??
-          data['body_en'] as String? ??
-          data['content_en'] as String? ??
-          data['bodyEn'] as String?,
-      senderName: data['sender_name'] as String? ?? data['sender'] as String?,
-      senderNameEn: data['sender_name_en'] as String?,
+      correlationId: data['correlation_id']?.toString() ?? 
+                    data['notification_id']?.toString() ?? 
+                    data['message_id']?.toString() ?? 
+                    message.messageId,
+      title: titleAr,
+      titleEn: titleEn,
+      body: messageAr,
+      bodyEn: messageEn,
+      senderName: data['sender_name']?.toString() ?? data['sender']?.toString(),
+      senderNameEn: data['sender_name_en']?.toString(),
       type: type,
       time: DateTime.now(),
       language: data['language']?.toString().toLowerCase(),
+      category: data['category']?.toString(),
+      targetScreen: data['target_screen']?.toString(),
       data: data,
     );
   }
@@ -561,6 +626,8 @@ class AppNotification {
       'time': time.toIso8601String(),
       'read': read,
       'language': language,
+      'category': category,
+      'target_screen': targetScreen,
       'data': data,
     };
   }
@@ -579,6 +646,8 @@ class AppNotification {
       time: DateTime.parse(json['time'] as String),
       read: json['read'] as bool? ?? false,
       language: json['language'] as String?,
+      category: json['category'] as String?,
+      targetScreen: json['target_screen'] as String?,
       data: json['data'] as Map<String, dynamic>? ?? {},
     );
   }
@@ -591,11 +660,13 @@ class AppNotification {
       case 'bus_boarding_afternoon':
       case 'bus_boarding':
       case 'student_boarded':
+      case 'check_in': // Added
       case 'checkIn':
         return NotificationType.checkIn;
       case 'student_alighted':
       case 'bus_alighting':
       case 'alighting':
+      case 'check_out': // Added
       case 'checkOut':
         return NotificationType.checkOut;
       case 'bus_proximity':
@@ -610,6 +681,7 @@ class AppNotification {
       case 'delay':
         return NotificationType.delay;
       case 'bus_route_change':
+      case 'route_change': // Added
       case 'routeChange':
         return NotificationType.routeChange;
       case 'student_absence':
@@ -617,6 +689,7 @@ class AppNotification {
         return NotificationType.absence;
       case 'absence_approved':
       case 'absenceApproved':
+      case 'absence_request_processed':
         return NotificationType.absenceApproved;
       case 'absence_rejected':
       case 'absenceRejected':
@@ -635,6 +708,7 @@ class AppNotification {
       case 'adminAnnouncement':
         return NotificationType.adminAnnouncement;
       case 'supervisor_message':
+      case 'supervisor_msg': // Added
       case 'supervisorMessage':
         return NotificationType.supervisorMessage;
       case 'new_message':
@@ -650,6 +724,10 @@ class AppNotification {
       case 'location_rejected':
       case 'locationRejected':
         return NotificationType.locationRejected;
+      case 'student_status': // Added: mapped to checkIn/checkOut based on data usually
+        return NotificationType.arrival; // Fallback or specific status
+      case 'address_change': // Added
+        return NotificationType.locationApproved;
       default:
         return NotificationType.schoolAlert;
     }
