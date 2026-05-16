@@ -1,5 +1,6 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:convert';
 import '../config/app_config.dart';
 
 enum StudentStatus {
@@ -38,6 +39,9 @@ enum NotificationType {
   locationRequest,
   locationApproved,
   locationRejected,
+  tripStarted,
+  tripEnded,
+  schoolAttendance,
 }
 
 extension NotificationTypeX on NotificationType {
@@ -77,6 +81,12 @@ extension NotificationTypeX on NotificationType {
         return arabic ? 'تمت الموافقة على الموقع' : 'Location approved';
       case NotificationType.locationRejected:
         return arabic ? 'تم رفض طلب الموقع' : 'Location request rejected';
+      case NotificationType.tripStarted:
+        return arabic ? 'بدأت الرحلة' : 'Trip started';
+      case NotificationType.tripEnded:
+        return arabic ? 'انتهت الرحلة' : 'Trip ended';
+      case NotificationType.schoolAttendance:
+        return arabic ? 'تحديث الحضور' : 'Attendance update';
     }
   }
 
@@ -429,6 +439,7 @@ class AppNotification {
     this.language,
     this.category,
     this.targetScreen,
+    this.unreadCount,
     this.data = const {},
   });
 
@@ -444,6 +455,7 @@ class AppNotification {
   final DateTime time;
   bool read;
   final String? language;
+  final int? unreadCount;
   /// Backend payload: notification category (e.g. bus_tracking, chat, student_status)
   final String? category;
   /// Backend payload: target screen for deep-linking (e.g. map_page, chat_details)
@@ -538,10 +550,10 @@ class AppNotification {
     }
 
     final String titleAr = pick([data['title_ar'], data['title'], data['sender_name'], nestedData?['title_ar'], nestedData?['title'], nestedData?['sender_name']]) ?? '';
-    final String? titleEn = pick([data['title_en'], data['titleEn'], data['sender_name_en'], nestedData?['title_en'], nestedData?['titleEn'], nestedData?['sender_name_en']]);
+    final String? titleEn = pick([data['title_en'], data['titleEn'], data['title_English'], data['sender_name_en'], nestedData?['title_en'], nestedData?['titleEn'], nestedData?['sender_name_en']]);
 
     final String messageAr = pick([data['message_ar'], data['message'], data['body'], data['messagePreview'], nestedData?['message_ar'], nestedData?['message'], nestedData?['body']]) ?? '';
-    final String? messageEn = pick([data['message_en'], data['messageEn'], data['body_en'], data['message_en'], nestedData?['message_en'], nestedData?['messageEn']]);
+    final String? messageEn = pick([data['message_en'], data['messageEn'], data['message_English'], data['body_en'], data['bodyEn'], nestedData?['message_en'], nestedData?['messageEn']]);
 
     return AppNotification(
       id: notificationId ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -561,6 +573,7 @@ class AppNotification {
       type: parseType(data['type']?.toString() ?? nestedData?['type']?.toString()),
       time: DateTime.tryParse(data['created_at']?.toString() ?? '') ?? DateTime.now(),
       language: data['language']?.toString().toLowerCase() ?? nestedData?['language']?.toString().toLowerCase(),
+      unreadCount: int.tryParse(data['unread_count']?.toString() ?? nestedData?['unread_count']?.toString() ?? ''),
       category: category,
       targetScreen: targetScreen,
       data: data,
@@ -586,10 +599,10 @@ class AppNotification {
     }
 
     final String titleAr = pick([data['title_ar'], data['title'], data['sender_name'], message.notification?.title]) ?? '';
-    final String? titleEn = pick([data['title_en'], data['titleEn'], data['sender_name_en'], message.notification?.title]);
+    final String? titleEn = pick([data['title_en'], data['titleEn'], data['title_English'], data['sender_name_en'], message.notification?.title]);
 
     final String messageAr = pick([data['message_ar'], data['message'], data['body'], data['messagePreview'], message.notification?.body]) ?? '';
-    final String? messageEn = pick([data['message_en'], data['messageEn'], data['body_en'], data['message_en'], message.notification?.body]);
+    final String? messageEn = pick([data['message_en'], data['messageEn'], data['message_English'], data['body_en'], data['bodyEn'], message.notification?.body]);
 
     return AppNotification(
       id: dbId ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -606,6 +619,7 @@ class AppNotification {
       type: type,
       time: DateTime.now(),
       language: data['language']?.toString().toLowerCase(),
+      unreadCount: int.tryParse(data['unread_count']?.toString() ?? ''),
       category: data['category']?.toString(),
       targetScreen: data['target_screen']?.toString(),
       data: data,
@@ -628,6 +642,7 @@ class AppNotification {
       'language': language,
       'category': category,
       'target_screen': targetScreen,
+      'unread_count': unreadCount,
       'data': data,
     };
   }
@@ -648,6 +663,7 @@ class AppNotification {
       language: json['language'] as String?,
       category: json['category'] as String?,
       targetScreen: json['target_screen'] as String?,
+      unreadCount: json['unread_count'] as int?,
       data: json['data'] as Map<String, dynamic>? ?? {},
     );
   }
@@ -728,6 +744,16 @@ class AppNotification {
         return NotificationType.arrival; // Fallback or specific status
       case 'address_change': // Added
         return NotificationType.locationApproved;
+      case 'trip_started':
+      case 'tripStarted':
+        return NotificationType.tripStarted;
+      case 'trip_ended':
+      case 'tripEnded':
+        return NotificationType.tripEnded;
+      case 'school_attendance':
+      case 'schoolAttendance':
+      case 'attendance_update':
+        return NotificationType.schoolAttendance;
       default:
         return NotificationType.schoolAlert;
     }

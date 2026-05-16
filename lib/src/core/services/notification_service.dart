@@ -40,6 +40,20 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     await prefs.setStringList('processed_cids', processedCids);
   }
 
+  // ── Security Check: Student Relationship ──────────────────────────────
+  final targetStudentId = data['student_id']?.toString();
+  if (targetStudentId != null) {
+    final List<String> myStudentIds = prefs.getStringList('my_student_ids') ?? [];
+    if (!myStudentIds.contains(targetStudentId)) {
+      developer.log(
+        '🛑 SECURITY [BG]: Suppressing notification for foreign student $targetStudentId',
+        name: 'FCM',
+      );
+      return;
+    }
+  }
+
+
   // On Android, if the FCM message contains a `notification` object,
   // the system tray automatically displays it. We must NOT show a
   // second local notification, or the user sees duplicates.
@@ -55,7 +69,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
   
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@drawable/ic_notification');
+      AndroidInitializationSettings('ic_notification');
   
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
@@ -110,7 +124,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
           ticker: 'ticker',
           playSound: true,
           enableVibration: true,
-          icon: '@drawable/ic_notification',
+          icon: 'ic_notification',
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -215,7 +229,7 @@ class NotificationService {
 
     // ── 2. Initialize Local Notifications ─────────────────────────────────
     const androidInit = AndroidInitializationSettings(
-      '@drawable/ic_notification',
+      'ic_notification',
     );
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -289,16 +303,10 @@ class NotificationService {
 
     // ── 5. Foreground Message Handler (REGISTERED ONCE) ───────────────────
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      developer.log(
-        '📬 FCM [FG]: ${message.notification?.title} | data: ${message.data}',
-        name: 'FCM',
-      );
+      developer.log('📥 FCM RAW DATA: ${jsonEncode(message.data)}', name: 'FCM_RAW');
       
       final notification = AppNotification.fromFcm(message);
-
-      // Deduplication is handled centrally in AppController.addNotification()
-      // via correlationId and notification ID checks. No need for a separate
-      // dedup set here — it was causing inconsistencies.
+      developer.log('📦 MODEL CREATED: ID=${notification.id}, TitleEn=${notification.titleEn}', name: 'FCM_RAW');
 
       // Update app state (calls addNotification which handles dedup + popup)
       _onReceived?.call(notification, isTap: false);
@@ -386,8 +394,8 @@ class NotificationService {
       channelId ?? _channelId,
       channelName ?? _channelName,
       channelDescription: _channelDesc,
-      icon: '@drawable/ic_notification',
-      largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'),
+      icon: 'ic_notification',
+      largeIcon: const DrawableResourceAndroidBitmap('launcher_icon'),
       color: const Color(0xFF062A5A),
       importance: Importance.max,
       priority: Priority.high,

@@ -38,9 +38,12 @@ class NotificationRouter {
   ///   - In-app notifications list tap
   static void handleNotificationTap(AppController controller, AppNotification notification) {
     developer.log(
-      '🔗 [TAP DETECTED] id=${notification.id} | type=${notification.type} | target=${notification.targetScreen} | data=${notification.data}',
+      '🔗 [TAP DETECTED] id=${notification.id} | type=${notification.type} | target=${notification.targetScreen} | cat=${notification.category} | data=${notification.data}',
       name: 'ROUTER',
     );
+
+    // Mark as read immediately on tap to sync UI counters
+    controller.markNotificationsRead([notification.id]);
 
     // Defer routing to ensure the widget tree is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -218,12 +221,15 @@ class NotificationRouter {
       case 'contacts':
         return 5; // ContactsPage (for non-chat-message taps that still target chat)
       case 'attendance_history':
+      case 'school_attendance':
         return 7; // AttendanceHistoryPage
       case 'absence_history':
+      case 'absence_requests': // Added: match backend
         return 10; // AbsenceHistoryPage
       case 'location_requests':
       case 'location_request_details':
       case 'requests_history':
+      case 'location_request': // Added
         return 11; // LocationRequestsPage
       case 'notifications':
         return 4; // NotificationsPage
@@ -249,8 +255,10 @@ class NotificationRouter {
       case 'attendance':
         return 7;
       case 'absence':
+      case 'absences':
         return 10;
       case 'location_request':
+      case 'location_requests':
         return 11;
       case 'admin':
       case 'school':
@@ -275,7 +283,14 @@ class NotificationRouter {
       case NotificationType.arrival:
       case NotificationType.delay:
       case NotificationType.routeChange:
+      case NotificationType.tripStarted: // Added
+      case NotificationType.tripEnded: // Added
         controller.setNavIndex(2);
+        return;
+      
+      // Attendance events → attendance history
+      case NotificationType.schoolAttendance: // Added
+        controller.setNavIndex(7);
         return;
 
       // Student status events → children status

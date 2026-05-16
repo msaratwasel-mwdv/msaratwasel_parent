@@ -21,8 +21,29 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
     super.initState();
     // Refresh history when entering the page to ensure latest status
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
       AppScope.of(context).loadLocationRequestsFromApi();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
+    });
+  }
+
+  void _checkPendingNotification() {
+    if (!mounted) return;
+    final appScope = AppScope.of(context);
+    final pendingId = appScope.pendingNotificationId;
+    if (pendingId != null) {
+      // Consume the pending notification
+      appScope.clearPendingNotificationId();
+      // Force refresh data
+      appScope.loadLocationRequestsFromApi();
+    }
   }
 
   @override

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/pages/children_status_page.dart';
@@ -53,8 +56,10 @@ class _RootShellState extends State<RootShell> {
       builder: (context, _) {
         // Handle Deep Linking / Notification Redirects
         if (controller.pendingNotificationId != null) {
-          // Invalidate the cached NotificationsPage so it picks up the pending notification
-          _pages[4] = null;
+          // Invalidate cached pages that handle deep-links to ensure they re-initialize and consume the ID
+          _pages[4] = null;  // Notifications
+          _pages[10] = null; // Absence History
+          _pages[11] = null; // Location Requests
         }
 
         final currentIndex = controller.navIndex.clamp(0, _pages.length - 1);
@@ -115,9 +120,15 @@ class _RootShellState extends State<RootShell> {
             ),
             appBar: null,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: currentIndex == 2
-                ? page
-                : SafeArea(top: true, bottom: false, child: page),
+            body: controller.hasMissingLocation
+                ? MissingLocationView(
+                    students: controller.students
+                        .where((s) => !s.hasLocation)
+                        .toList(),
+                  )
+                : currentIndex == 2
+                    ? page
+                    : SafeArea(top: true, bottom: false, child: page),
           ),
         );
       },
@@ -566,3 +577,216 @@ class _DrawerItem extends StatelessWidget {
     );
   }
 }
+
+class MissingLocationView extends StatelessWidget {
+  const MissingLocationView({super.key, required this.students});
+
+  final List<Student> students;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final controller = AppScope.of(context);
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: isDark ? const Color(0xFF0F172A) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.location_off_rounded,
+              color: AppColors.error,
+              size: 64,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            context.t('mandatoryLocationTitle') ?? 'تحديد الموقع المنزل إلزامي',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            context.t('mandatoryLocationDesc') ??
+                'يرجى تحديد موقع المنزل لكل ابن لضمان وصول الحافلة بدقة.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: isDark ? Colors.white70 : AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 40),
+          Expanded(
+            child: ListView.separated(
+              itemCount: students.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final student = students[index];
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.grey.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark ? Colors.white12 : Colors.black12,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        backgroundImage: (student.avatarUrl != null &&
+                                student.avatarUrl!.isNotEmpty)
+                            ? CachedNetworkImageProvider(
+                                student.avatarUrl!,
+                                headers: controller.token.isNotEmpty
+                                    ? {
+                                        'Authorization':
+                                            'Bearer ${controller.token}',
+                                      }
+                                    : null,
+                              )
+                            : null,
+                        child: (student.avatarUrl == null ||
+                                student.avatarUrl!.isEmpty)
+                            ? Text(
+                                student.displayName.isNotEmpty 
+                                  ? student.displayName.characters.first 
+                                  : '?',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              student.displayName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              student.grade,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white60 : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          // Show loading
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LocationPickerScreen(
+                                initialLocation: student.homeLocation,
+                              ),
+                            ),
+                          );
+
+                          if (context.mounted) Navigator.pop(context); // close loading
+
+                          if (result != null && context.mounted) {
+                            LatLng? location;
+                            String? label;
+                            String? note;
+
+                            if (result is LatLng) {
+                              location = result;
+                            } else if (result is Map) {
+                              location = result['location'] as LatLng?;
+                              label = result['label'] as String?;
+                              note = result['note'] as String?;
+                            }
+
+                            if (location != null) {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+
+                              await controller.updateHomeLocationApi(
+                                location,
+                                studentId: student.id,
+                                address: label,
+                                note: note,
+                              );
+
+                              if (context.mounted) Navigator.pop(context);
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        child: Text(context.t('setNow') ?? 'تحديد'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Logout button as a secondary option if they are stuck
+          TextButton.icon(
+            onPressed: () => controller.logout(),
+            icon: const Icon(Icons.logout_rounded, size: 20),
+            label: Text(context.t('logout') ?? 'تسجيل الخروج'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.redAccent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

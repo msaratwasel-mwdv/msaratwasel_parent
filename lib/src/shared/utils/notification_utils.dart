@@ -37,6 +37,12 @@ extension NotificationTypeUI on NotificationType {
         return Icons.add_location_alt_rounded;
       case NotificationType.locationRejected:
         return Icons.wrong_location_rounded;
+      case NotificationType.tripStarted:
+        return Icons.directions_bus_rounded;
+      case NotificationType.tripEnded:
+        return Icons.check_circle_rounded;
+      case NotificationType.schoolAttendance:
+        return Icons.how_to_reg_rounded;
     }
   }
 }

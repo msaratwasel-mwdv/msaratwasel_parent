@@ -207,10 +207,15 @@ class AppController extends ChangeNotifier {
 
   bool get hasNewMessages => _hasNewMessages;
 
+  bool _hasMissingLocation = false;
+  bool get hasMissingLocation => _hasMissingLocation;
+
   void clearNewMessages() {
     _hasNewMessages = false;
     notifyListeners();
   }
+  
+  int? _serverUnreadCount;
 
   // --- Unread Counts Provider ---
   int get chatUnreadCount {
@@ -219,6 +224,7 @@ class AppController extends ChangeNotifier {
   }
 
   int get notificationsUnreadCount {
+    if (_serverUnreadCount != null) return _serverUnreadCount!;
     return _notifications.where((n) => !n.read).length;
   }
 
@@ -473,6 +479,10 @@ class AppController extends ChangeNotifier {
             .map((e) => Student.fromJson(e as Map<String, dynamic>))
             .toList();
 
+        // Check for missing locations
+        _hasMissingLocation = _students.any((s) => !s.hasLocation);
+        developer.log('📍 Missing location check: $_hasMissingLocation', name: 'APP_STATE');
+
         // 🚌 الاشتراك في قنوات الباصات للأبناء لتتبع مواقعهم لحظياً
         for (var student in _students) {
           if (student.bus.id.isNotEmpty && student.bus.id != '-') {
@@ -486,6 +496,12 @@ class AppController extends ChangeNotifier {
 
         // Synchronize trip groups with the loaded students
         _syncTripGroupsWithStudents();
+
+        // ✅ Security: Persist student IDs for background isolate checks
+        final studentIds = _students.map((s) => s.id.toString()).toList();
+        await prefs.setStringList('my_student_ids', studentIds);
+        developer.log('🔐 Persisted ${studentIds.length} student IDs for background security checks.', name: 'AUTH');
+
 
         // LOAD PERSISTED TIMESTAMPS FOR TODAY
         final todayStr =
@@ -512,13 +528,13 @@ class AppController extends ChangeNotifier {
         }
 
         AppLogger.d('✅ Loaded ${_students.length} children');
-        notifyListeners();
       }
     } catch (e, st) {
       AppLogger.d('❌ loadChildrenFromApi failed: $e');
       print(st);
     } finally {
       _isLoadingChildren = false;
+      notifyListeners();
     }
   }
 
@@ -1214,15 +1230,28 @@ class AppController extends ChangeNotifier {
     }
 
     final prefs = await _storage.prefs;
+    
+    // 1. Terminate Real-time Connections
+    _reverbService?.dispose();
+    _reverbService = null;
+
+    // 2. Clear Persistent Storage (Identifiable Data)
     await _storage.deleteAccessToken();
+    await prefs.remove('user_id');
     await prefs.remove('user_name');
     await prefs.remove('user_name_en');
     await prefs.remove('user_phone');
     await prefs.remove('user_email');
     await prefs.remove('user_national_id');
     await prefs.remove('user_avatar_url');
+    // Clear processed CIDs and student IDs to prevent leaking to next user session
+    await prefs.remove('processed_cids');
+    await prefs.remove('my_student_ids');
 
+
+    // 3. Clear In-Memory State
     _isAuthenticated = false;
+    _userId = null;
     _userName = '';
     _userNameEn = '';
     _userPhone = '';
@@ -1230,7 +1259,11 @@ class AppController extends ChangeNotifier {
     _userNationalId = '';
     _userAvatarUrl = '';
     _students = [];
+    _hasMissingLocation = false;
+    _notifications.clear();
+    _processedCidsMemory.clear();
     _navIndex = 0;
+    
     notifyListeners();
   }
 
@@ -1330,6 +1363,14 @@ class AppController extends ChangeNotifier {
         item.read = true;
       }
     }
+    
+    // Optimistically decrement server unread count if we are marking specific items as read
+    if (_serverUnreadCount != null && ids != null && ids.isNotEmpty) {
+      _serverUnreadCount = math.max(0, _serverUnreadCount! - ids.length);
+    } else if (ids == null) {
+      _serverUnreadCount = 0;
+    }
+    
     notifyListeners();
 
     // 2. Sync with server
@@ -1355,9 +1396,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> markNotificationsReadByCategory(String category) async {
+    final List<String> synonyms;
+    if (category == 'absence_history' || category == 'absence' || category == 'absences') {
+      synonyms = ['absence_history', 'absence', 'absences'];
+    } else if (category == 'location_requests' || category == 'location_request' || category == 'location_request_details') {
+      synonyms = ['location_requests', 'location_request', 'location_request_details'];
+    } else {
+      synonyms = [category];
+    }
+
     final targetIds = _notifications
         .where((n) =>
-            !n.read && (n.category == category || n.targetScreen == category))
+            !n.read && (synonyms.contains(n.category) || synonyms.contains(n.targetScreen)))
         .map((n) => n.id)
         .toList();
     if (targetIds.isNotEmpty) {
@@ -1365,88 +1415,109 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  /// Checks if a correlation ID has been processed, using both memory and persistent storage.
+  /// Checks if a correlation ID has been processed.
   Future<bool> _isCidProcessed(String? cid) async {
     if (cid == null) return false;
-    
-    // 1. Check memory first (fast)
-    if (_processedCorrelationIds.contains(cid)) return true;
-    
-    // Optimistically add to memory to prevent async race conditions
-    _processedCorrelationIds.add(cid);
-    if (_processedCorrelationIds.length > 100) {
-      _processedCorrelationIds.remove(_processedCorrelationIds.first);
-    }
-    
-    // 2. Check SharedPreferences (persistent, syncs with background isolate)
     try {
       final prefs = await _storage.prefs;
       final List<String> processedCids = prefs.getStringList('processed_cids') ?? [];
-      
-      if (processedCids.contains(cid)) {
-        return true;
-      }
-      
-      // 3. Mark as processed in persistent storage
+      if (processedCids.contains(cid)) return true;
       processedCids.add(cid);
       if (processedCids.length > 100) processedCids.removeAt(0);
       await prefs.setStringList('processed_cids', processedCids);
-    } catch (e) {
-      developer.log('⚠️ Failed to check persistent CIDs: $e', name: 'NOTIFICATION');
-    }
-    
+    } catch (_) {}
     return false;
   }
-
   /// Called by [NotificationService] whenever an FCM push arrives.
   Future<void> addNotification(AppNotification notification, {bool isTap = false}) async {
+    developer.log('🧪 DEBUG: Incoming notification ${notification.id} | isTap: $isTap', name: 'NOTIF_DEBUG');
+    developer.log('🧪 DEBUG: List length before: ${_notifications.length}', name: 'NOTIF_DEBUG');
     final String currentLang = locale.languageCode;
     final String? payloadLang = notification.data['language']
         ?.toString()
         .toLowerCase();
 
     developer.log(
-      '🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload CID: ${notification.correlationId}, isTap: $isTap',
+      '🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload CID: ${notification.correlationId}, unread: ${notification.unreadCount}, isTap: $isTap',
       name: 'NOTIFICATION',
     );
 
-    // 1. Check for global deduplication FIRST
-    // Check memory set first (Synchronous, ultra-fast)
+    // Sync global unread count if provided by server.
+    // Note: This may cause a jump (e.g. from 20 to 84) because it reflects the 
+    // total unread count in the database, whereas the app might have only 
+    // loaded a limited number of recent notifications locally.
+    if (notification.unreadCount != null) {
+      _serverUnreadCount = notification.unreadCount;
+      developer.log('📈 Synced server unread count: $_serverUnreadCount', name: 'NOTIFICATION');
+    }
+    
+    if (isTap) {
+      notification.read = true;
+      markNotificationsRead([notification.id]);
+    }
+
+    developer.log('🧪 DEBUG: Incoming ID: ${notification.id} | CID: ${notification.correlationId}', name: 'NOTIF_DEBUG');
+    developer.log('🧪 DEBUG: Current list size: ${_notifications.length}', name: 'NOTIF_DEBUG');
+
     final cid = notification.correlationId;
     if (!isTap && cid != null && cid.isNotEmpty) {
+      // Memory check (Ultra-fast synchronous check)
       if (_processedCidsMemory.contains(cid)) {
-        developer.log(
-          '♻️ Skipping duplicate notification (Memory Match: $cid)',
-          name: 'NOTIFICATION',
-        );
+        developer.log('♻️ Skipping duplicate notification (Memory Match: $cid)', name: 'NOTIFICATION');
         return;
       }
-      // Add to memory set immediately
+      
+      // Persistent storage check (Asynchronous fallback)
+      if (await _isCidProcessed(cid)) {
+        developer.log('♻️ Skipping duplicate notification (Storage Match: $cid)', name: 'NOTIFICATION');
+        return;
+      }
+
+      // 🚨 CRITICAL RACE FIX: Add to memory set IMMEDIATELY before any async gaps
       _processedCidsMemory.add(cid);
-      // Prune memory set if it gets too large
       if (_processedCidsMemory.length > 500) {
         _processedCidsMemory.remove(_processedCidsMemory.first);
       }
     }
 
-    // Check persistent storage (Asynchronous, robust)
-    if (!isTap && await _isCidProcessed(notification.correlationId)) {
-      developer.log(
-        '♻️ Skipping duplicate notification (Storage Match: ${notification.correlationId})',
-        name: 'NOTIFICATION',
-      );
-      return;
+    // 2. SECURITY CHECK: Verify user-student relationship if possible
+    // We only process if the student belongs to the current user's list
+    final targetStudentId = notification.data['student_id']?.toString();
+    if (targetStudentId != null) {
+      bool isMyStudent = _students.any((s) => s.id == targetStudentId);
+      
+      // If memory is empty (e.g. during boot), check persisted list from storage
+      if (!isMyStudent && _students.isEmpty) {
+        final prefs = await _storage.prefs;
+        final savedIds = prefs.getStringList('my_student_ids') ?? [];
+        isMyStudent = savedIds.contains(targetStudentId);
+        if (isMyStudent) {
+        }
+      }
+
+      if (!isMyStudent) {
+        return;
+      }
     }
 
     // 2. Check for list-based duplicate (fallback)
     final isDuplicate = _notifications.any((n) => n.id == notification.id);
     if (isDuplicate) {
-      developer.log(
-        '⚠️ Skipping duplicate notification: ID=${notification.id}',
-        name: 'NOTIFICATION',
-      );
       return;
     }
+
+    // ── إضافة الإشعار إلى القائمة المحلية ──
+    _notifications.insert(0, notification);
+    
+    // Sort immediately to maintain consistency before UI rebuild
+    _notifications.sort((a, b) => b.time.compareTo(a.time));
+
+    if (_notifications.length > 200) _notifications.removeLast();
+    
+    // Force a microtask delay to ensure UI can handle the notification safely
+    Future.microtask(() {
+      notifyListeners();
+    });
 
     // ── Foreground Display (Heads-up) ───────────────────────────────────
     // Only show local notification banner if app is active (Foreground)
@@ -1465,10 +1536,6 @@ class AppController extends ChangeNotifier {
         if (convId != null &&
             convId == ActiveConversationTracker.activeConversationId) {
           shouldSuppress = true;
-          developer.log(
-            '🚫 Suppressing chat notification banner because conversation $convId is active',
-            name: 'NOTIFICATION',
-          );
         }
       }
 
@@ -1502,28 +1569,38 @@ class AppController extends ChangeNotifier {
         );
       }
     } else if (!isTap && !isForeground) {
-      developer.log(
-        '🔇 App in background: suppressing local banner for ${notification.id}. '
-        'FCM System Notification or Background Handler should manage the tray.',
-        name: 'NOTIFICATION',
-      );
     }
 
-    // 3. Handle Chat Notifications
-    if (notification.type == NotificationType.chat ||
-        notification.type == NotificationType.supervisorMessage) {
-      developer.log(
-        '💬 FCM: Chat notification received (${notification.type}) — isTap: $isTap',
-        name: 'NOTIFICATION',
-      );
-      _hasNewMessages = true;
-
-      if (isTap) {
-        NotificationRouter.handleNotificationTap(this, notification);
+    // 3. Handle Navigation on Tap
+    if (isTap) {
+      NotificationRouter.handleNotificationTap(this, notification);
+      
+      // If it's a chat message, we also set the flag for UI state
+      if (notification.type == NotificationType.chat ||
+          notification.type == NotificationType.supervisorMessage) {
+        _hasNewMessages = true;
       }
-
+      
       notifyListeners();
       return;
+    }
+
+    // ── إضافة الإشعار إلى القائمة المحلية وتحديث الواجهة فوراً ──
+    final exists = _notifications.any((n) => n.id == notification.id);
+    if (!exists) {
+      _notifications.insert(0, notification);
+      if (_notifications.length > 200) _notifications.removeLast();
+    }
+
+    // 4. Handle Background Updates (Non-tap)
+    if (notification.type == NotificationType.chat ||
+        notification.type == NotificationType.supervisorMessage) {
+      _hasNewMessages = true;
+      notifyListeners();
+      
+      // If not a tap, we still might want to process further (like student status) 
+      // but usually chats don't have student status updates.
+      if (!isTap) return; 
     }
 
     // ── تحديث حالة الطالب لحظياً بناءً على بيانات الإشعار ──
@@ -1573,28 +1650,12 @@ class AppController extends ChangeNotifier {
         if (newStatus != null && _students[index].status != newStatus) {
           _students[index] = _students[index].copyWith(status: newStatus);
           _persistTimestamps(_students[index]);
-
-          developer.log(
-            '🔄 FCM: Student $studentId status updated to $newStatus',
-            name: 'NOTIFICATION',
-          );
         }
       }
     }
 
-    // Add to list FIRST (before routing, so the page can find it)
-    final exists = _notifications.any((n) => n.id == notification.id);
-    if (!exists) {
-      _notifications.insert(0, notification);
-      developer.log(
-        '🔔 AppController: notification added — type: ${notification.type}',
-        name: 'NOTIFICATION',
-      );
-    }
-
     // Handle navigation on Tap (AFTER adding to list)
     if (isTap) {
-      developer.log('👆 AppController: Notification tap detected, routing...', name: 'NOTIFICATION');
       NotificationRouter.handleNotificationTap(this, notification);
     }
     
@@ -1602,10 +1663,6 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _handleRealtimeNotification(Map<String, dynamic> data) async {
-    developer.log(
-      '🌐 Realtime Notification via Reverb: ${data['title']} | Data: $data',
-      name: 'REVERB',
-    );
     final notification = AppNotification.fromMap(data);
     await addNotification(notification);
   }
@@ -1618,17 +1675,8 @@ class AppController extends ChangeNotifier {
     // ── 0. Correlation ID Deduplication ──────────────────────────────────
     final correlationId = msgData['correlation_id']?.toString();
     if (correlationId != null && await _isCidProcessed(correlationId)) {
-      developer.log(
-        '♻️ Skipping duplicate message via Reverb (CID: $correlationId)',
-        name: 'REVERB',
-      );
       return;
     }
-
-    developer.log(
-      '💬 Realtime Message via Reverb: ${msgData['content']}',
-      name: 'REVERB',
-    );
 
     final senderId = msgData['from_user_id']?.toString();
     // Check if it's an incoming message (not from current user)
@@ -1693,10 +1741,6 @@ class AppController extends ChangeNotifier {
       final token = await _storage.readAccessToken();
 
       if (token == null) {
-        developer.log(
-          '⚠️ AppController: no token found to load notifications',
-          name: 'NOTIFICATION',
-        );
         return;
       }
 
@@ -1728,9 +1772,6 @@ class AppController extends ChangeNotifier {
       _notifications.sort((a, b) => b.time.compareTo(a.time));
 
       notifyListeners();
-      print(
-        '📋 AppController: loaded ${filteredFetched.length} notifications from API (filtered chat)',
-      );
     } catch (e, st) {
       developer.log(
         '⚠️ AppController: failed to load notifications from API',
@@ -1766,6 +1807,8 @@ class AppController extends ChangeNotifier {
         '⚠️ AppController: failed to load absence requests',
         name: 'ABSENCE',
       );
+    } finally {
+      notifyListeners();
     }
   }
 
@@ -2352,3 +2395,4 @@ class AppScope extends InheritedNotifier<AppController> {
   @override
   bool updateShouldNotify(AppScope oldWidget) => notifier != oldWidget.notifier;
 }
+

@@ -20,21 +20,7 @@ class NotificationRepositoryImpl implements NotificationsRepository {
             : (notificationsMap ?? []);
 
         return data.map((json) {
-          return AppNotification(
-            id: json['id'].toString(),
-            title: json['title'] ?? '',
-            body: json['message'] ?? json['body'] ?? '',
-            type: AppNotification.parseType(json['type']),
-            time: json['created_at'] != null
-                ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
-                : DateTime.now(),
-            read: json['read'] == true || json['status'] == 'read',
-            data: json['data'] is Map
-                ? Map<String, dynamic>.from(json['data'] as Map)
-                : (json['metadata'] is Map
-                      ? Map<String, dynamic>.from(json['metadata'] as Map)
-                      : const {}),
-          );
+          return AppNotification.fromMap(json);
         }).toList();
       }
       return [];

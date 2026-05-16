@@ -802,46 +802,83 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.directions_bus_rounded,
-            label: context.t('track'),
-            color: AppColors.accent,
-            isDark: isDark,
-            onTap: () => controller.setNavIndex(2),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.directions_bus_rounded,
+                label: context.t('track'),
+                color: AppColors.accent,
+                isDark: isDark,
+                onTap: () => controller.setNavIndex(2),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.chat_bubble_rounded,
+                label: context.t('chat'),
+                color: isDark ? AppColors.dark.accent : AppColors.primary,
+                isDark: isDark,
+                badgeCount: controller.chatUnreadCount,
+                onTap: () => controller.setNavIndex(5),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.calendar_month_rounded,
+                label: context.t('attendance'),
+                color: Colors.orange,
+                isDark: isDark,
+                onTap: () => controller.setNavIndex(7),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.chat_bubble_rounded,
-            label: context.t('chat'), // Was 'رسائل' which matches 'chat' key
-            color: isDark ? AppColors.dark.accent : AppColors.primary,
-            isDark: isDark,
-            onTap: () => controller.setNavIndex(5),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.calendar_month_rounded,
-            label: context.t('attendance'), // Was 'حضور'
-            color: Colors.orange,
-            isDark: isDark,
-            onTap: () => controller.setNavIndex(7),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.settings_rounded,
-            label: context.t('settings'),
-            color: Colors.grey,
-            isDark: isDark,
-            onTap: () => controller.setNavIndex(9),
-          ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.assignment_turned_in_rounded,
+                label: context.t('absenceRequests'),
+                color: Colors.teal,
+                isDark: isDark,
+                badgeCount: controller.absenceUnreadCount,
+                onTap: () {
+                  controller.setNavIndex(10);
+                  controller.markNotificationsReadByCategory('absence_history');
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.location_history_rounded,
+                label: context.t('locationRequests'),
+                color: Colors.blue,
+                isDark: isDark,
+                badgeCount: controller.locationUnreadCount,
+                onTap: () {
+                  controller.setNavIndex(11);
+                  controller.markNotificationsReadByCategory('location_requests');
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.settings_rounded,
+                label: context.t('settings'),
+                color: Colors.grey,
+                isDark: isDark,
+                onTap: () => controller.setNavIndex(9),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -855,6 +892,7 @@ class _QuickActionButton extends StatelessWidget {
     required this.color,
     required this.isDark,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -862,6 +900,7 @@ class _QuickActionButton extends StatelessWidget {
   final Color color;
   final bool isDark;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -870,34 +909,64 @@ class _QuickActionButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Column(
+          child: Stack(
             children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.2),
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                child: Column(
+                  children: [
+                    Icon(icon, color: color, size: 28),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
+              if (badgeCount > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : badgeCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
             ],
           ),
-        ),
       ),
     );
   }

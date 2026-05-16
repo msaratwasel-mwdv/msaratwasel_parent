@@ -19,8 +19,30 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
       AppScope.of(context).loadAbsenceRequestsFromApi();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingNotification();
+    });
+  }
+
+  void _checkPendingNotification() {
+    if (!mounted) return;
+    final controller = AppScope.of(context);
+    final pendingId = controller.pendingNotificationId;
+    if (pendingId != null) {
+      // If we are here, it means we are responding to a notification tap
+      // we can clear it so it doesn't trigger again
+      controller.clearPendingNotificationId();
+      // Force a refresh of the history
+      controller.loadAbsenceRequestsFromApi();
+    }
   }
 
   @override

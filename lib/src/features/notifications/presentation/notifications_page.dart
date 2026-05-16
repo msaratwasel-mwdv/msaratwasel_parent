@@ -54,7 +54,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
           orElse: () => AppNotification(
             id: 'temp',
             title: '',
+            titleEn: '',
             body: '',
+            bodyEn: '',
             type: NotificationType.schoolAlert,
             time: DateTime.now(),
           ),
@@ -154,6 +156,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     final filtered = controller.notifications.where((n) {
       bool matchesType = true;
       switch (_filter) {
@@ -166,6 +169,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
             NotificationType.arrival,
             NotificationType.delay,
             NotificationType.routeChange,
+            NotificationType.tripStarted,
+            NotificationType.tripEnded,
           ].contains(n.type);
           break;
         case _Filter.student:
@@ -174,6 +179,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
             NotificationType.checkOut,
             NotificationType.lateBoarding,
             NotificationType.absence,
+            NotificationType.absenceApproved,
+            NotificationType.absenceRejected,
           ].contains(n.type);
           break;
         case _Filter.school:
