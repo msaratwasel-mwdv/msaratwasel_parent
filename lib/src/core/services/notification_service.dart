@@ -161,7 +161,7 @@ class NotificationService {
   static OnNotificationReceived? get onReceived => _onReceived;
 
   // Notification Channel Constants
-  static const String _channelId = 'msarat_wasel_high_importance_v3';
+  static const String _channelId = 'msarat_wasel_high_importance_v4';
   static const String _channelName = 'إشعارات مسارات واصل الهامة';
   static const String _channelDesc = 'هذه القناة مخصصة لإشعارات الحافلات والرسائل الهامة';
 
