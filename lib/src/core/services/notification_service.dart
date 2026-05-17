@@ -104,7 +104,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     
     final type = data['type']?.toString();
     if (type == 'chat_message') {
-      channelId = 'chat_messages';
+      channelId = 'chat_messages_v3';
       channelName = 'رسائل المحادثات';
     } else if (type == 'admin_announcement') {
       channelId = 'school_announcements';
@@ -263,7 +263,7 @@ class NotificationService {
       showBadge: true,
     );
     const chatChannel = AndroidNotificationChannel(
-      'chat_messages',
+      'chat_messages_v3',
       'رسائل المحادثات',
       description: 'إشعارات الرسائل الجديدة في المحادثات',
       importance: Importance.max,
