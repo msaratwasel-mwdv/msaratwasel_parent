@@ -208,7 +208,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               ),
                             ),
                             title: Text(
-                              notification.title,
+                              notification.getDisplayTitle(AppScope.of(context).locale.languageCode == 'en'),
                               style: TextStyle(
                                 fontWeight: isPending ? FontWeight.w900 : FontWeight.bold,
                                 color: isPending ? AppColors.primary : null,
@@ -217,7 +217,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(notification.body),
+                                Text(notification.getDisplayBody(AppScope.of(context).locale.languageCode == 'en')),
                                 const SizedBox(height: 4),
                                 Text(
                                   '${notification.time.hour == 0 ? 12 : (notification.time.hour > 12 ? notification.time.hour - 12 : notification.time.hour)}:${notification.time.minute.toString().padLeft(2, '0')} ${notification.time.hour >= 12 ? context.t('pm') : context.t('am')}',

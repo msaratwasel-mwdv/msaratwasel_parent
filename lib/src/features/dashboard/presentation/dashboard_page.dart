@@ -119,7 +119,7 @@ class DashboardPage extends StatelessWidget {
                     children: [
                       _WelcomeHeader(
                         studentName: students.isNotEmpty
-                            ? students.first.name
+                            ? students.first.getLocalizedName(AppScope.of(context).locale.languageCode)
                             : context.t('student'),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -620,8 +620,8 @@ class _StudentCard extends StatelessWidget {
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(
-                          student.name.isNotEmpty
-                              ? student.name.characters.first
+                          student.getLocalizedName(AppScope.of(context).locale.languageCode).isNotEmpty
+                              ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first
                               : '?',
                           style: const TextStyle(
                             color: AppColors.primary,
@@ -637,7 +637,7 @@ class _StudentCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.name,
+                        student.getLocalizedName(AppScope.of(context).locale.languageCode),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -788,16 +788,17 @@ class _BusInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = AppScope.of(context).locale.languageCode;
     final items = [
       _InfoItem(
         icon: Icons.person_rounded,
         label: context.t('driverName'),
-        value: student.bus.driver?.name ?? context.t('notAvailable'),
+        value: student.bus.driver?.getLocalizedName(lang) ?? context.t('notAvailable'),
       ),
       _InfoItem(
         icon: Icons.escalator_warning_rounded,
         label: context.t('assistantName'),
-        value: student.bus.supervisor?.name ?? context.t('notAvailable'),
+        value: student.bus.supervisor?.getLocalizedName(lang) ?? context.t('notAvailable'),
       ),
       _InfoItem(
         icon: Icons.pin_drop_rounded,

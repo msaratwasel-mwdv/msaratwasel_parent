@@ -27,6 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
     return AuthUser(
       id: user['id'].toString(),
       name: user['name'] ?? '',
+      nameEn: user['name_en'] ?? user['nameEn'],
       role: user['role'] ?? 'guardian',
       accessToken: data['token'] ?? response.data['token'],
     );

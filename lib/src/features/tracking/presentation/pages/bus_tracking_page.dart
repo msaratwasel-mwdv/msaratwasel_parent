@@ -121,7 +121,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         try {
           // Create marker for student using our generator
           final icon = await MarkerGenerator.createStudentMarker(
-            name: student.name,
+            name: student.getLocalizedName(AppScope.of(context).locale.languageCode),
             imageUrl: student.avatarUrl,
             authToken: authToken,
             color: AppColors.accent,
@@ -131,7 +131,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           _studentIcons[student.id] = icon;
           if (mounted) setState(() {});
         } catch (e) {
-          debugPrint('Error creating marker for ${student.name}: $e');
+          debugPrint('Error creating marker for ${student.getLocalizedName(AppScope.of(context).locale.languageCode)}: $e');
         }
       }
     }
@@ -390,7 +390,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                   ),
               anchor: const Offset(0.5, 0.9), // Anchor at the tip of the pin
               infoWindow: InfoWindow(
-                title: student.name,
+                title: student.getLocalizedName(AppScope.of(context).locale.languageCode),
                 snippet: context.t('homeLocation'),
               ),
             ),
@@ -713,7 +713,7 @@ class _DynamicBusSelector extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${context.t('driver')}: ${group.driver?.name ?? '---'}',
+                          '${context.t('driver')}: ${group.driver?.getLocalizedName(AppScope.of(context).locale.languageCode) ?? '---'}',
                           style: TextStyle(
                             color: isSelected
                                 ? Colors.white.withAlpha(200)
@@ -1135,7 +1135,7 @@ class _DataDrivenPanel extends StatelessWidget {
         return Row(
           children: [
             UserAvatar(
-              name: staff.name,
+              name: staff.getLocalizedName(AppScope.of(context).locale.languageCode),
               avatarUrl: staff.imageUrl,
               radius: 16,
               fontSize: 10,
@@ -1155,7 +1155,7 @@ class _DataDrivenPanel extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    staff.name,
+                    staff.getLocalizedName(AppScope.of(context).locale.languageCode),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -1295,7 +1295,7 @@ class _StudentCard extends StatelessWidget {
         children: [
           // Avatar with shadow
           UserAvatar(
-            name: student.displayName,
+            name: student.getLocalizedName(AppScope.of(context).locale.languageCode),
             avatarUrl: student.avatarUrl,
             radius: 22,
           ),
@@ -1305,7 +1305,7 @@ class _StudentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  student.displayName,
+                  student.getLocalizedName(AppScope.of(context).locale.languageCode),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -1314,7 +1314,7 @@ class _StudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  student.grade,
+                  student.getLocalizedGrade(AppScope.of(context).locale.languageCode),
                   style: TextStyle(color: colors.text70, fontSize: 11),
                 ),
               ],
@@ -1534,12 +1534,12 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
           if (driver != null)
             ListTile(
               leading: UserAvatar(
-                name: driver.name,
+                name: driver.getLocalizedName(AppScope.of(context).locale.languageCode),
                 avatarUrl: driver.imageUrl,
                 token: AppScope.of(context).token,
               ),
               title: Text(
-                '${context.t('driver')}: ${driver.name}',
+                '${context.t('driver')}: ${driver.getLocalizedName(AppScope.of(context).locale.languageCode)}',
                 style: TextStyle(color: colors.text),
               ),
               subtitle: Text(
@@ -1556,12 +1556,12 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
           if (supervisor != null)
             ListTile(
               leading: UserAvatar(
-                name: supervisor.name,
+                name: supervisor.getLocalizedName(AppScope.of(context).locale.languageCode),
                 avatarUrl: supervisor.imageUrl,
                 token: AppScope.of(context).token,
               ),
               title: Text(
-                '${context.t('supervisor')}: ${supervisor.name}',
+                '${context.t('supervisor')}: ${supervisor.getLocalizedName(AppScope.of(context).locale.languageCode)}',
                 style: TextStyle(color: colors.text),
               ),
               subtitle: Text(

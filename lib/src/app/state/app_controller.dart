@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1464,12 +1466,34 @@ class AppController extends ChangeNotifier {
       // Memory check (Ultra-fast synchronous check)
       if (_processedCidsMemory.contains(cid)) {
         developer.log('♻️ Skipping duplicate notification (Memory Match: $cid)', name: 'NOTIFICATION');
+        try {
+          FirebaseCrashlytics.instance.log('FCM FG: Suppressing duplicate notification (Memory Match: $cid)');
+          Sentry.addBreadcrumb(
+            Breadcrumb(
+              message: 'FCM FG: Suppressed duplicate notification (Memory Match)',
+              category: 'fcm.foreground.suppressed',
+              level: SentryLevel.warning,
+              data: {'correlation_id': cid},
+            ),
+          );
+        } catch (_) {}
         return;
       }
       
       // Persistent storage check (Asynchronous fallback)
       if (await _isCidProcessed(cid)) {
         developer.log('♻️ Skipping duplicate notification (Storage Match: $cid)', name: 'NOTIFICATION');
+        try {
+          FirebaseCrashlytics.instance.log('FCM FG: Suppressing duplicate notification (Storage Match: $cid)');
+          Sentry.addBreadcrumb(
+            Breadcrumb(
+              message: 'FCM FG: Suppressed duplicate notification (Storage Match)',
+              category: 'fcm.foreground.suppressed',
+              level: SentryLevel.warning,
+              data: {'correlation_id': cid},
+            ),
+          );
+        } catch (_) {}
         return;
       }
 
@@ -1496,6 +1520,24 @@ class AppController extends ChangeNotifier {
       }
 
       if (!isMyStudent) {
+        developer.log(
+          '🛑 SECURITY: Suppressing notification for foreign student $targetStudentId',
+          name: 'NOTIFICATION',
+        );
+        try {
+          FirebaseCrashlytics.instance.log('SECURITY check failed: Suppressing notification for student $targetStudentId');
+          Sentry.addBreadcrumb(
+            Breadcrumb(
+              message: 'SECURITY check failed: Student not in parent list',
+              category: 'security.suppressed',
+              level: SentryLevel.warning,
+              data: {
+                'student_id': targetStudentId,
+                'my_students': _students.map((s) => s.id).toList(),
+              },
+            ),
+          );
+        } catch (_) {}
         return;
       }
     }
@@ -1536,6 +1578,17 @@ class AppController extends ChangeNotifier {
         if (convId != null &&
             convId == ActiveConversationTracker.activeConversationId) {
           shouldSuppress = true;
+          try {
+            FirebaseCrashlytics.instance.log('FCM FG: Suppressing notification - active in conversation $convId');
+            Sentry.addBreadcrumb(
+              Breadcrumb(
+                message: 'FCM FG: Suppressed notification because user is actively inside the chat screen',
+                category: 'fcm.foreground.suppressed',
+                level: SentryLevel.info,
+                data: {'conversation_id': convId},
+              ),
+            );
+          } catch (_) {}
         }
       }
 
@@ -1546,7 +1599,7 @@ class AppController extends ChangeNotifier {
         String? channelName;
 
         if (isChatMessage) {
-          channelId = 'chat_messages';
+          channelId = 'chat_messages_v3';
           channelName = 'رسائل المحادثات';
         } else if (notification.type == NotificationType.adminAnnouncement ||
             notification.type == NotificationType.schoolAlert) {

@@ -141,8 +141,8 @@ class _ChildStatusCard extends StatelessWidget {
                         (student.avatarUrl == null ||
                             student.avatarUrl!.isEmpty)
                         ? Text(
-                            student.displayName.isNotEmpty
-                                ? student.displayName.characters.first
+                            student.getLocalizedName(controller.locale.languageCode).isNotEmpty
+                                ? student.getLocalizedName(controller.locale.languageCode).characters.first
                                 : '?',
                             style: TextStyle(
                               color: AppColors.primary,
@@ -160,7 +160,7 @@ class _ChildStatusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.displayName,
+                        student.getLocalizedName(controller.locale.languageCode),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16, // Consistent size

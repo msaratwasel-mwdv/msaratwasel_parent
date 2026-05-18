@@ -669,8 +669,8 @@ class MissingLocationView extends StatelessWidget {
                         child: (student.avatarUrl == null ||
                                 student.avatarUrl!.isEmpty)
                             ? Text(
-                                student.displayName.isNotEmpty 
-                                  ? student.displayName.characters.first 
+                                student.getLocalizedName(controller.locale.languageCode).isNotEmpty 
+                                  ? student.getLocalizedName(controller.locale.languageCode).characters.first 
                                   : '?',
                                 style: const TextStyle(
                                   color: AppColors.primary,
@@ -685,7 +685,7 @@ class MissingLocationView extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              student.displayName,
+                              student.getLocalizedName(controller.locale.languageCode),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -693,7 +693,7 @@ class MissingLocationView extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              student.grade,
+                              student.getLocalizedGrade(controller.locale.languageCode),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: isDark ? Colors.white60 : AppColors.textSecondary,

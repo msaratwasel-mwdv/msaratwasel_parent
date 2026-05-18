@@ -1,5 +1,7 @@
 plugins {
     id("com.google.gms.google-services") version "4.4.2" apply false
+    id("com.google.firebase.crashlytics") version "3.0.2" apply false
+    id("io.sentry.android.gradle") version "4.14.0" apply false
 }
 
 allprojects {
@@ -21,6 +23,14 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+subprojects {
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_8)
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

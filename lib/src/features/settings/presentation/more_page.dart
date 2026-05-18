@@ -208,6 +208,17 @@ class _MorePageState extends State<MorePage> {
                           ),
                         ),
                       ),
+                      _Divider(),
+                      _SettingsTile(
+                        icon: PhosphorIcons.bug(
+                          PhosphorIconsStyle.duotone,
+                        ),
+                        title: 'اختبار تتبع الأخطاء Sentry',
+                        subtitle: 'اضغط لإرسال خطأ تجريبي للتأكد من ربط Sentry',
+                        onTap: () {
+                          throw StateError('Masarat Wasel Sentry Test Error!');
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),

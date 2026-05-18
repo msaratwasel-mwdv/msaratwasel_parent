@@ -210,13 +210,13 @@ class _ChildCard extends StatelessWidget {
                           (student.avatarUrl == null ||
                               student.avatarUrl!.isEmpty)
                           ? Text(
-                              student.displayName.isNotEmpty
-                                  ? student.displayName.characters.first
+                              student.getLocalizedName(AppScope.of(context).locale.languageCode).isNotEmpty
+                                  ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first
                                   : '?',
                               style: TextStyle(
                                 color: AppColors.primary,
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
                               ),
                             )
                           : null,
@@ -228,7 +228,7 @@ class _ChildCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          student.displayName,
+                          student.getLocalizedName(AppScope.of(context).locale.languageCode),
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white
@@ -240,8 +240,8 @@ class _ChildCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           student.nationalId != null
-                              ? '${context.t('studentGrade')}: ${student.grade} • ${student.nationalId}'
-                              : '${context.t('studentGrade')}: ${student.grade}',
+                              ? '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)} • ${student.nationalId}'
+                              : '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)}',
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white70
@@ -288,14 +288,18 @@ class _ChildCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white70
+                                    : AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -599,8 +603,8 @@ class _ChildDetailsSheet extends StatelessWidget {
                         (student.avatarUrl == null ||
                             student.avatarUrl!.isEmpty)
                         ? Text(
-                            student.displayName.isNotEmpty
-                                ? student.displayName.characters.first
+                            student.getLocalizedName(AppScope.of(context).locale.languageCode).isNotEmpty
+                                ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first
                                 : '?',
                             style: TextStyle(
                               color: AppColors.primary,
@@ -617,7 +621,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.displayName,
+                        student.getLocalizedName(AppScope.of(context).locale.languageCode),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 20,
@@ -626,7 +630,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${context.t('studentGrade')}: ${student.grade} • ${student.schoolId}',
+                        '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)} • ${student.schoolId}',
                         style: TextStyle(
                           color: isDark
                               ? Colors.white70
@@ -969,7 +973,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                     icon: Icons.airline_seat_recline_normal_rounded,
                     isDark: isDark,
                     child: _ContactInfoRow(
-                      name: student.bus.driver!.name,
+                      name: student.bus.driver!.getLocalizedName(AppScope.of(context).locale.languageCode),
                       phone: student.bus.driver!.phone ?? '',
                       avatarUrl: student.bus.driver!.imageUrl,
                       isDark: isDark,
@@ -987,7 +991,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                     icon: Icons.verified_user_rounded,
                     isDark: isDark,
                     child: _ContactInfoRow(
-                      name: student.bus.supervisor!.name,
+                      name: student.bus.supervisor!.getLocalizedName(AppScope.of(context).locale.languageCode),
                       phone: student.bus.supervisor!.phone ?? '',
                       avatarUrl: student.bus.supervisor!.imageUrl,
                       isDark: isDark,

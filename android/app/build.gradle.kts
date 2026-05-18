@@ -4,6 +4,8 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
+    id("io.sentry.android.gradle")
 }
 
 android {
@@ -54,4 +56,10 @@ flutter {
 dependencies {
     // Enables Java 8+ APIs on older Android versions (needed for flutter_local_notifications).
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+sentry {
+    // Disables automatic upload of debug symbols for debug builds to speed up compilation
+    uploadNativeSymbols.set(false)
+    includeProguardMapping.set(true)
 }

@@ -102,19 +102,29 @@ class BusStaffInfo {
   const BusStaffInfo({
     required this.id,
     required this.name,
+    this.nameEn,
     this.phone,
     this.imageUrl,
   });
 
   final int id;
   final String name;
+  final String? nameEn;
   final String? phone;
   final String? imageUrl;
+
+  String getLocalizedName(String languageCode) {
+    if (languageCode.toLowerCase() == 'en') {
+      return (nameEn != null && nameEn!.trim().isNotEmpty) ? nameEn! : name;
+    }
+    return name;
+  }
 
   factory BusStaffInfo.fromJson(Map<String, dynamic> json) {
     return BusStaffInfo(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
+      nameEn: json['name_en'] as String? ?? json['nameEn'] as String?,
       phone: json['phone'] as String?,
       imageUrl: AppConfig.normalizeImageUrl(json['image_url'] as String?),
     );
@@ -226,6 +236,7 @@ class Student {
     required this.id,
     required this.name,
     required this.grade,
+    this.gradeEn,
     required this.schoolId,
     required this.bus,
     required this.status,
@@ -255,6 +266,7 @@ class Student {
   final String name;
   final String? nameEn;
   final String grade;
+  final String? gradeEn;
   final String schoolId;
   final String? nationalId;
   final String? gender;
@@ -285,6 +297,20 @@ class Student {
     return id;
   }
 
+  String getLocalizedName(String languageCode) {
+    if (languageCode == 'en' && nameEn != null && nameEn!.trim().isNotEmpty) {
+      return nameEn!;
+    }
+    return displayName;
+  }
+
+  String getLocalizedGrade(String languageCode) {
+    if (languageCode == 'en' && gradeEn != null && gradeEn!.trim().isNotEmpty) {
+      return gradeEn!;
+    }
+    return grade;
+  }
+
   // Timestamps for the 5-step cycle
   final DateTime? waitingAtHomeTime;
   final DateTime? onBusToSchoolTime;
@@ -298,11 +324,12 @@ class Student {
     return Student(
       id: json['id'].toString(),
       name: json['name'] as String? ?? '',
-      nameEn: json['name_en'] as String?,
+      nameEn: json['name_en'] as String? ?? json['nameEn'] as String?,
       nationalId: json['national_id'] as String?,
       gender: json['gender'] as String?,
       studentCode: json['student_code'] as String?,
       grade: json['grade'] as String? ?? '',
+      gradeEn: json['grade_en'] as String?,
       schoolId: json['school']?['id']?.toString() ?? '',
       bus: json['bus'] != null
           ? BusInfo.fromJson(json['bus'] as Map<String, dynamic>)
@@ -371,6 +398,7 @@ class Student {
     String? name,
     String? nameEn,
     String? grade,
+    String? gradeEn,
     String? schoolId,
     String? nationalId,
     String? gender,
@@ -398,6 +426,7 @@ class Student {
       name: name ?? this.name,
       nameEn: nameEn ?? this.nameEn,
       grade: grade ?? this.grade,
+      gradeEn: gradeEn ?? this.gradeEn,
       schoolId: schoolId ?? this.schoolId,
       nationalId: nationalId ?? this.nationalId,
       gender: gender ?? this.gender,

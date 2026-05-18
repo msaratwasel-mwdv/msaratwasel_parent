@@ -222,6 +222,7 @@ class NotificationRouter {
         return 5; // ContactsPage (for non-chat-message taps that still target chat)
       case 'attendance_history':
       case 'school_attendance':
+      case 'attendance_details':
         return 7; // AttendanceHistoryPage
       case 'absence_history':
       case 'absence_requests': // Added: match backend

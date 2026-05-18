@@ -200,7 +200,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
 
   Widget _studentCard(TextTheme textTheme, dynamic student, bool isDark) {
     final String id = student.id;
-    final String name = student.name;
+    final String name = student.getLocalizedName(AppScope.of(context).locale.languageCode);
     final String? avatarUrl = student.avatarUrl;
     final bool selected = selectedStudentId == id;
 

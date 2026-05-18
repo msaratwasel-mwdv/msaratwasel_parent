@@ -566,8 +566,8 @@ class _ChildQuickCard extends StatelessWidget {
                       : null,
                   child: student.avatarUrl == null || student.avatarUrl!.isEmpty
                       ? Text(
-                          student.displayName.isNotEmpty
-                              ? student.displayName.characters.first
+                          student.getLocalizedName(AppScope.of(context).locale.languageCode).isNotEmpty
+                              ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first
                               : '?',
                           style: TextStyle(
                             color: isDark ? Colors.white : AppColors.primary,
@@ -583,7 +583,7 @@ class _ChildQuickCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        student.displayName,
+                        student.getLocalizedName(AppScope.of(context).locale.languageCode),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
                           fontSize: 16,
@@ -592,7 +592,7 @@ class _ChildQuickCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${context.t('studentGrade')}: ${student.grade}',
+                        '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)}',
                         style: TextStyle(
                           color: isDark
                               ? Colors.white70
@@ -602,14 +602,18 @@ class _ChildQuickCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
-                        style: TextStyle(
-                          color: isDark
-                              ? Colors.white54
-                              : AppColors.textSecondary.withValues(alpha: 0.8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          '${context.t('bus')} ${(student.bus.number.isNotEmpty && student.bus.number != '-') ? student.bus.number : context.t('notSpecified')} • ${(student.bus.plate.isNotEmpty && student.bus.plate != '-') ? student.bus.plate : context.t('notSpecified')}',
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.white54
+                                : AppColors.textSecondary.withValues(alpha: 0.8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
                     ],
@@ -770,7 +774,7 @@ class _NotificationItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  notification.title,
+                  notification.getDisplayTitle(AppScope.of(context).locale.languageCode == 'en'),
                   style: TextStyle(
                     color: isDark ? Colors.white : AppColors.textPrimary,
                     fontSize: 14,

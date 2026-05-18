@@ -41,11 +41,11 @@ class ChildDetailPage extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              student.name,
+              student.getLocalizedName(AppScope.of(context).locale.languageCode),
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             Text(
-              '${context.t('studentGrade')}: ${student.grade}',
+              '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)}',
               style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -68,7 +68,7 @@ class ChildDetailPage extends StatelessWidget {
               children: [
                 _InfoTile(
                   label: context.t('driverName'),
-                  value: student.bus.driver?.name ?? context.t('notAvailable'),
+                  value: student.bus.driver?.getLocalizedName(AppScope.of(context).locale.languageCode) ?? context.t('notAvailable'),
                 ),
               ],
             ),

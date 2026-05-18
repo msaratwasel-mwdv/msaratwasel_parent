@@ -55,7 +55,9 @@ class ChildListPage extends StatelessWidget {
               : null,
           child: student.avatarUrl == null || student.avatarUrl!.isEmpty
               ? Text(
-                  student.name.isNotEmpty ? student.name.characters.first : '?',
+                  student.getLocalizedName(AppScope.of(context).locale.languageCode).isNotEmpty 
+                      ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first 
+                      : '?',
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.bold,
@@ -64,11 +66,11 @@ class ChildListPage extends StatelessWidget {
               : null,
         ),
         title: Text(
-          student.name,
+          student.getLocalizedName(AppScope.of(context).locale.languageCode),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${student.grade} | ${student.schoolName ?? "-"}',
+          '${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)} | ${student.schoolName ?? "-"}',
           style: TextStyle(color: Colors.grey[600]),
         ),
         trailing: const Icon(Icons.chevron_right, color: AppColors.primary),

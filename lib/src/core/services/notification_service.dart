@@ -5,9 +5,12 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Background message handler — must be a top-level function.
 @pragma('vm:entry-point')
@@ -19,6 +22,24 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 
   // Initialize Firebase for the background isolate
   await Firebase.initializeApp();
+
+  // Log in Firebase Crashlytics & Sentry
+  try {
+    FirebaseCrashlytics.instance.log('📬 FCM [BG] Received: messageId=${message.messageId}, data=${message.data}');
+    FirebaseCrashlytics.instance.setCustomKey('last_bg_fcm_id', message.messageId ?? 'unknown');
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        message: 'FCM BG: Background push received',
+        category: 'fcm.background',
+        level: SentryLevel.info,
+        data: {
+          'message_id': message.messageId ?? 'unknown',
+          'data': message.data,
+        },
+      ),
+    );
+  } catch (_) {}
+
   final SharedPreferences prefs = await SharedPreferences.getInstance();
 
   final data = message.data;
@@ -32,6 +53,16 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     final List<String> processedCids = prefs.getStringList('processed_cids') ?? [];
     if (processedCids.contains(cid)) {
       developer.log('♻️ [BG] Skipping persistent duplicate (CID: $cid)', name: 'FCM');
+      try {
+        Sentry.addBreadcrumb(
+          Breadcrumb(
+            message: 'FCM BG: Suppressed persistent duplicate',
+            category: 'fcm.background.suppressed',
+            level: SentryLevel.warning,
+            data: {'correlation_id': cid},
+          ),
+        );
+      } catch (_) {}
       return;
     }
     // Update the list
@@ -49,10 +80,19 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
         '🛑 SECURITY [BG]: Suppressing notification for foreign student $targetStudentId',
         name: 'FCM',
       );
+      try {
+        Sentry.addBreadcrumb(
+          Breadcrumb(
+            message: 'FCM BG: Suppressed due to security check failure (not my student)',
+            category: 'fcm.background.suppressed',
+            level: SentryLevel.warning,
+            data: {'student_id': targetStudentId},
+          ),
+        );
+      } catch (_) {}
       return;
     }
   }
-
 
   // On Android, if the FCM message contains a `notification` object,
   // the system tray automatically displays it. We must NOT show a
@@ -62,6 +102,16 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
       '📬 FCM [BG]: System will auto-display notification, skipping local show',
       name: 'FCM',
     );
+    try {
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          message: 'FCM BG: Suppressed double local show because system auto-displays it',
+          category: 'fcm.background.suppressed',
+          level: SentryLevel.info,
+          data: {'message_id': message.messageId ?? 'unknown'},
+        ),
+      );
+    } catch (_) {}
     return;
   }
 
@@ -99,7 +149,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   final String displayBody = isEnglish ? bodyEn : bodyAr;
 
   if (displayTitle.isNotEmpty || displayBody.isNotEmpty) {
-    String channelId = 'msarat_wasel_high_importance_v3';
+    String channelId = 'msarat_wasel_high_importance_v4';
     String channelName = 'إشعارات مسارات واصل الهامة';
     
     final type = data['type']?.toString();
@@ -308,6 +358,32 @@ class NotificationService {
       final notification = AppNotification.fromFcm(message);
       developer.log('📦 MODEL CREATED: ID=${notification.id}, TitleEn=${notification.titleEn}', name: 'FCM_RAW');
 
+      // Track in Crashlytics and Analytics
+      try {
+        FirebaseCrashlytics.instance.log('📥 FCM [FG] Received: id=${notification.id}, type=${notification.type}');
+        FirebaseCrashlytics.instance.setCustomKey('last_fg_fcm_id', notification.id);
+        FirebaseAnalytics.instance.logEvent(
+          name: 'notification_received',
+          parameters: {
+            'id': notification.id,
+            'type': notification.type,
+            'state': 'foreground',
+          },
+        );
+        Sentry.addBreadcrumb(
+          Breadcrumb(
+            message: 'FCM FG: Foreground message received',
+            category: 'fcm.foreground',
+            level: SentryLevel.info,
+            data: {
+              'id': notification.id,
+              'type': notification.type.name,
+              'data': message.data,
+            },
+          ),
+        );
+      } catch (_) {}
+
       // Update app state (calls addNotification which handles dedup + popup)
       _onReceived?.call(notification, isTap: false);
     });
@@ -319,6 +395,33 @@ class NotificationService {
         name: 'FCM',
       );
       final notification = AppNotification.fromFcm(message);
+      
+      // Track in Crashlytics and Analytics
+      try {
+        FirebaseCrashlytics.instance.log('👆 FCM tapped from background: id=${notification.id}, type=${notification.type}');
+        FirebaseCrashlytics.instance.setCustomKey('last_tapped_fcm_id', notification.id);
+        FirebaseAnalytics.instance.logEvent(
+          name: 'notification_tapped',
+          parameters: {
+            'id': notification.id,
+            'type': notification.type,
+            'state': 'background',
+          },
+        );
+        Sentry.addBreadcrumb(
+          Breadcrumb(
+            message: 'FCM Tap: Background notification tapped',
+            category: 'fcm.tap',
+            level: SentryLevel.info,
+            data: {
+              'id': notification.id,
+              'type': notification.type.name,
+              'state': 'background',
+            },
+          ),
+        );
+      } catch (_) {}
+
       _onReceived?.call(notification, isTap: true);
     });
 
@@ -330,6 +433,33 @@ class NotificationService {
         name: 'FCM',
       );
       final notification = AppNotification.fromFcm(initialMessage);
+      
+      // Track in Crashlytics and Analytics
+      try {
+        FirebaseCrashlytics.instance.log('🚀 FCM tapped from terminated: id=${notification.id}, type=${notification.type}');
+        FirebaseCrashlytics.instance.setCustomKey('last_tapped_fcm_id', notification.id);
+        FirebaseAnalytics.instance.logEvent(
+          name: 'notification_tapped',
+          parameters: {
+            'id': notification.id,
+            'type': notification.type,
+            'state': 'terminated',
+          },
+        );
+        Sentry.addBreadcrumb(
+          Breadcrumb(
+            message: 'FCM Tap: Terminated notification tapped',
+            category: 'fcm.tap',
+            level: SentryLevel.info,
+            data: {
+              'id': notification.id,
+              'type': notification.type.name,
+              'state': 'terminated',
+            },
+          ),
+        );
+      } catch (_) {}
+
       _onReceived?.call(notification, isTap: true);
     }
 
@@ -366,12 +496,26 @@ class NotificationService {
     try {
       token = await _fcm.getToken();
       developer.log('🔑 FCM Token = $token', name: 'FCM');
+      // Track token registration
+      try {
+        FirebaseAnalytics.instance.logEvent(
+          name: 'fcm_token_registered',
+          parameters: {'token_length': token?.length ?? 0},
+        );
+      } catch (_) {}
     } catch (e) {
       developer.log('❌ FCM: failed to get token: $e', name: 'FCM');
     }
 
     _fcm.onTokenRefresh.listen((newToken) {
       developer.log('🔄 FCM Token refreshed = $newToken', name: 'FCM');
+      try {
+        FirebaseCrashlytics.instance.log('🔄 FCM Token refreshed');
+        FirebaseAnalytics.instance.logEvent(
+          name: 'fcm_token_refreshed',
+          parameters: {'token_length': newToken.length},
+        );
+      } catch (_) {}
     });
 
     developer.log('✅ NotificationService: FCM initialised', name: 'FCM');

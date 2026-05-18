@@ -145,7 +145,7 @@ class ChildSelector extends StatelessWidget {
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Text(
-                        child.name,
+                        child.getLocalizedName(Localizations.localeOf(context).languageCode),
                         style: GoogleFonts.cairo(
                           fontSize: 16,
                           fontWeight: isSelected

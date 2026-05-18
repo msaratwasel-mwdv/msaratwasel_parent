@@ -151,9 +151,8 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
                     Builder(
                       builder: (context) {
                         final student = AppScope.of(context).students.where((s) => s.id == request.studentId).firstOrNull;
-                        final isAr = Localizations.localeOf(context).languageCode == 'ar';
                         final displayName = student != null 
-                          ? (isAr ? student.name : (student.nameEn ?? student.name))
+                          ? student.getLocalizedName(Localizations.localeOf(context).languageCode)
                           : request.studentName;
                         
                         return Text(

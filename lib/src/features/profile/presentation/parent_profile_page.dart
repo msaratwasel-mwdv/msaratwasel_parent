@@ -286,8 +286,8 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   (student) => Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: _ChildQuickCard(
-                      name: student.name,
-                      grade: student.grade,
+                      name: student.getLocalizedName(AppScope.of(context).locale.languageCode),
+                      grade: student.getLocalizedGrade(AppScope.of(context).locale.languageCode),
                       avatarUrl: student.avatarUrl,
                       isDark: isDark,
                     ),
