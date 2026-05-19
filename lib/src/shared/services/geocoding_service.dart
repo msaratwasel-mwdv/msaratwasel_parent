@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/core/config/api_keys.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 
 class GeocodingService {
   final Dio _dio;
@@ -24,7 +25,7 @@ class GeocodingService {
     LatLng location, {
     CancelToken? cancelToken,
   }) async {
-    print(
+    AppLogger.d(
       '🔍 GeocodingService: Reverse geocoding for ${location.latitude}, ${location.longitude}',
     );
     try {
@@ -67,9 +68,9 @@ class GeocodingService {
       }
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
-        print('🔍 GeocodingService: Request cancelled');
+        AppLogger.d('🔍 GeocodingService: Request cancelled');
       } else {
-        print('❌ GeocodingService Error: $e');
+        AppLogger.e('❌ GeocodingService Error: $e', error: e);
       }
     }
     return 'Unknown Location';

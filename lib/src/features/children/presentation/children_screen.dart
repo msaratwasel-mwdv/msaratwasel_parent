@@ -325,7 +325,7 @@ class _ChildCard extends StatelessWidget {
                       value: student.tripCount.toString(),
                       label: context.t('tripLog'),
                       icon: Icons.directions_bus_rounded,
-                      color: AppColors.primary,
+                      color: isDark ? Colors.white : AppColors.primary,
                       isDark: isDark,
                     ),
                   ),
@@ -524,7 +524,7 @@ class _StatBox extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: isDark ? Colors.white60 : AppColors.textSecondary,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 11,
                 ),
               ),
@@ -578,14 +578,14 @@ class _ChildDetailsSheet extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(3),
+                  padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: AppColors.brandGradient,
                   ),
                   child: CircleAvatar(
                     radius: 28,
-                    backgroundColor: Colors.white,
+                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                     backgroundImage:
                         (student.avatarUrl != null &&
                             student.avatarUrl!.isNotEmpty)
@@ -607,8 +607,8 @@ class _ChildDetailsSheet extends StatelessWidget {
                                 ? student.getLocalizedName(AppScope.of(context).locale.languageCode).characters.first
                                 : '?',
                             style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 24,
+                              color: isDark ? Colors.white : AppColors.primary,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                             ),
                           )
@@ -624,27 +624,87 @@ class _ChildDetailsSheet extends StatelessWidget {
                         student.getLocalizedName(AppScope.of(context).locale.languageCode),
                         style: TextStyle(
                           color: isDark ? Colors.white : AppColors.textPrimary,
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)} • ${student.schoolId}',
-                        style: TextStyle(
-                          color: isDark
-                              ? Colors.white70
-                              : AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.06) : AppColors.primary.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.school_rounded,
+                                  size: 12,
+                                  color: isDark ? Colors.white70 : AppColors.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${context.t('studentGrade')}: ${student.getLocalizedGrade(AppScope.of(context).locale.languageCode)}',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white70 : AppColors.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (student.nationalId != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.badge_rounded,
+                                    size: 12,
+                                    color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    student.nationalId!,
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
                 IconButton(
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      size: 18,
+                    ),
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -718,7 +778,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                                       : (isArabic
                                             ? 'الموقع غير محدد'
                                             : 'Location not set'),
-                                  textDirection: TextDirection.ltr,
+                                  textDirection: student.hasLocation ? TextDirection.ltr : null,
                                   style: TextStyle(
                                     color: !student.hasLocation
                                         ? AppColors.error
@@ -868,7 +928,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                                   student.hasLocation
                                       ? Icons.edit_location_alt_rounded
                                       : Icons.add_location_alt_rounded,
-                                  size: 18,
+                                  size: 16,
                                 ),
                                 label: Text(
                                   student.hasLocation
@@ -877,20 +937,38 @@ class _ChildDetailsSheet extends StatelessWidget {
                                 ),
                                 style: TextButton.styleFrom(
                                   foregroundColor: student.hasLocation
-                                      ? AppColors.primary
-                                      : AppColors.error,
+                                      ? (isDark ? Colors.white : AppColors.primary)
+                                      : (isDark ? Colors.red[300] : AppColors.error),
+                                  backgroundColor: student.hasLocation
+                                      ? (isDark ? Colors.white.withOpacity(0.08) : AppColors.primary.withValues(alpha: 0.05))
+                                      : (isDark ? Colors.red.withOpacity(0.1) : AppColors.error.withValues(alpha: 0.08)),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                               ),
 
-                              if (student.hasLocation)
+                              if (student.hasLocation) ...[
+                                const SizedBox(width: 8),
                                 IconButton(
-                                  icon: const Icon(Icons.map_rounded, size: 22),
-                                  color: isDark
-                                      ? Colors.white
-                                      : AppColors.primary,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? Colors.white.withOpacity(0.08) : AppColors.primary.withValues(alpha: 0.05),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.map_rounded,
+                                      size: 18,
+                                      color: isDark ? Colors.white : AppColors.primary,
+                                    ),
+                                  ),
                                   onPressed: () {
                                     Navigator.push(
                                       context,
@@ -905,6 +983,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                                     );
                                   },
                                 ),
+                              ],
                             ],
                           ),
                         ],
@@ -1155,9 +1234,9 @@ class _ContactInfoRow extends StatelessWidget {
                     : null,
                 backgroundColor: AppColors.primary.withAlpha(30),
                 child: (avatarUrl == null || avatarUrl!.trim().isEmpty)
-                    ? const Icon(
+                    ? Icon(
                         Icons.person_rounded,
-                        color: AppColors.primary,
+                        color: isDark ? Colors.white : AppColors.primary,
                         size: 18,
                       )
                     : null,

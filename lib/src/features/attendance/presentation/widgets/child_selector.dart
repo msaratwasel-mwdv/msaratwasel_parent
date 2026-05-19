@@ -22,15 +22,6 @@ class ChildSelector extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final displayChildren = children.toList();
-    if (selectedChild != null) {
-      final index = displayChildren.indexWhere(
-        (c) => c.id == selectedChild!.id,
-      );
-      if (index != -1 && index != displayChildren.length - 1) {
-        final child = displayChildren.removeAt(index);
-        displayChildren.add(child);
-      }
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

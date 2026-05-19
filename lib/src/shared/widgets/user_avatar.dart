@@ -27,16 +27,17 @@ class UserAvatar extends StatelessWidget {
         ? {'Authorization': 'Bearer $token'}
         : null;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final Widget placeholder = fallbackIcon != null
         ? Icon(
             fallbackIcon,
-            color: AppColors.primary,
+            color: isDark ? Colors.white : AppColors.primary,
             size: fontSize ?? (radius * 1.2),
           )
         : Text(
             name.isNotEmpty ? name[0] : '?',
             style: TextStyle(
-              color: AppColors.primary,
+              color: isDark ? Colors.white : AppColors.primary,
               fontSize: fontSize ?? (radius * 0.8),
               fontWeight: FontWeight.w800,
             ),
@@ -47,7 +48,7 @@ class UserAvatar extends StatelessWidget {
       height: radius * 2,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.primary.withValues(alpha: 0.15),
+        color: (isDark ? Colors.white : AppColors.primary).withValues(alpha: 0.15),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasAvatar

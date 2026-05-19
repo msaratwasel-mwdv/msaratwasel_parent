@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -16,6 +17,7 @@ class OfflineBannerWrapper extends StatefulWidget {
 class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
   bool _hasInternet = true;
   late final StreamSubscription<List<ConnectivityResult>> _subscription;
+  Timer? _offlineTimer;
 
   @override
   void initState() {
@@ -28,23 +30,69 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
 
   Future<void> _checkInitial() async {
     final results = await Connectivity().checkConnectivity();
-    _updateStatus(results);
+    await _updateStatus(results);
   }
 
-  void _updateStatus(List<ConnectivityResult> results) {
-    bool hasInternetNow = !results.contains(ConnectivityResult.none);
-    if (_hasInternet != hasInternetNow) {
-      if (mounted) {
-        setState(() {
-          _hasInternet = hasInternetNow;
-        });
-      }
+  Future<void> _updateStatus(List<ConnectivityResult> results) async {
+    bool hasConnection = results.isNotEmpty && !results.contains(ConnectivityResult.none);
+    
+    if (!hasConnection) {
+      _setInternetStatus(false);
+      return;
     }
+
+    try {
+      final lookupResult = await InternetAddress.lookup('google.com').timeout(
+        const Duration(seconds: 3),
+      );
+      final hasActualInternet = lookupResult.isNotEmpty && lookupResult[0].rawAddress.isNotEmpty;
+      _setInternetStatus(hasActualInternet);
+    } catch (_) {
+      _setInternetStatus(false);
+    }
+  }
+
+  void _setInternetStatus(bool hasInternet) {
+    if (_hasInternet == hasInternet) return;
+    
+    if (mounted) {
+      setState(() {
+        _hasInternet = hasInternet;
+      });
+    }
+
+    if (!hasInternet) {
+      _startOfflineTimer();
+    } else {
+      _stopOfflineTimer();
+    }
+  }
+
+  void _startOfflineTimer() {
+    _offlineTimer?.cancel();
+    _offlineTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final lookupResult = await InternetAddress.lookup('google.com').timeout(
+          const Duration(seconds: 3),
+        );
+        if (lookupResult.isNotEmpty && lookupResult[0].rawAddress.isNotEmpty) {
+          _setInternetStatus(true);
+        }
+      } catch (_) {
+        // Still offline
+      }
+    });
+  }
+
+  void _stopOfflineTimer() {
+    _offlineTimer?.cancel();
+    _offlineTimer = null;
   }
 
   @override
   void dispose() {
     _subscription.cancel();
+    _stopOfflineTimer();
     super.dispose();
   }
 

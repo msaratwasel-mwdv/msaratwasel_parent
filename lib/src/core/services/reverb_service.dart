@@ -227,7 +227,7 @@ class ReverbService {
             );
           } catch (_) {}
           if (_onNotificationReceived != null) {
-            _onNotificationReceived!(data);
+            _onNotificationReceived(data);
           }
           break;
 
@@ -276,7 +276,7 @@ class ReverbService {
             );
           } catch (_) {}
           if (_onMessageReceived != null) {
-            _onMessageReceived!(data);
+            _onMessageReceived(data);
           }
           break;
 

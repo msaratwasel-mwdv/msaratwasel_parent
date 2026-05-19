@@ -99,7 +99,7 @@ class _AddressDisplayState extends State<AddressDisplay> {
         Icon(
           Icons.location_on_rounded,
           size: 16,
-          color: widget.iconColor ?? AppColors.primary,
+          color: widget.iconColor ?? (isDark ? Colors.white : AppColors.primary),
         ),
         const SizedBox(width: 8),
         Expanded(

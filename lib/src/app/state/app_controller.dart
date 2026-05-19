@@ -13,7 +13,6 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 // FCM token registration — see _registerFcmToken below
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/core/routing/notification_router.dart';
@@ -51,7 +50,6 @@ class AppController extends ChangeNotifier {
 
   late final Dio dio;
   final StorageService _storage = StorageService();
-  final Set<String> _processedCorrelationIds = {};
   final Set<String> _subscribedChannels = {};
 
   // ── Global Navigator Key ──────────────────────────────────────────────
@@ -471,7 +469,7 @@ class AppController extends ChangeNotifier {
       AppLogger.d('👶 loadChildrenFromApi: calling /parent/children...');
 
       final response = await dio.get('parent/children');
-      print(
+      AppLogger.d(
         '👶 Children API => ${response.statusCode} | body: ${response.data}',
       );
 
@@ -532,8 +530,7 @@ class AppController extends ChangeNotifier {
         AppLogger.d('✅ Loaded ${_students.length} children');
       }
     } catch (e, st) {
-      AppLogger.d('❌ loadChildrenFromApi failed: $e');
-      print(st);
+      AppLogger.e('❌ loadChildrenFromApi failed: $e', error: e, stackTrace: st);
     } finally {
       _isLoadingChildren = false;
       notifyListeners();
@@ -1434,10 +1431,6 @@ class AppController extends ChangeNotifier {
   Future<void> addNotification(AppNotification notification, {bool isTap = false}) async {
     developer.log('🧪 DEBUG: Incoming notification ${notification.id} | isTap: $isTap', name: 'NOTIF_DEBUG');
     developer.log('🧪 DEBUG: List length before: ${_notifications.length}', name: 'NOTIF_DEBUG');
-    final String currentLang = locale.languageCode;
-    final String? payloadLang = notification.data['language']
-        ?.toString()
-        .toLowerCase();
 
     developer.log(
       '🚨 NOTIFICATION RECEIVED - ID: ${notification.id}, Type: ${notification.type}, Payload CID: ${notification.correlationId}, unread: ${notification.unreadCount}, isTap: $isTap',
@@ -1756,20 +1749,42 @@ class AppController extends ChangeNotifier {
       // Mark that new messages exist (for badge indicators)
       if (isIncoming) {
         _hasNewMessages = true;
-        
-        final convIdStr = msgData['conversation_id']?.toString();
-        if (convIdStr != null) {
-          final convId = int.tryParse(convIdStr);
-          if (convId != null) {
-            final idx = _conversations.indexWhere((c) => c.id == convId);
-            if (idx != -1) {
-              _conversations[idx] = _conversations[idx].copyWith(
-                unreadCount: _conversations[idx].unreadCount + 1,
-              );
-            } else {
-              // If we didn't find the conversation, fetch from API later
-              loadConversationsFromApi();
-            }
+      }
+      
+      final convIdStr = msgData['conversation_id']?.toString();
+      if (convIdStr != null) {
+        final convId = int.tryParse(convIdStr);
+        if (convId != null) {
+          final idx = _conversations.indexWhere((c) => c.id == convId);
+          if (idx != -1) {
+            final previewMessage = ChatMessage(
+              id: int.tryParse(msgData['id']?.toString() ?? '') ?? DateTime.now().millisecondsSinceEpoch,
+              conversationId: convId,
+              sender: ChatMessageSender(
+                id: int.tryParse(msgData['from_user_id']?.toString() ?? '') ?? 0,
+                name: msgData['sender_name']?.toString() ?? (isIncoming ? 'المدرسة' : 'أنت'),
+                role: 'مدرسة',
+              ),
+              body: msgData['content']?.toString() ?? msgData['body']?.toString() ?? '',
+              createdAt: DateTime.tryParse(msgData['created_at']?.toString() ?? '') ?? DateTime.now(),
+              isMine: !isIncoming,
+              attachmentUrl: msgData['media_url']?.toString() ?? msgData['attachment_url']?.toString(),
+            );
+
+            _conversations[idx] = _conversations[idx].copyWith(
+              unreadCount: isIncoming ? _conversations[idx].unreadCount + 1 : _conversations[idx].unreadCount,
+              lastMessage: previewMessage,
+              updatedAt: previewMessage.createdAt,
+            );
+            
+            _conversations.sort((a, b) {
+              final aDate = a.updatedAt ?? DateTime(1970);
+              final bDate = b.updatedAt ?? DateTime(1970);
+              return bDate.compareTo(aDate);
+            });
+          } else {
+            // If we didn't find the conversation, fetch from API later
+            loadConversationsFromApi();
           }
         }
       }

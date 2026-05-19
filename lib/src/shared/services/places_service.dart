@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/core/config/api_keys.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 
 class PlacesService {
   final Dio _dio;
@@ -26,7 +27,7 @@ class PlacesService {
     String sessionToken, {
     CancelToken? cancelToken,
   }) async {
-    print('🔍 PlacesService: Fetching predictions for "$query"');
+    AppLogger.d('🔍 PlacesService: Fetching predictions for "$query"');
 
     try {
       final response = await _dio.post(
@@ -61,9 +62,9 @@ class PlacesService {
       }
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
-        print('🔍 PlacesService: Request cancelled');
+        AppLogger.d('🔍 PlacesService: Request cancelled');
       } else {
-        print('❌ PlacesService Error: $e');
+        AppLogger.e('❌ PlacesService Error: $e', error: e);
       }
     }
     return [];
@@ -75,7 +76,7 @@ class PlacesService {
     String sessionToken, {
     CancelToken? cancelToken,
   }) async {
-    print('🔍 PlacesService: Fetching details for $placeId');
+    AppLogger.d('🔍 PlacesService: Fetching details for $placeId');
     try {
       final response = await _dio.get(
         'https://places.googleapis.com/v1/places/$placeId',
@@ -99,9 +100,9 @@ class PlacesService {
       }
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
-        print('🔍 PlacesService: Details request cancelled');
+        AppLogger.d('🔍 PlacesService: Details request cancelled');
       } else {
-        print('❌ PlacesService Details Error: $e');
+        AppLogger.e('❌ PlacesService Details Error: $e', error: e);
       }
     }
     return null;

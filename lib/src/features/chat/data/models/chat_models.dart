@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../../../../core/config/app_config.dart';
 
 class ChatContact {

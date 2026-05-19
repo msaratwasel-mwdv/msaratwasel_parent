@@ -1,8 +1,5 @@
-import 'dart:collection';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart'; // Use project logger
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
@@ -22,13 +19,6 @@ import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
 /// | Holiday/Field trip  | admin             | notifications       | 4         |
 /// | Default fallback    | -                 | -                   | 4         |
 class NotificationRouter {
-  // ── Tap Deduplication ──────────────────────────────────────────────────
-  // LRU of last 200 handled notification IDs prevents double-tap navigation.
-  static final LinkedHashSet<String> _handledTapIds = LinkedHashSet<String>();
-  static const int _maxHandledIds = 200;
-  static DateTime? _lastTapTime;
-  static String? _lastTapId;
-
   /// The SINGLE entry point for handling all notification taps.
   ///
   /// Called from:

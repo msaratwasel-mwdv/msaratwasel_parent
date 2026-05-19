@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui' as ui;
 
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import '../../../../app/state/app_controller.dart';
@@ -116,12 +114,15 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     List<Student> students,
     String authToken,
   ) async {
+    if (!mounted) return;
+    final languageCode = AppScope.of(context).locale.languageCode;
     for (final student in students) {
       if (!_studentIcons.containsKey(student.id)) {
+        final studentName = student.getLocalizedName(languageCode);
         try {
           // Create marker for student using our generator
           final icon = await MarkerGenerator.createStudentMarker(
-            name: student.getLocalizedName(AppScope.of(context).locale.languageCode),
+            name: studentName,
             imageUrl: student.avatarUrl,
             authToken: authToken,
             color: AppColors.accent,
@@ -131,7 +132,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           _studentIcons[student.id] = icon;
           if (mounted) setState(() {});
         } catch (e) {
-          debugPrint('Error creating marker for ${student.getLocalizedName(AppScope.of(context).locale.languageCode)}: $e');
+          debugPrint('Error creating marker for $studentName: $e');
         }
       }
     }
@@ -626,7 +627,9 @@ class _DynamicBusSelector extends StatelessWidget {
               width: 160, // Slightly wider
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : colors.card,
+                color: isSelected 
+                    ? (isDark ? Colors.white : AppColors.primary) 
+                    : colors.card,
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
@@ -662,7 +665,9 @@ class _DynamicBusSelector extends StatelessWidget {
                     child: Text(
                       '${index + 1}',
                       style: TextStyle(
-                        color: isSelected ? Colors.white : colors.text,
+                        color: isSelected 
+                            ? (isDark ? AppColors.textPrimary : Colors.white) 
+                            : colors.text,
                         fontWeight: FontWeight.bold,
                         fontSize: 10,
                       ),
@@ -693,7 +698,7 @@ class _DynamicBusSelector extends StatelessWidget {
                           '${context.t('updated')}: ${group.tracking != null ? "${group.tracking!.lastUpdate.hour}:${group.tracking!.lastUpdate.minute.toString().padLeft(2, "0")}" : "---"}',
                           style: TextStyle(
                             color: isSelected
-                                ? Colors.white.withAlpha(180)
+                                ? (isDark ? AppColors.textSecondary : Colors.white.withAlpha(180))
                                 : colors.text70,
                             fontSize: 8.5,
                           ),
@@ -704,7 +709,9 @@ class _DynamicBusSelector extends StatelessWidget {
                         Text(
                           '${context.t('bus')} $busDisplayName',
                           style: TextStyle(
-                            color: isSelected ? Colors.white : colors.text,
+                            color: isSelected 
+                                ? (isDark ? AppColors.textPrimary : Colors.white) 
+                                : colors.text,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -716,7 +723,7 @@ class _DynamicBusSelector extends StatelessWidget {
                           '${context.t('driver')}: ${group.driver?.getLocalizedName(AppScope.of(context).locale.languageCode) ?? '---'}',
                           style: TextStyle(
                             color: isSelected
-                                ? Colors.white.withAlpha(200)
+                                ? (isDark ? AppColors.textSecondary : Colors.white.withAlpha(200))
                                 : colors.text70,
                             fontSize: 9,
                           ),
@@ -730,7 +737,7 @@ class _DynamicBusSelector extends StatelessWidget {
                   Icon(
                     Icons.directions_bus_filled_rounded,
                     color: isSelected
-                        ? Colors.white
+                        ? (isDark ? AppColors.textPrimary : Colors.white)
                         : colors.text.withAlpha(180),
                     size: 18,
                   ),
@@ -969,12 +976,16 @@ class _DataDrivenPanel extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white 
+                  : AppColors.primary,
               shape: BoxShape.circle,
             ),
             child: Icon(
               isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? AppColors.textPrimary 
+                  : Colors.white,
               size: 22,
             ),
           ),
@@ -1041,7 +1052,7 @@ class _DataDrivenPanel extends StatelessWidget {
                 (tracking?.etaMinutes != null
                     ? '${tracking!.etaMinutes} ${context.t('minutesSuffix')}'
                     : '--'),
-            iconColor: AppColors.primary,
+            iconColor: isDark ? Colors.white : AppColors.primary,
           ),
         ],
       ),
@@ -1095,6 +1106,7 @@ class _DataDrivenPanel extends StatelessWidget {
   }
 
   Widget _buildActionFooter(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         const SizedBox(height: 16),
@@ -1103,16 +1115,16 @@ class _DataDrivenPanel extends StatelessWidget {
             _ActionTile(
               icon: Icons.phone_in_talk_rounded,
               label: context.t('quickCall'),
-              color: Colors.green.withAlpha(15),
-              textColor: Colors.green,
+              color: isDark ? Colors.green.withAlpha(30) : Colors.green.withAlpha(15),
+              textColor: isDark ? Colors.greenAccent : Colors.green,
               onPressed: () => _showQuickCall(context, group),
             ),
             const SizedBox(width: 12),
             _ActionTile(
               icon: Icons.chat_bubble_rounded,
               label: context.t('chat'),
-              color: AppColors.primary.withAlpha(15),
-              textColor: AppColors.primary,
+              color: isDark ? Colors.white.withAlpha(30) : AppColors.primary.withAlpha(15),
+              textColor: isDark ? Colors.white : AppColors.primary,
               onPressed: () {
                 AppScope.of(context).setNavIndex(5);
               },

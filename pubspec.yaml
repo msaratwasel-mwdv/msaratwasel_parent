@@ -110,7 +110,7 @@ dependencies:
   timeago: ^3.7.0
   firebase_crashlytics: ^4.3.10
   firebase_analytics: ^11.6.0
-  sentry_flutter: 8.10.0
+  sentry_flutter: ^8.13.0
 
 dev_dependencies:
   flutter_test:

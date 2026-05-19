@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/features/chat/data/models/chat_models.dart';
@@ -19,7 +18,7 @@ class ContactsPage extends StatefulWidget {
 }
 
 class _ContactsPageState extends State<ContactsPage> {
-  late final ChatRepository _repo;
+  ChatRepository? _repo;
 
   List<ChatContact> _contacts = [];
   bool _isLoading = true;
@@ -28,10 +27,12 @@ class _ContactsPageState extends State<ContactsPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_repo == null) {
+      _repo = ChatRepository(dio: AppScope.of(context).dio);
+    }
     if (_isLoading &&
         _contacts.isEmpty &&
         _error == null) {
-      _repo = ChatRepository(dio: AppScope.of(context).dio);
       _loadData();
     }
   }
@@ -42,7 +43,7 @@ class _ContactsPageState extends State<ContactsPage> {
     try {
       final appController = AppScope.of(context);
       final results = await Future.wait<dynamic>([
-        _repo.getContacts(),
+        _repo!.getContacts(),
         appController.loadConversationsFromApi(),
       ]);
 
@@ -75,7 +76,7 @@ class _ContactsPageState extends State<ContactsPage> {
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
-      final conversation = await _repo.startConversation(contact.id);
+      final conversation = await _repo!.startConversation(contact.id);
 
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
@@ -145,7 +146,7 @@ class _ContactsPageState extends State<ContactsPage> {
               child: CustomScrollView(
                 slivers: [
                   AppSliverHeader(
-                    title: context.t('messages'),
+                    title: context.t('chat'),
                     leading: Material(
                       color: Colors.transparent,
                       child: IconButton(
@@ -271,15 +272,17 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDark ? Colors.white : AppColors.primary;
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.primary),
+        Icon(icon, size: 18, color: color),
         const SizedBox(width: AppSpacing.sm),
         Text(
           title,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: color,
           ),
         ),
       ],
@@ -306,8 +309,8 @@ class _ContactTile extends StatelessWidget {
         ? Icons.directions_bus_rounded
         : Icons.support_agent_rounded;
     final avatarColor = isDriver
-        ? const Color(0xFF2563EB)
-        : const Color(0xFF7C3AED);
+        ? (isDark ? Colors.blue[300]! : const Color(0xFF2563EB))
+        : (isDark ? Colors.purple[300]! : const Color(0xFF7C3AED));
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -363,7 +366,7 @@ class _ContactTile extends StatelessWidget {
         ),
         trailing: Icon(
           Icons.chat_rounded,
-          color: AppColors.primary.withValues(alpha: 0.5),
+          color: isDark ? Colors.white54 : AppColors.primary.withValues(alpha: 0.5),
           size: 20,
         ),
       ),
@@ -391,9 +394,6 @@ class _ConversationTile extends StatelessWidget {
     final avatarIcon = isDriver
         ? Icons.directions_bus_rounded
         : Icons.support_agent_rounded;
-    final avatarColor = isDriver
-        ? const Color(0xFF2563EB)
-        : const Color(0xFF7C3AED);
 
     final lastMsg = conversation.lastMessage;
     final subtitle =

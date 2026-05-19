@@ -3,14 +3,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:msaratwasel_user/src/app/app.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:msaratwasel_user/src/core/utils/logger.dart';
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +33,7 @@ void main() async {
       // Handle Flutter errors
       FlutterError.onError = (details) {
         FlutterError.presentError(details);
-        developer.log('Flutter Error: ${details.exception}', name: 'ERROR');
+        AppLogger.e('Flutter Error: ${details.exception}', error: details.exception, stackTrace: details.stack);
         // Send error report to Firebase Crashlytics & Sentry
         FirebaseCrashlytics.instance.recordFlutterFatalError(details);
         Sentry.captureException(details.exception, stackTrace: details.stack);
@@ -42,11 +41,7 @@ void main() async {
 
       // Handle platform/asynchronous errors
       PlatformDispatcher.instance.onError = (error, stack) {
-        developer.log(
-          'Unhandled Async Error: $error',
-          name: 'ERROR',
-          stackTrace: stack,
-        );
+        AppLogger.e('Unhandled Async Error: $error', error: error, stackTrace: stack);
         // Send async error report to Firebase Crashlytics & Sentry
         FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
         Sentry.captureException(error, stackTrace: stack);
@@ -54,46 +49,38 @@ void main() async {
       };
 
       try {
-        print('🚀 MsaratWasel: Application starting...');
-        developer.log('🚀 MsaratWasel: Application starting...', name: 'APP_START');
+        AppLogger.i('🚀 MsaratWasel: Application starting...');
 
         // Watchdog timer: Force remove splash after 15 seconds if nothing else does
         Future.delayed(const Duration(seconds: 15), () {
           try {
-            print(
-              '⏰ MsaratWasel: Startup Watchdog triggered (15s). Forcing splash removal.',
-            );
+            AppLogger.w('⏰ MsaratWasel: Startup Watchdog triggered (15s). Forcing splash removal.');
             FlutterNativeSplash.remove();
           } catch (_) {}
         });
 
         // 1. تهيئة Firebase — ضروري لـ FCM
-        print('🔥 MsaratWasel: Initializing Firebase...');
+        AppLogger.i('🔥 MsaratWasel: Initializing Firebase...');
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print('⚠️ MsaratWasel: Firebase initialization timed out after 10s');
+            AppLogger.w('⚠️ MsaratWasel: Firebase initialization timed out after 10s');
             return Firebase.app();
           },
         );
-        print('🔥 MsaratWasel: Firebase initialized successfully');
+        AppLogger.i('🔥 MsaratWasel: Firebase initialized successfully');
 
         // 2. إنشاء AppController
-        print('🏗️ MsaratWasel: Creating AppController...');
+        AppLogger.i('🏗️ MsaratWasel: Creating AppController...');
         final controller = AppController();
 
-        print('🚀 MsaratWasel: Widgets initialized. Calling runApp...');
+        AppLogger.i('🚀 MsaratWasel: Widgets initialized. Calling runApp...');
         runApp(MsaratWaselApp(controller: controller));
-        print('🚀 MsaratWasel: runApp called successfully');
+        AppLogger.i('🚀 MsaratWasel: runApp called successfully');
       } catch (e, stack) {
-        print('❌ MsaratWasel: CRITICAL Error during initialization: $e');
-        developer.log(
-          'CRITICAL Error during initialization: $e',
-          name: 'ERROR',
-          stackTrace: stack,
-        );
+        AppLogger.e('❌ MsaratWasel: CRITICAL Error during initialization: $e', error: e, stackTrace: stack);
         Sentry.captureException(e, stackTrace: stack);
 
         // Ensure splash is removed even on error to avoid hang

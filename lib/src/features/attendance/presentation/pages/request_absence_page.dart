@@ -120,22 +120,22 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSectionLabel(context.t('chooseStudent')),
+                  _buildSectionLabel(context, context.t('chooseStudent')),
                   const SizedBox(height: 12),
                   _studentSelector(context, textTheme, isDark),
 
                   const SizedBox(height: 30),
-                  _buildSectionLabel(context.t('absenceType')),
+                  _buildSectionLabel(context, context.t('absenceType')),
                   const SizedBox(height: 12),
                   _absenceTypeRow(textTheme, isDark),
 
                   const SizedBox(height: 30),
-                  _buildSectionLabel(context.t('selectDate')),
+                  _buildSectionLabel(context, context.t('selectDate')),
                   const SizedBox(height: 12),
                   _modernDatePicker(textTheme, isDark),
 
                   const SizedBox(height: 30),
-                  _buildSectionLabel(context.t('absenceReason')),
+                  _buildSectionLabel(context, context.t('absenceReason')),
                   const SizedBox(height: 12),
                   _modernReasonField(textTheme, isDark),
 
@@ -151,13 +151,14 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     );
   }
 
-  Widget _buildSectionLabel(String text) {
+  Widget _buildSectionLabel(BuildContext context, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text,
       style: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w800,
-        color: AppColors.primary.withValues(alpha: 0.8),
+        color: isDark ? Colors.white.withValues(alpha: 0.8) : AppColors.primary.withValues(alpha: 0.8),
         letterSpacing: 0.5,
       ),
     );
@@ -178,15 +179,6 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
     selectedStudentId ??= students.first.id;
 
     final displayStudents = students.toList();
-    if (selectedStudentId != null) {
-      final index = displayStudents.indexWhere(
-        (s) => s.id == selectedStudentId,
-      );
-      if (index != -1 && index != displayStudents.length - 1) {
-        final selected = displayStudents.removeAt(index);
-        displayStudents.add(selected);
-      }
-    }
 
     return Column(
       children: [
@@ -434,7 +426,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
           children: [
             Icon(
               Icons.calendar_today_rounded,
-              color: AppColors.primary,
+              color: isDark ? Colors.white70 : AppColors.primary,
               size: 22,
             ),
             const SizedBox(width: AppSpacing.md),
@@ -514,6 +506,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
   Widget _submitButton(TextTheme textTheme) {
     return SizedBox(
       height: 56,
+      width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
