@@ -8,7 +8,7 @@ class NotificationRepositoryImpl implements NotificationsRepository {
   NotificationRepositoryImpl({required this.dio});
 
   @override
-  Future<List<AppNotification>> fetchNotifications() async {
+  Future<NotificationFetchResult> fetchNotifications() async {
     try {
       final response = await dio.get('guardian/notifications');
 
@@ -19,13 +19,20 @@ class NotificationRepositoryImpl implements NotificationsRepository {
             ? (notificationsMap['data'] ?? [])
             : (notificationsMap ?? []);
 
-        return data.map((json) {
+        final notifications = data.map((json) {
           return AppNotification.fromMap(json);
         }).toList();
+
+        final unreadCount = response.data['unread_count'] as int? ?? 0;
+
+        return NotificationFetchResult(
+          notifications: notifications,
+          unreadCount: unreadCount,
+        );
       }
-      return [];
+      return NotificationFetchResult(notifications: [], unreadCount: 0);
     } catch (e) {
-      return [];
+      return NotificationFetchResult(notifications: [], unreadCount: 0);
     }
   }
 }

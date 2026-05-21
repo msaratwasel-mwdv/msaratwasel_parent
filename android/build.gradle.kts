@@ -1,7 +1,6 @@
 plugins {
     id("com.google.gms.google-services") version "4.4.2" apply false
     id("com.google.firebase.crashlytics") version "3.0.2" apply false
-    id("io.sentry.android.gradle") version "4.14.0" apply false
 }
 
 allprojects {
@@ -29,6 +28,31 @@ subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_8)
+        }
+    }
+}
+
+subprojects {
+    plugins.withId("com.android.library") {
+        val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        if (android != null && android.namespace == null) {
+            val groupString = project.group.toString()
+            android.namespace = if (groupString.isNotEmpty()) {
+                groupString
+            } else {
+                "com.example.${project.name.replace("-", ".").replace("_", ".")}"
+            }
+        }
+    }
+    plugins.withId("com.android.application") {
+        val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        if (android != null && android.namespace == null) {
+            val groupString = project.group.toString()
+            android.namespace = if (groupString.isNotEmpty()) {
+                groupString
+            } else {
+                "com.example.${project.name.replace("-", ".").replace("_", ".")}"
+            }
         }
     }
 }

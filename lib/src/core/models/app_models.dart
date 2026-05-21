@@ -357,12 +357,11 @@ class Student {
               double.tryParse(json['school']['longitude'].toString()) ?? 0.0,
             )
           : null,
-      // These will be populated by AppController when updates arrive
-      waitingAtHomeTime: null,
-      onBusToSchoolTime: null,
-      atSchoolTime: null,
-      onBusToHomeTime: null,
-      arrivedHomeTime: null,
+      waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time']) : null,
+      onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time']) : null,
+      atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time']) : null,
+      onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time']) : null,
+      arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time']) : null,
       etaMinutes: json['eta_minutes'] as int?,
       pendingLocation: json['pending_location'] as Map<String, dynamic>?,
     );
@@ -385,6 +384,10 @@ class Student {
       case 'atHome':
         if (direction == 'to_home') return StudentStatus.arrivedHome;
         return StudentStatus.waitingAtHome; // morning default
+      case 'waiting':
+        if (direction == 'to_school') return StudentStatus.waitingAtHome;
+        if (direction == 'to_home') return StudentStatus.onBusToHome;
+        return StudentStatus.waitingAtHome;
       case 'notBoarded':
         return StudentStatus.notBoarded;
       case 'late':
@@ -544,17 +547,22 @@ class AppNotification {
           ? senderNameEn!
           : (senderName ?? '');
 
-  factory AppNotification.fromMap(Map<String, dynamic> data) {
+  factory AppNotification.fromMap(Map<String, dynamic> rawData) {
     Map<String, dynamic>? nestedData;
-    if (data['data'] is Map) {
-      nestedData = Map<String, dynamic>.from(data['data']);
-    } else if (data['data'] is String) {
+    if (rawData['data'] is Map) {
+      nestedData = Map<String, dynamic>.from(rawData['data']);
+    } else if (rawData['data'] is String) {
       try {
-        final decoded = jsonDecode(data['data']);
+        final decoded = jsonDecode(rawData['data']);
         if (decoded is Map) {
           nestedData = Map<String, dynamic>.from(decoded);
         }
       } catch (_) {}
+    }
+    
+    final data = Map<String, dynamic>.from(rawData);
+    if (nestedData != null) {
+      data.addAll(nestedData);
     }
     
     final notificationId = data['notification_id']?.toString() ??
@@ -601,6 +609,7 @@ class AppNotification {
           nestedData?['sender_name_en']?.toString(),
       type: parseType(data['type']?.toString() ?? nestedData?['type']?.toString()),
       time: DateTime.tryParse(data['created_at']?.toString() ?? '') ?? DateTime.now(),
+      read: (data['read'] == true || data['read'] == 1 || data['read'] == 'true' || data['status']?.toString() == 'read'),
       language: data['language']?.toString().toLowerCase() ?? nestedData?['language']?.toString().toLowerCase(),
       unreadCount: int.tryParse(data['unread_count']?.toString() ?? nestedData?['unread_count']?.toString() ?? ''),
       category: category,
@@ -610,7 +619,24 @@ class AppNotification {
   }
 
   factory AppNotification.fromFcm(RemoteMessage message) {
-    final data = message.data;
+    final rawData = message.data;
+    Map<String, dynamic>? nestedData;
+    if (rawData['data'] is Map) {
+      nestedData = Map<String, dynamic>.from(rawData['data'] as Map);
+    } else if (rawData['data'] is String) {
+      try {
+        final decoded = jsonDecode(rawData['data'] as String);
+        if (decoded is Map) {
+          nestedData = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+
+    final data = Map<String, dynamic>.from(rawData);
+    if (nestedData != null) {
+      data.addAll(nestedData);
+    }
+
     final type = parseType(data['type']?.toString());
 
     final dbId = data['notification_id']?.toString() ??

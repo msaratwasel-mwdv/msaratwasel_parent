@@ -9,8 +9,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 // FCM token registration — see _registerFcmToken below
@@ -32,8 +30,9 @@ import 'package:msaratwasel_user/src/core/services/notification_service.dart';
 import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking.dart';
 import 'package:msaratwasel_user/src/features/tracking/domain/entities/bus_tracking_group.dart';
 import 'package:msaratwasel_user/src/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:msaratwasel_user/src/core/services/notification_badge_service.dart';
 
-class AppController extends ChangeNotifier {
+class AppController extends ChangeNotifier with WidgetsBindingObserver {
   AppController()
     : _students = [],
       _tripGroups = {},
@@ -46,6 +45,15 @@ class AppController extends ChangeNotifier {
       _locationRequests = [] {
     AppLogger.i('🏗️ AppController: Instance created');
     _initDio();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      developer.log('🔄 App resumed: synchronizing notification badge...', name: 'LIFECYCLE');
+      _updateAppIconBadge();
+    }
   }
 
   late final Dio dio;
@@ -243,6 +251,11 @@ class AppController extends ChangeNotifier {
                 n.targetScreen == 'location_requests' ||
                 n.targetScreen == 'location_request_details'))
         .length;
+  }
+
+  void _updateAppIconBadge() async {
+    final count = notificationsUnreadCount;
+    await NotificationBadgeService.sync(count);
   }
 
   final List<AttendanceEntry> _attendance;
@@ -503,29 +516,7 @@ class AppController extends ChangeNotifier {
         developer.log('🔐 Persisted ${studentIds.length} student IDs for background security checks.', name: 'AUTH');
 
 
-        // LOAD PERSISTED TIMESTAMPS FOR TODAY
-        final todayStr =
-            "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
-        for (int i = 0; i < _students.length; i++) {
-          final sid = _students[i].id;
-          _students[i] = _students[i].copyWith(
-            waitingAtHomeTime: _parseTime(
-              prefs.getString('ts_${sid}_waitingAtHome_$todayStr'),
-            ),
-            onBusToSchoolTime: _parseTime(
-              prefs.getString('ts_${sid}_onBusToSchool_$todayStr'),
-            ),
-            atSchoolTime: _parseTime(
-              prefs.getString('ts_${sid}_atSchool_$todayStr'),
-            ),
-            onBusToHomeTime: _parseTime(
-              prefs.getString('ts_${sid}_onBusToHome_$todayStr'),
-            ),
-            arrivedHomeTime: _parseTime(
-              prefs.getString('ts_${sid}_arrivedHome_$todayStr'),
-            ),
-          );
-        }
+
 
         AppLogger.d('✅ Loaded ${_students.length} children');
       }
@@ -675,7 +666,7 @@ class AppController extends ChangeNotifier {
                           ? now
                           : _students[idx].arrivedHomeTime,
                     );
-                    _persistTimestamps(_students[idx]);
+                    _syncStudentInTripGroups(_students[idx]);
                   }
                 }
               }
@@ -748,7 +739,7 @@ class AppController extends ChangeNotifier {
                   ? now
                   : _students[idx].arrivedHomeTime,
             );
-            _persistTimestamps(_students[idx]);
+            _syncStudentInTripGroups(_students[idx]);
             updated = true;
           }
         }
@@ -958,6 +949,12 @@ class AppController extends ChangeNotifier {
       newStatus = (direction == 'to_school')
           ? StudentStatus.atSchool
           : StudentStatus.arrivedHome;
+    } else if (newStatusStr == 'waiting') {
+      newStatus = (direction == 'to_school')
+          ? StudentStatus.waitingAtHome
+          : StudentStatus.onBusToHome;
+    } else if (newStatusStr == 'absent') {
+      newStatus = StudentStatus.atHome;
     } else {
       // Fallback for direct enum name matching if backend sends onBus/atHome etc.
       newStatus = StudentStatus.values.firstWhere(
@@ -986,7 +983,7 @@ class AppController extends ChangeNotifier {
             ? now
             : _students[idx].arrivedHomeTime,
       );
-      _persistTimestamps(_students[idx]);
+      _syncStudentInTripGroups(_students[idx]);
       developer.log(
         '🔔 Real-time status update: ${_students[idx].name} ($newStatusStr + $direction) → $newStatus at $now',
         name: 'REVERB',
@@ -995,39 +992,13 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  // --- PERSISTENCE UTILS ---
-  DateTime? _parseTime(String? s) => s != null ? DateTime.tryParse(s) : null;
-
-  Future<void> _persistTimestamps(Student s) async {
-    final prefs = await _storage.prefs;
-    final todayStr =
-        "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
-    final sid = s.id;
-    if (s.waitingAtHomeTime != null)
-      await prefs.setString(
-        'ts_${sid}_waitingAtHome_$todayStr',
-        s.waitingAtHomeTime!.toIso8601String(),
-      );
-    if (s.onBusToSchoolTime != null)
-      await prefs.setString(
-        'ts_${sid}_onBusToSchool_$todayStr',
-        s.onBusToSchoolTime!.toIso8601String(),
-      );
-    if (s.atSchoolTime != null)
-      await prefs.setString(
-        'ts_${sid}_atSchool_$todayStr',
-        s.atSchoolTime!.toIso8601String(),
-      );
-    if (s.onBusToHomeTime != null)
-      await prefs.setString(
-        'ts_${sid}_onBusToHome_$todayStr',
-        s.onBusToHomeTime!.toIso8601String(),
-      );
-    if (s.arrivedHomeTime != null)
-      await prefs.setString(
-        'ts_${sid}_arrivedHome_$todayStr',
-        s.arrivedHomeTime!.toIso8601String(),
-      );
+  void _syncStudentInTripGroups(Student s) {
+    final busId = s.bus.id;
+    if (busId.isNotEmpty && busId != '-' && _tripGroups.containsKey(busId)) {
+      final group = _tripGroups[busId]!;
+      final updatedStudents = group.students.map((st) => st.id == s.id ? s : st).toList();
+      _tripGroups[busId] = group.copyWith(students: updatedStudents);
+    }
   }
 
   Future<void> completeOnboarding() async {
@@ -1262,6 +1233,8 @@ class AppController extends ChangeNotifier {
     _notifications.clear();
     _processedCidsMemory.clear();
     _navIndex = 0;
+    _serverUnreadCount = null;
+    _updateAppIconBadge();
     
     notifyListeners();
   }
@@ -1371,6 +1344,7 @@ class AppController extends ChangeNotifier {
     }
     
     notifyListeners();
+    _updateAppIconBadge();
 
     // 2. Sync with server
     if (ids == null || ids.isEmpty) return;
@@ -1459,34 +1433,14 @@ class AppController extends ChangeNotifier {
       // Memory check (Ultra-fast synchronous check)
       if (_processedCidsMemory.contains(cid)) {
         developer.log('♻️ Skipping duplicate notification (Memory Match: $cid)', name: 'NOTIFICATION');
-        try {
-          FirebaseCrashlytics.instance.log('FCM FG: Suppressing duplicate notification (Memory Match: $cid)');
-          Sentry.addBreadcrumb(
-            Breadcrumb(
-              message: 'FCM FG: Suppressed duplicate notification (Memory Match)',
-              category: 'fcm.foreground.suppressed',
-              level: SentryLevel.warning,
-              data: {'correlation_id': cid},
-            ),
-          );
-        } catch (_) {}
+        developer.log('FCM FG: Suppressing duplicate notification (Memory Match: $cid)', name: 'FCM');
         return;
       }
       
       // Persistent storage check (Asynchronous fallback)
       if (await _isCidProcessed(cid)) {
         developer.log('♻️ Skipping duplicate notification (Storage Match: $cid)', name: 'NOTIFICATION');
-        try {
-          FirebaseCrashlytics.instance.log('FCM FG: Suppressing duplicate notification (Storage Match: $cid)');
-          Sentry.addBreadcrumb(
-            Breadcrumb(
-              message: 'FCM FG: Suppressed duplicate notification (Storage Match)',
-              category: 'fcm.foreground.suppressed',
-              level: SentryLevel.warning,
-              data: {'correlation_id': cid},
-            ),
-          );
-        } catch (_) {}
+        developer.log('FCM FG: Suppressing duplicate notification (Storage Match: $cid)', name: 'FCM');
         return;
       }
 
@@ -1517,41 +1471,34 @@ class AppController extends ChangeNotifier {
           '🛑 SECURITY: Suppressing notification for foreign student $targetStudentId',
           name: 'NOTIFICATION',
         );
-        try {
-          FirebaseCrashlytics.instance.log('SECURITY check failed: Suppressing notification for student $targetStudentId');
-          Sentry.addBreadcrumb(
-            Breadcrumb(
-              message: 'SECURITY check failed: Student not in parent list',
-              category: 'security.suppressed',
-              level: SentryLevel.warning,
-              data: {
-                'student_id': targetStudentId,
-                'my_students': _students.map((s) => s.id).toList(),
-              },
-            ),
-          );
-        } catch (_) {}
+        developer.log('SECURITY check failed: Suppressing notification for student $targetStudentId', name: 'FCM');
         return;
       }
     }
 
-    // 2. Check for list-based duplicate (fallback)
+    // 2. Check for list-based duplicate (fallback) and add to list if new
     final isDuplicate = _notifications.any((n) => n.id == notification.id);
-    if (isDuplicate) {
-      return;
+    if (!isDuplicate) {
+      // ── إضافة الإشعار إلى القائمة المحلية ──
+      _notifications.insert(0, notification);
+      
+      // Sort immediately to maintain consistency before UI rebuild
+      _notifications.sort((a, b) => b.time.compareTo(a.time));
+
+      if (_notifications.length > 200) _notifications.removeLast();
+
+      // If it's a new unread notification, and the payload didn't explicitly specify unreadCount,
+      // and we have a cached server count, increment it.
+      if (!isTap && !notification.read && notification.unreadCount == null && _serverUnreadCount != null) {
+        _serverUnreadCount = _serverUnreadCount! + 1;
+        developer.log('📈 Incremented unread count (no payload unreadCount): $_serverUnreadCount', name: 'NOTIFICATION');
+      }
     }
-
-    // ── إضافة الإشعار إلى القائمة المحلية ──
-    _notifications.insert(0, notification);
-    
-    // Sort immediately to maintain consistency before UI rebuild
-    _notifications.sort((a, b) => b.time.compareTo(a.time));
-
-    if (_notifications.length > 200) _notifications.removeLast();
     
     // Force a microtask delay to ensure UI can handle the notification safely
     Future.microtask(() {
       notifyListeners();
+      _updateAppIconBadge();
     });
 
     // ── Foreground Display (Heads-up) ───────────────────────────────────
@@ -1571,17 +1518,7 @@ class AppController extends ChangeNotifier {
         if (convId != null &&
             convId == ActiveConversationTracker.activeConversationId) {
           shouldSuppress = true;
-          try {
-            FirebaseCrashlytics.instance.log('FCM FG: Suppressing notification - active in conversation $convId');
-            Sentry.addBreadcrumb(
-              Breadcrumb(
-                message: 'FCM FG: Suppressed notification because user is actively inside the chat screen',
-                category: 'fcm.foreground.suppressed',
-                level: SentryLevel.info,
-                data: {'conversation_id': convId},
-              ),
-            );
-          } catch (_) {}
+          developer.log('FCM FG: Suppressing notification - active in conversation $convId', name: 'FCM');
         }
       }
 
@@ -1614,42 +1551,9 @@ class AppController extends ChangeNotifier {
           channelName: channelName,
         );
       }
-    } else if (!isTap && !isForeground) {
     }
 
-    // 3. Handle Navigation on Tap
-    if (isTap) {
-      NotificationRouter.handleNotificationTap(this, notification);
-      
-      // If it's a chat message, we also set the flag for UI state
-      if (notification.type == NotificationType.chat ||
-          notification.type == NotificationType.supervisorMessage) {
-        _hasNewMessages = true;
-      }
-      
-      notifyListeners();
-      return;
-    }
-
-    // ── إضافة الإشعار إلى القائمة المحلية وتحديث الواجهة فوراً ──
-    final exists = _notifications.any((n) => n.id == notification.id);
-    if (!exists) {
-      _notifications.insert(0, notification);
-      if (_notifications.length > 200) _notifications.removeLast();
-    }
-
-    // 4. Handle Background Updates (Non-tap)
-    if (notification.type == NotificationType.chat ||
-        notification.type == NotificationType.supervisorMessage) {
-      _hasNewMessages = true;
-      notifyListeners();
-      
-      // If not a tap, we still might want to process further (like student status) 
-      // but usually chats don't have student status updates.
-      if (!isTap) return; 
-    }
-
-    // ── تحديث حالة الطالب لحظياً بناءً على بيانات الإشعار ──
+    // 3. Update student status in memory instantly based on notification (for both tap and non-tap)
     final studentId = notification.data['student_id']?.toString();
     if (studentId != null) {
       final index = _students.indexWhere((s) => s.id == studentId);
@@ -1675,17 +1579,15 @@ class AppController extends ChangeNotifier {
                 : StudentStatus.arrivedHome;
             break;
           case NotificationType.approach:
-            // Proximity logic: refresh tracking
+            newStatus = StudentStatus.waitingAtHome;
             _fetchTrackingFromApi();
             break;
           case NotificationType.absenceApproved:
           case NotificationType.absenceRejected:
-            // Refresh absence requests to get updated status
             loadAbsenceRequestsFromApi();
             break;
           case NotificationType.locationApproved:
           case NotificationType.locationRejected:
-            // Refresh children to get updated location/status
             loadChildrenFromApi();
             loadLocationRequestsFromApi();
             break;
@@ -1694,18 +1596,60 @@ class AppController extends ChangeNotifier {
         }
 
         if (newStatus != null && _students[index].status != newStatus) {
-          _students[index] = _students[index].copyWith(status: newStatus);
-          _persistTimestamps(_students[index]);
+          final eventTime = notification.time;
+          _students[index] = _students[index].copyWith(
+            status: newStatus,
+            waitingAtHomeTime: (newStatus == StudentStatus.waitingAtHome)
+                ? eventTime
+                : _students[index].waitingAtHomeTime,
+            onBusToSchoolTime: (newStatus == StudentStatus.onBusToSchool)
+                ? eventTime
+                : _students[index].onBusToSchoolTime,
+            atSchoolTime: (newStatus == StudentStatus.atSchool)
+                ? eventTime
+                : _students[index].atSchoolTime,
+            onBusToHomeTime: (newStatus == StudentStatus.onBusToHome)
+                ? eventTime
+                : _students[index].onBusToHomeTime,
+            arrivedHomeTime: (newStatus == StudentStatus.arrivedHome)
+                ? eventTime
+                : _students[index].arrivedHomeTime,
+          );
+          _syncStudentInTripGroups(_students[index]);
         }
       }
     }
 
-    // Handle navigation on Tap (AFTER adding to list)
+    // 4. Handle Background Updates / UI Flags (Non-tap)
+    if (notification.type == NotificationType.chat ||
+        notification.type == NotificationType.supervisorMessage) {
+      _hasNewMessages = true;
+    }
+
+    // 5. Handle Navigation and Async Backend Sync on Tap
     if (isTap) {
+      // 🔄 Sync and reload the fresh database-driven status in background
+      if (notification.type == NotificationType.checkIn ||
+          notification.type == NotificationType.checkOut ||
+          notification.type == NotificationType.arrival ||
+          notification.type == NotificationType.tripStarted ||
+          notification.type == NotificationType.tripEnded) {
+        loadChildrenFromApi();
+      } else if (notification.type == NotificationType.absenceApproved ||
+                 notification.type == NotificationType.absenceRejected) {
+        loadAbsenceRequestsFromApi();
+      } else if (notification.type == NotificationType.locationApproved ||
+                 notification.type == NotificationType.locationRejected) {
+        loadChildrenFromApi();
+        loadLocationRequestsFromApi();
+      }
+
+      // Navigate to the target page instantly
       NotificationRouter.handleNotificationTap(this, notification);
     }
     
     notifyListeners();
+    _updateAppIconBadge();
   }
 
   Future<void> _handleRealtimeNotification(Map<String, dynamic> data) async {
@@ -1800,7 +1744,9 @@ class AppController extends ChangeNotifier {
   /// Clears all local notifications.
   Future<void> clearNotifications() async {
     _notifications.clear();
+    _serverUnreadCount = 0;
     notifyListeners();
+    _updateAppIconBadge();
   }
 
   /// Fetches the notification history from the Laravel API on app boot.
@@ -1822,7 +1768,13 @@ class AppController extends ChangeNotifier {
       );
 
       final repo = NotificationRepositoryImpl(dio: dio);
-      final fetched = await repo.fetchNotifications();
+      final result = await repo.fetchNotifications();
+      final fetched = result.notifications;
+
+      // Sync server unread count
+      _serverUnreadCount = result.unreadCount;
+      developer.log('📈 Synced server unread count: $_serverUnreadCount', name: 'NOTIFICATION');
+      _updateAppIconBadge();
 
       // تصفية إشعارات الشات حتى لا تظهر في القائمة العامة
       final filteredFetched = fetched
@@ -2441,6 +2393,7 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _reverbService?.dispose();
     _messageStreamController.close();
     super.dispose();

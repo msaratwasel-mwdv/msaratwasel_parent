@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
@@ -85,6 +86,7 @@ class _ChildStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -233,13 +235,10 @@ class _ChildStatusCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '--',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
+                _WaitingTimeWidget(
+                  student: student,
+                  isArabic: isArabic,
+                  isDark: isDark,
                 ),
               ],
             ),
@@ -293,9 +292,10 @@ class _ChildStatusCard extends StatelessWidget {
                   bool reached,
                   bool active,
                 ) {
-                  if (time != null) return DateFormat('hh:mm a').format(time);
+                  final localeStr = Localizations.localeOf(context).languageCode;
+                  if (time != null) return DateFormat('hh:mm a', localeStr).format(time);
                   if (active)
-                    return DateFormat('hh:mm a').format(DateTime.now());
+                    return DateFormat('hh:mm a', localeStr).format(DateTime.now());
 
                   return '--:--';
                 }
@@ -537,6 +537,105 @@ class _TimelineStep extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _WaitingTimeWidget extends StatefulWidget {
+  const _WaitingTimeWidget({
+    required this.student,
+    required this.isArabic,
+    required this.isDark,
+  });
+
+  final Student student;
+  final bool isArabic;
+  final bool isDark;
+
+  @override
+  State<_WaitingTimeWidget> createState() => _WaitingTimeWidgetState();
+}
+
+class _WaitingTimeWidgetState extends State<_WaitingTimeWidget> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimerIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WaitingTimeWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _startTimerIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimerIfNeeded() {
+    _timer?.cancel();
+    final student = widget.student;
+    
+    // We tick if the student is currently waiting and waitingAtHomeTime is set
+    final isWaiting = student.waitingAtHomeTime != null &&
+        student.onBusToSchoolTime == null &&
+        (student.status == StudentStatus.waitingAtHome ||
+            student.status == StudentStatus.notBoarded ||
+            student.status == StudentStatus.late);
+
+    if (isWaiting) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  String _getWaitingTime() {
+    final student = widget.student;
+    if (student.waitingAtHomeTime == null) return '--';
+
+    final DateTime endTime;
+    if (student.onBusToSchoolTime != null) {
+      endTime = student.onBusToSchoolTime!;
+    } else if (student.status == StudentStatus.waitingAtHome ||
+        student.status == StudentStatus.notBoarded ||
+        student.status == StudentStatus.late) {
+      endTime = DateTime.now();
+    } else {
+      return '--';
+    }
+
+    final difference = endTime.difference(student.waitingAtHomeTime!);
+    if (difference.isNegative) return '0 ${widget.isArabic ? 'دقيقة' : 'min'}';
+    final minutes = difference.inMinutes;
+    final seconds = difference.inSeconds % 60;
+    if (minutes == 0) {
+      return widget.isArabic ? '$seconds ثانية' : '$seconds sec';
+    }
+    if (seconds == 0) {
+      return widget.isArabic ? '$minutes دقيقة' : '$minutes min';
+    }
+    return widget.isArabic
+        ? '$minutes دقيقة و $seconds ثانية'
+        : '$minutes min $seconds sec';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _getWaitingTime(),
+      style: TextStyle(
+        color: widget.isDark ? Colors.white : AppColors.textPrimary,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
     );
   }
 }

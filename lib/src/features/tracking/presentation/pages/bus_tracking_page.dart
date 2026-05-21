@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1279,9 +1280,89 @@ class _StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasBoarded =
-        student.status == StudentStatus.onBusToSchool ||
-        student.status == StudentStatus.onBusToHome;
+    final String localeStr = Localizations.localeOf(context).languageCode;
+    final bool isArabic = localeStr == 'ar';
+    final bool isFemale = student.gender?.toLowerCase() == 'female';
+
+    final String statusText;
+    final Color statusColor;
+    final IconData statusIcon;
+    final String subtitleText;
+
+    switch (student.status) {
+      case StudentStatus.onBusToSchool:
+      case StudentStatus.onBusToHome:
+      case StudentStatus.onBus:
+        statusText = isArabic
+            ? (isFemale ? 'ركبت الحافلة' : 'ركب الحافلة')
+            : context.t('boarded');
+        statusColor = Colors.green;
+        statusIcon = Icons.directions_bus_rounded;
+        final DateTime? boardingTime = student.status == StudentStatus.onBusToHome
+            ? student.onBusToHomeTime
+            : student.onBusToSchoolTime;
+        if (boardingTime != null) {
+          subtitleText = "${context.t('boardingTime')} ${DateFormat('hh:mm a', localeStr).format(boardingTime)}";
+        } else {
+          subtitleText = context.t('boardingTime');
+        }
+        break;
+
+      case StudentStatus.atSchool:
+        statusText = isArabic
+            ? (isFemale ? 'وصلت المدرسة' : 'وصل المدرسة')
+            : context.t('arrivedSchool');
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle_rounded;
+        if (student.atSchoolTime != null) {
+          final String arrivedWord = isArabic
+              ? (isFemale ? 'وصلت' : 'وصل')
+              : context.t('arrived');
+          subtitleText = "$arrivedWord ${DateFormat('hh:mm a', localeStr).format(student.atSchoolTime!)}";
+        } else {
+          subtitleText = isArabic
+              ? (isFemale ? 'وصلت المدرسة' : 'وصل المدرسة')
+              : context.t('arrivedSchool');
+        }
+        break;
+
+      case StudentStatus.arrivedHome:
+      case StudentStatus.atHome:
+        statusText = isArabic
+            ? (isFemale ? 'وصلت المنزل' : 'وصل المنزل')
+            : context.t('arrivedHome');
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle_rounded;
+        if (student.arrivedHomeTime != null) {
+          final String arrivedWord = isArabic
+              ? (isFemale ? 'وصلت' : 'وصل')
+              : context.t('arrived');
+          subtitleText = "$arrivedWord ${DateFormat('hh:mm a', localeStr).format(student.arrivedHomeTime!)}";
+        } else {
+          subtitleText = isArabic
+              ? (isFemale ? 'وصلت المنزل' : 'وصل المنزل')
+              : context.t('arrivedHome');
+        }
+        break;
+
+      case StudentStatus.late:
+        statusText = context.t('late');
+        statusColor = Colors.red;
+        statusIcon = Icons.access_time_filled_rounded;
+        subtitleText = context.t('waitingForBoarding');
+        break;
+
+      case StudentStatus.waitingAtHome:
+      case StudentStatus.notBoarded:
+        statusText = isArabic
+            ? (isFemale ? 'لم تركب بعد' : 'لم يركب بعد')
+            : context.t('notBoardedYet');
+        statusColor = Colors.orange;
+        statusIcon = Icons.error_outline_rounded;
+        subtitleText = context.t('waitingForBoarding');
+        break;
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colors = isDark ? AppColors.dark : AppColors.light;
@@ -1341,7 +1422,7 @@ class _StudentCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: (hasBoarded ? Colors.green : Colors.orange).withAlpha(
+                  color: statusColor.withAlpha(
                     15,
                   ),
                   borderRadius: BorderRadius.circular(10),
@@ -1350,21 +1431,17 @@ class _StudentCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      hasBoarded
-                          ? context.t('boarded')
-                          : context.t('notBoardedYet'),
+                      statusText,
                       style: TextStyle(
-                        color: hasBoarded ? Colors.green : Colors.orange,
+                        color: statusColor,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      hasBoarded
-                          ? Icons.check_circle_rounded
-                          : Icons.error_outline_rounded,
-                      color: hasBoarded ? Colors.green : Colors.orange,
+                      statusIcon,
+                      color: statusColor,
                       size: 14,
                     ),
                   ],
@@ -1372,9 +1449,7 @@ class _StudentCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                hasBoarded
-                    ? 'وقت الركوب 9:10 ص'
-                    : context.t('waitingForBoarding'),
+                subtitleText,
                 style: TextStyle(
                   color: colors.text70,
                   fontSize: 10,
