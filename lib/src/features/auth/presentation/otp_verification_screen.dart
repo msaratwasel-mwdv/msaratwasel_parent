@@ -8,6 +8,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/widgets/frosted_card.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 import 'package:msaratwasel_user/src/shared/widgets/primary_button.dart';
 import 'package:msaratwasel_user/src/features/auth/presentation/widgets/auth_background.dart';
 
@@ -99,7 +100,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
+            icon: DirectionalIcon(
               Icons.arrow_back_ios_new_rounded,
               color: isDark ? Colors.white : AppColors.primary,
             ),

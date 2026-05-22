@@ -368,6 +368,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       } catch (e) {
         AppLogger.w('⚠️ updateLocale sync failed: $e');
       }
+      // Force immediate reload of localized user profile, children and tracking data
+      await loadProfileFromApi();
+      await loadChildrenFromApi();
+      startTrackingPoll();
     }
   }
 
@@ -1246,17 +1250,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final token = await _storage.readAccessToken();
       if (token == null) return;
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      final response = await dio.get('parent/profile');
+      final response = await this.dio.get('parent/profile');
       if (response.statusCode == 200) {
         final data = response.data['data'] as Map<String, dynamic>;
         _userName = data['name'] as String? ?? _userName;
@@ -2106,8 +2100,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     }
     final etaMinutes = refinedEta ?? etaMinutesRaw;
 
-    final updatedAt =
-        DateTime.tryParse(data['last_update'] ?? '') ?? DateTime.now();
+    final updatedAt = DateTime.tryParse(
+          data['last_update']?.toString() ??
+          data['timestamp']?.toString() ??
+          data['last_location_update']?.toString() ??
+          '',
+        ) ?? DateTime.now();
     final tripStatus = (data['trip_status'] ?? data['status'])?.toString();
     final busNumber = data['bus_number']?.toString();
     final busPlate = data['plate_number']?.toString();
@@ -2188,7 +2186,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
     // 1. Quality Filters for Location (Pre-process)
     final bool hasLocation = lat != null && lng != null;
-    final bool isOverspeed = hasLocation && speed > 80.0;
+    final bool isOverspeed = hasLocation && speed > 180.0;
 
     // 2. Initial/Update Logic
     if (existingGroup == null) {
@@ -2245,7 +2243,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                   existingGroup.tracking!.longitude,
                 );
 
-          if (distance < 0.005 && existingGroup.tracking != null) {
+          if (distance < 0.002 && existingGroup.tracking != null) {
             _tripGroups[busId] = existingGroup.copyWith(
               tracking: existingGroup.tracking!.copyWith(
                 lastUpdate: updatedAt,
@@ -2324,22 +2322,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     final newGroups = Map<String, BusTrackingGroup>.from(_tripGroups);
-    final now = DateTime.now();
 
-    // Remove groups for buses no longer present or stale (>3m without update)
+    // Remove groups for buses no longer present
     newGroups.removeWhere((id, group) {
       final isGone = !grouped.containsKey(id);
-      // Increased stale timeout to 10 minutes to be more resilient
-      final isStale =
-          group.tracking != null &&
-          now.difference(group.tracking!.lastUpdate).inMinutes >= 10;
-
-      if (isStale) {
-        AppLogger.d(
-          '🚌 _syncTripGroupsWithStudents: Removing stale bus $id (no update for >10m)',
-        );
-      }
-      return isGone || isStale;
+      return isGone;
     });
 
     // Add or update groups
@@ -2357,7 +2344,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           longitude: firstBus.longitude!,
           speed: 0,
           heading: 0,
-          lastUpdate: DateTime.now(),
+          lastUpdate: DateTime.fromMillisecondsSinceEpoch(0),
         );
         AppLogger.d(
           '🚌 Initial location for bus $busId: ${firstBus.latitude}, ${firstBus.longitude}',

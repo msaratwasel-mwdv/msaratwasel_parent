@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart'; // Ensure this exists for AppScope
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 
@@ -35,7 +36,7 @@ class AppSliverHeader extends StatelessWidget {
     } else if (canPop) {
       // Regular pushed page
       activeLeading = IconButton(
-        icon: Icon(
+        icon: DirectionalIcon(
           Icons.arrow_back_ios_new_rounded,
           size: 22,
           color: isDark ? Colors.white : AppColors.primary,

@@ -245,4 +245,49 @@ class MarkerGenerator {
     if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
+
+  /// Simple version for Home Marker
+  static Future<BitmapDescriptor> createHomeMarker({
+    required Color color,
+    required double size,
+  }) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    final double pixelRatio =
+        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double canvasSize = size * pixelRatio;
+    final center = Offset(canvasSize / 2, canvasSize / 2);
+    final radius = canvasSize / 2;
+
+    final paint = Paint()..color = color;
+    canvas.drawCircle(center, radius, paint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.home.codePoint),
+        style: TextStyle(
+          fontSize: radius * 1.2,
+          fontFamily: Icons.home.fontFamily,
+          package: Icons.home.fontPackage,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy - textPainter.height / 2,
+      ),
+    );
+
+    final picture = pictureRecorder.endRecording();
+    final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+
+    if (byteData == null) return BitmapDescriptor.defaultMarker;
+    return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
+  }
 }

@@ -5,6 +5,7 @@ import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 
 class RequestAbsencePage extends StatefulWidget {
   const RequestAbsencePage({super.key});
@@ -369,7 +370,7 @@ class _RequestAbsencePageState extends State<RequestAbsencePage> {
               AnimatedScale(
                 scale: active ? 1.1 : 1.0,
                 duration: const Duration(milliseconds: 200),
-                child: Icon(
+                child: DirectionalIcon(
                   icon,
                   color: active
                       ? (isDark ? Colors.white : AppColors.primary)

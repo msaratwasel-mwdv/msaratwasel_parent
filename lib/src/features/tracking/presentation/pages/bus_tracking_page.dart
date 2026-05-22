@@ -43,6 +43,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   LatLng? _lastFetchTarget;
   bool _isFetchingRoute = false;
 
+  bool _followBus = true;
+  LatLng? _lastBusPosition;
+
   @override
   void initState() {
     super.initState();
@@ -64,9 +67,19 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       }
     }
 
-    // Trigger road-following route update
-    if (selectedGroup?.tracking != null) {
+    final tracking = selectedGroup?.tracking;
+    if (tracking != null) {
       _fetchRoadFollowingRoute();
+
+      final newPos = LatLng(tracking.latitude, tracking.longitude);
+      if (_lastBusPosition != newPos) {
+        _lastBusPosition = newPos;
+        if (_followBus && _mapController != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _centerOnBus(tracking);
+          });
+        }
+      }
     }
   }
 
@@ -78,9 +91,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         size: 30.0,
       );
 
-      _homeIcon = await BitmapDescriptor.asset(
-        const ImageConfiguration(size: Size(40, 40)),
-        'assets/images/home_marker.png',
+      _homeIcon = await MarkerGenerator.createHomeMarker(
+        color: Colors.orange,
+        size: 25.0,
       );
 
       // Generate a nice school marker using our generator
@@ -463,30 +476,39 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: tracking != null
-            ? LatLng(tracking.latitude, tracking.longitude)
-            : const LatLng(15.3694, 44.1910),
-        zoom: 14,
-      ),
-      trafficEnabled: true,
-      onMapCreated: (c) {
-        _mapController = c;
-        // Fit bounds on first load if we have a group
-        if (group != null) {
-          Future.delayed(const Duration(milliseconds: 500), () {
-            _fitMapBounds(group);
+    return Listener(
+      onPointerDown: (_) {
+        if (_followBus) {
+          setState(() {
+            _followBus = false;
           });
         }
       },
-      style: isDark ? _darkMapStyle : null,
-      markers: markers,
-      polylines: polylines,
-      mapType: _currentMapType,
-      zoomControlsEnabled: false,
-      myLocationButtonEnabled: false,
-      mapToolbarEnabled: false,
+      child: GoogleMap(
+        initialCameraPosition: CameraPosition(
+          target: tracking != null
+              ? LatLng(tracking.latitude, tracking.longitude)
+              : const LatLng(15.3694, 44.1910),
+          zoom: 14,
+        ),
+        trafficEnabled: true,
+        onMapCreated: (c) {
+          _mapController = c;
+          // Fit bounds on first load if we have a group
+          if (group != null) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              _fitMapBounds(group);
+            });
+          }
+        },
+        style: isDark ? _darkMapStyle : null,
+        markers: markers,
+        polylines: polylines,
+        mapType: _currentMapType,
+        zoomControlsEnabled: false,
+        myLocationButtonEnabled: false,
+        mapToolbarEnabled: false,
+      ),
     );
   }
 
@@ -506,14 +528,23 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
               _MapActionFab(
                 icon: Icons.directions_bus_filled,
                 label: context.t('bus'),
-                onPressed: () => _centerOnBus(tracking),
+                onPressed: () {
+                  setState(() {
+                    _followBus = true;
+                  });
+                  _centerOnBus(tracking);
+                },
               ),
               const SizedBox(height: 12),
               _MapActionFab(
                 icon: Icons.zoom_out_map,
                 label: context.t('showAll'),
-                onPressed: () =>
-                    _fitMapBounds(AppScope.of(context).selectedGroup),
+                onPressed: () {
+                  setState(() {
+                    _followBus = false;
+                  });
+                  _fitMapBounds(AppScope.of(context).selectedGroup);
+                },
               ),
             ],
           ),

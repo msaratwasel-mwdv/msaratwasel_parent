@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_controller.dart';
 
 class LocationPickerScreen extends StatefulWidget {
@@ -190,7 +191,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
+                  icon: const DirectionalIcon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 20,
+                  ),
                   color: AppColors.primary,
                   onPressed: () => Navigator.pop(context),
                 ),

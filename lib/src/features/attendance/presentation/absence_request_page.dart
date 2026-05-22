@@ -8,6 +8,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/features/absence/domain/entities/absence_request.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 
 class AbsenceRequestPage extends StatefulWidget {
   const AbsenceRequestPage({super.key});
@@ -61,7 +62,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
             leading: Material(
               color: Colors.transparent,
               child: IconButton(
-                icon: Icon(
+                icon: DirectionalIcon(
                   Icons.arrow_back_rounded,
                   color: isDark ? Colors.white : AppColors.primary,
                 ),
@@ -205,7 +206,7 @@ class _AbsenceRequestPageState extends State<AbsenceRequestPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              DirectionalIcon(
                 icon,
                 color: active
                     ? const Color(0xFF1E3A8A)

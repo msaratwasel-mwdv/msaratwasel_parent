@@ -6,6 +6,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/animated_background.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 
 class OnboardingPage extends StatefulWidget {
   final AppController controller;
@@ -170,10 +171,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           ),
                           if (_currentIndex < 2) ...[
                             SizedBox(width: 8.w),
-                            Icon(
-                              isRtl
-                                  ? Icons.arrow_back_rounded
-                                  : Icons.arrow_forward_rounded,
+                            DirectionalIcon(
+                              Icons.arrow_forward_rounded,
                               size: 20.w,
                               color: AppColors.primary,
                             ),

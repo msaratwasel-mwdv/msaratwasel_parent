@@ -13,6 +13,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/core/utils/active_conversation_tracker.dart';
 import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 
 /// Real-time chat page connected to the Laravel Chat API.
 class ChatPage extends StatefulWidget {
@@ -266,9 +267,10 @@ class _ChatPageState extends State<ChatPage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_rounded,
+          icon: DirectionalIcon(
+            Icons.arrow_back_ios_new_rounded,
             color: isDark ? Colors.white : AppColors.primary,
+            size: 20,
           ),
           onPressed: () => Navigator.pop(context),
         ),

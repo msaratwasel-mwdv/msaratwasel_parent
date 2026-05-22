@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
@@ -403,7 +404,7 @@ class _SettingsTile extends StatelessWidget {
               if (trailing != null)
                 trailing!
               else
-                Icon(
+                DirectionalIcon(
                   Icons.arrow_forward_ios_rounded,
                   size: 16,
                   color: isDark ? Colors.white30 : Colors.black26,

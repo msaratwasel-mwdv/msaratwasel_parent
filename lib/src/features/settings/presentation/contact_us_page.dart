@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -354,7 +355,7 @@ class _ContactCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
+              DirectionalIcon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
                 color: isDark

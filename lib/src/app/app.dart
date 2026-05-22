@@ -58,6 +58,7 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
             splitScreenMode: true,
             builder: (context, child) {
               return MaterialApp(
+                key: ValueKey(locale.languageCode),
                 navigatorKey: _controller.navigatorKey,
                 title: locale.languageCode == 'ar'
                     ? 'مسارات واصل'

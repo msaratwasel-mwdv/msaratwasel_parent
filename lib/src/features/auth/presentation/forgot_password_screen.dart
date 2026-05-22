@@ -10,6 +10,7 @@ import 'package:msaratwasel_user/src/shared/widgets/custom_text_field.dart';
 import 'package:msaratwasel_user/src/shared/widgets/frosted_card.dart';
 import 'package:msaratwasel_user/src/shared/widgets/primary_button.dart';
 import 'package:msaratwasel_user/src/features/auth/presentation/widgets/auth_background.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key, required this.controller});
@@ -67,7 +68,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
+            icon: DirectionalIcon(
               Icons.arrow_back_ios_new_rounded,
               color: isDark ? Colors.white : AppColors.primary,
             ),

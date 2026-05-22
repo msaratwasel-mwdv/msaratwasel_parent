@@ -12,6 +12,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
 import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
+import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
 class ParentProfilePage extends StatefulWidget {
   const ParentProfilePage({super.key});
 
@@ -646,7 +647,7 @@ class _ChildQuickCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
+          DirectionalIcon(
             Icons.arrow_forward_ios_rounded,
             size: 16,
             color: isDark ? Colors.white60 : AppColors.textSecondary,
