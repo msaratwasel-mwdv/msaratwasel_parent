@@ -226,7 +226,7 @@ class BusInfo {
         json['departure_time']?.toString() ??
             json['start_time']?.toString() ??
             '',
-      ),
+      )?.toLocal(),
     );
   }
 }
@@ -337,11 +337,11 @@ class Student {
       status: deriveStudentStatus(
         json['status'] as String?,
         json['suggested_direction'] as String?,
-        arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time']) : null,
-        onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time']) : null,
-        atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time']) : null,
-        onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time']) : null,
-        waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time']) : null,
+        arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time'])?.toLocal() : null,
+        onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time'])?.toLocal() : null,
+        atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time'])?.toLocal() : null,
+        onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time'])?.toLocal() : null,
+        waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time'])?.toLocal() : null,
       ),
       suggestedDirection: json['suggested_direction'] as String?,
       avatarUrl: AppConfig.normalizeImageUrl(json['image_url'] as String?),
@@ -362,11 +362,11 @@ class Student {
               double.tryParse(json['school']['longitude'].toString()) ?? 0.0,
             )
           : null,
-      waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time']) : null,
-      onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time']) : null,
-      atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time']) : null,
-      onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time']) : null,
-      arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time']) : null,
+      waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time'])?.toLocal() : null,
+      onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time'])?.toLocal() : null,
+      atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time'])?.toLocal() : null,
+      onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time'])?.toLocal() : null,
+      arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time'])?.toLocal() : null,
       etaMinutes: json['eta_minutes'] as int?,
       pendingLocation: json['pending_location'] as Map<String, dynamic>?,
     );
