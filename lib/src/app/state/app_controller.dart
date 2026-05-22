@@ -2152,8 +2152,30 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           if (sId != null && rawStatus != null) {
             final studentIdx = _students.indexWhere((s) => s.id == sId);
             if (studentIdx != -1) {
-              final updatedStudent = _students[studentIdx].copyWith(
-                status: Student.deriveStudentStatus(rawStatus, tripTypeStr),
+              final currentStudent = _students[studentIdx];
+              final now = DateTime.now();
+
+              final isArrivedHome = rawStatus == 'atHome' && (tripTypeStr == 'back' || tripTypeStr == 'to_home' || tripTypeStr == 'return');
+              final isAtSchool = rawStatus == 'atSchool';
+              final isOnBusToSchool = rawStatus == 'onBus' && (tripTypeStr == 'forth' || tripTypeStr == 'to_school' || tripTypeStr == 'morning');
+              final isOnBusToHome = rawStatus == 'onBus' && (tripTypeStr == 'back' || tripTypeStr == 'to_home' || tripTypeStr == 'return');
+              final isWaiting = rawStatus == 'waiting';
+
+              final updatedStudent = currentStudent.copyWith(
+                arrivedHomeTime: isArrivedHome ? now : currentStudent.arrivedHomeTime,
+                atSchoolTime: isAtSchool ? now : currentStudent.atSchoolTime,
+                onBusToSchoolTime: isOnBusToSchool ? now : currentStudent.onBusToSchoolTime,
+                onBusToHomeTime: isOnBusToHome ? now : currentStudent.onBusToHomeTime,
+                waitingAtHomeTime: isWaiting ? now : currentStudent.waitingAtHomeTime,
+                status: Student.deriveStudentStatus(
+                  rawStatus,
+                  tripTypeStr,
+                  arrivedHomeTime: isArrivedHome ? now : currentStudent.arrivedHomeTime,
+                  onBusToHomeTime: isOnBusToHome ? now : currentStudent.onBusToHomeTime,
+                  atSchoolTime: isAtSchool ? now : currentStudent.atSchoolTime,
+                  onBusToSchoolTime: isOnBusToSchool ? now : currentStudent.onBusToSchoolTime,
+                  waitingAtHomeTime: isWaiting ? now : currentStudent.waitingAtHomeTime,
+                ),
               );
               _students[studentIdx] = updatedStudent;
             }

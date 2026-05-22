@@ -337,6 +337,11 @@ class Student {
       status: deriveStudentStatus(
         json['status'] as String?,
         json['suggested_direction'] as String?,
+        arrivedHomeTime: json['arrived_home_time'] != null ? DateTime.tryParse(json['arrived_home_time']) : null,
+        onBusToHomeTime: json['on_bus_to_home_time'] != null ? DateTime.tryParse(json['on_bus_to_home_time']) : null,
+        atSchoolTime: json['at_school_time'] != null ? DateTime.tryParse(json['at_school_time']) : null,
+        onBusToSchoolTime: json['on_bus_to_school_time'] != null ? DateTime.tryParse(json['on_bus_to_school_time']) : null,
+        waitingAtHomeTime: json['waiting_at_home_time'] != null ? DateTime.tryParse(json['waiting_at_home_time']) : null,
       ),
       suggestedDirection: json['suggested_direction'] as String?,
       avatarUrl: AppConfig.normalizeImageUrl(json['image_url'] as String?),
@@ -369,24 +374,53 @@ class Student {
 
 
 
-  /// Derives the 5-state trip cycle status from API status + direction
+  /// Derives the 5-state trip cycle status from API status + direction + timestamps
   static StudentStatus deriveStudentStatus(
     String? rawStatus,
-    String? direction,
-  ) {
+    String? direction, {
+    DateTime? arrivedHomeTime,
+    DateTime? onBusToHomeTime,
+    DateTime? atSchoolTime,
+    DateTime? onBusToSchoolTime,
+    DateTime? waitingAtHomeTime,
+  }) {
+    if (arrivedHomeTime != null) {
+      return StudentStatus.arrivedHome;
+    }
+    if (onBusToHomeTime != null) {
+      if (rawStatus == 'atHome' || rawStatus == 'arrivedHome') {
+        return StudentStatus.arrivedHome;
+      }
+      return StudentStatus.onBusToHome;
+    }
+    if (atSchoolTime != null) {
+      if (direction == 'to_home' || direction == 'back' || direction == 'return') {
+        if (rawStatus == 'onBus') return StudentStatus.onBusToHome;
+      }
+      return StudentStatus.atSchool;
+    }
+    if (onBusToSchoolTime != null) {
+      if (rawStatus == 'atSchool') return StudentStatus.atSchool;
+      return StudentStatus.onBusToSchool;
+    }
+    if (waitingAtHomeTime != null) {
+      if (rawStatus == 'onBus') return StudentStatus.onBusToSchool;
+      return StudentStatus.waitingAtHome;
+    }
+
     switch (rawStatus) {
       case 'onBus':
-        if (direction == 'to_school') return StudentStatus.onBusToSchool;
-        if (direction == 'to_home') return StudentStatus.onBusToHome;
+        if (direction == 'to_school' || direction == 'forth' || direction == 'morning') return StudentStatus.onBusToSchool;
+        if (direction == 'to_home' || direction == 'back' || direction == 'return') return StudentStatus.onBusToHome;
         return StudentStatus.onBus; // fallback
       case 'atSchool':
         return StudentStatus.atSchool;
       case 'atHome':
-        if (direction == 'to_home') return StudentStatus.arrivedHome;
+        if (direction == 'to_home' || direction == 'back' || direction == 'return') return StudentStatus.arrivedHome;
         return StudentStatus.waitingAtHome; // morning default
       case 'waiting':
-        if (direction == 'to_school') return StudentStatus.waitingAtHome;
-        if (direction == 'to_home') return StudentStatus.onBusToHome;
+        if (direction == 'to_school' || direction == 'forth' || direction == 'morning') return StudentStatus.waitingAtHome;
+        if (direction == 'to_home' || direction == 'back' || direction == 'return') return StudentStatus.onBusToHome;
         return StudentStatus.waitingAtHome;
       case 'notBoarded':
         return StudentStatus.notBoarded;
