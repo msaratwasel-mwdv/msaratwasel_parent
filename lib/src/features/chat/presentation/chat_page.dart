@@ -79,45 +79,8 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _handleWebSocketMessage(Map<String, dynamic> data) {
-    final messageData = data['message'];
-    if (messageData == null) return;
-
-    final conversationId = messageData['conversation_id'];
-    if (conversationId?.toString() != widget.conversationId.toString()) return;
-
-    // Parse IDs safely
-    final idRaw = messageData['id'];
-    final msgId = idRaw is int ? idRaw : int.tryParse(idRaw?.toString() ?? '') ?? DateTime.now().millisecondsSinceEpoch;
-
-    // Avoid duplicates
-    if (!_messages.any((m) => m.id == msgId)) {
-      developer.log('🚀 ChatPage: Received real-time message', name: 'CHAT');
-      
-      final senderIdRaw = messageData['from_user_id'];
-      final senderId = senderIdRaw is int ? senderIdRaw : int.tryParse(senderIdRaw?.toString() ?? '') ?? 0;
-      final isMine = senderId.toString() == _appController.userId?.toString();
-
-      final newMessage = ChatMessage(
-        id: msgId,
-        conversationId: widget.conversationId,
-        sender: ChatMessageSender(
-          id: senderId,
-          name: messageData['sender_name']?.toString() ?? (isMine ? 'أنت' : 'المدرسة'),
-          role: 'مدرسة',
-        ),
-        body: messageData['content']?.toString() ?? messageData['body']?.toString() ?? '',
-        createdAt: DateTime.tryParse(messageData['created_at']?.toString() ?? '') ?? DateTime.now(),
-        isMine: isMine,
-        attachmentUrl: messageData['media_url']?.toString() ?? messageData['attachment_url']?.toString(),
-      );
-
-      setState(() {
-        _messages.insert(0, newMessage);
-      });
-      // Mark as read (API + central state)
-      _repo.markAsRead(widget.conversationId);
-      _appController.markConversationAsRead(widget.conversationId);
-    }
+    developer.log('🚀 ChatPage: Received real-time message event, reloading...', name: 'CHAT');
+    _pollNewMessages();
   }
 
   void _schedulePoll() {

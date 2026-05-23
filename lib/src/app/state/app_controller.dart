@@ -1652,8 +1652,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _handleIncomingMessage(Map<String, dynamic> data) async {
+    // Forward the raw event to UI listeners (like ChatPage) instantly so they can trigger API reloads
+    _messageStreamController.add(data);
+
     // Parse the message data
-    final msgData = data['message'];
+    final msgData = data['message'] ?? data;
     if (msgData == null) return;
 
     // ── 0. Correlation ID Deduplication ──────────────────────────────────
@@ -1729,9 +1732,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
       notifyListeners();
 
-      // ── 2. Broadcast the raw data so specific pages (like ChatPage) can handle it
-      // ONLY if it's a new message that we successfully added to the list.
-      _messageStreamController.add(data);
     }
   }
 

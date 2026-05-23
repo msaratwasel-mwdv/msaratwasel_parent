@@ -118,7 +118,8 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     String channelName = 'إشعارات مسارات واصل الهامة';
     
     final type = data['type']?.toString();
-    if (type == 'chat_message') {
+    bool isChat = (type == 'chat_message' || type == 'chat' || type == 'new_message' || type == 'supervisor_message');
+    if (isChat) {
       channelId = 'chat_messages_v3';
       channelName = 'رسائل المحادثات';
     } else if (type == 'admin_announcement') {
