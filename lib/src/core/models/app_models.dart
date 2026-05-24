@@ -122,7 +122,9 @@ class BusStaffInfo {
 
   factory BusStaffInfo.fromJson(Map<String, dynamic> json) {
     return BusStaffInfo(
-      id: json['id'] as int,
+      id: json['id'] is int 
+          ? json['id'] as int 
+          : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name'] as String? ?? '',
       nameEn: json['name_en'] as String? ?? json['nameEn'] as String?,
       phone: json['phone'] as String?,
@@ -146,6 +148,8 @@ class BusInfo {
     this.speed,
     this.etaMinutes,
     this.startTime,
+    this.targetLatitude,
+    this.targetLongitude,
   });
 
   final String id;
@@ -161,6 +165,8 @@ class BusInfo {
   final double? speed;
   final int? etaMinutes;
   final DateTime? startTime;
+  final double? targetLatitude;
+  final double? targetLongitude;
 
   BusInfo copyWith({
     String? id,
@@ -176,6 +182,8 @@ class BusInfo {
     double? speed,
     int? etaMinutes,
     DateTime? startTime,
+    double? targetLatitude,
+    double? targetLongitude,
   }) {
     return BusInfo(
       id: id ?? this.id,
@@ -191,6 +199,8 @@ class BusInfo {
       speed: speed ?? this.speed,
       etaMinutes: etaMinutes ?? this.etaMinutes,
       startTime: startTime ?? this.startTime,
+      targetLatitude: targetLatitude ?? this.targetLatitude,
+      targetLongitude: targetLongitude ?? this.targetLongitude,
     );
   }
 
@@ -227,6 +237,8 @@ class BusInfo {
             json['start_time']?.toString() ??
             '',
       )?.toLocal(),
+      targetLatitude: double.tryParse(json['target_lat']?.toString() ?? ''),
+      targetLongitude: double.tryParse(json['target_lng']?.toString() ?? ''),
     );
   }
 }

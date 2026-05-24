@@ -189,7 +189,8 @@ class _ChildStatusCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.md),
                 if (student.status == StudentStatus.onBus ||
                     student.status == StudentStatus.onBusToSchool ||
-                    student.status == StudentStatus.onBusToHome)
+                    student.status == StudentStatus.onBusToHome ||
+                    (controller.groupForBus(student.bus.id)?.isActiveTrip ?? false))
                   IconButton(
                     onPressed: () {
                       controller.selectStudent(studentIndex);

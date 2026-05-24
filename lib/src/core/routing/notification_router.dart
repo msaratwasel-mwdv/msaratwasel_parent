@@ -35,6 +35,15 @@ class NotificationRouter {
     // Mark as read immediately on tap to sync UI counters
     controller.markNotificationsRead([notification.id]);
 
+    // Parse student ID and select student if found
+    final studentId = notification.data['student_id']?.toString() ??
+                      notification.data['studentId']?.toString() ??
+                      notification.data['student']?['id']?.toString();
+    if (studentId != null && studentId.isNotEmpty) {
+      AppLogger.i('🔗 ROUTER: Setting pending student_id=$studentId');
+      controller.setPendingStudentId(studentId);
+    }
+
     // Defer routing to ensure the widget tree is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       developer.log('🔗 [EXECUTING ROUTE] id=${notification.id}', name: 'ROUTER');

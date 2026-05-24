@@ -77,6 +77,10 @@ class BusTrackingGroup {
       'started',
       'en_route',
       'active',
+      'in_progress',
+      'awaiting_confirmation',
+      'awaiting_video',
+      'on_route',
     };
 
     // A trip is active IF the status is in the active list.
@@ -91,6 +95,10 @@ class BusTrackingGroup {
       case 'started':
       case 'en_route':
       case 'active':
+      case 'in_progress':
+      case 'awaiting_confirmation':
+      case 'awaiting_video':
+      case 'on_route':
         return BusState.enRoute;
       case 'finished':
       case 'at_school':

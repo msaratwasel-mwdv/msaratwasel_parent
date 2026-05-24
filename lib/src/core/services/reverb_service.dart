@@ -134,6 +134,9 @@ class ReverbService {
         case 'bus.location.updated':
         case 'BusLocationUpdated':
         case 'App\\Events\\BusLocationUpdated':
+        case 'trip.status.updated':
+        case 'TripStatusUpdated':
+        case 'App\\Events\\TripStatusUpdated':
           developer.log('📍 Event: ${event}', name: 'REVERB');
           final data = _parseData(message['data']);
           if (_onBusLocationUpdated != null) {

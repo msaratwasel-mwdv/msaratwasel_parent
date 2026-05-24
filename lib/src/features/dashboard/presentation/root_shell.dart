@@ -179,7 +179,7 @@ class CustomDrawer extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     AppLogger.d('🏠 RootShell: building');
-    final controller = AppScope.of(context);
+    final controller = AppScope.read(context);
 
     // Premium: Dark text for light mode, White text for dark mode
     final textColor = isDark ? Colors.white : AppColors.textPrimary;
@@ -587,7 +587,7 @@ class MissingLocationView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final controller = AppScope.of(context);
+    final controller = AppScope.read(context);
 
     return Container(
       width: double.infinity,

@@ -24,19 +24,30 @@ class MsaratWaselApp extends StatefulWidget {
 
 class _MsaratWaselAppState extends State<MsaratWaselApp> {
   late final AppController _controller;
+  late Locale _currentLocale;
+  late ThemeMode _currentThemeMode;
 
   @override
   void initState() {
     super.initState();
     developer.log('⚡ MsaratWaselApp: initState', name: 'UI');
-    // Use the externally provided controller (wired to OneSignal in main),
-    // or fall back to creating a new one.
     _controller = widget.controller ?? AppController();
     _controller.bootstrap();
+    _currentLocale = _controller.locale;
+    _currentThemeMode = _controller.themeMode;
+    _controller.addListener(_onControllerChange);
+  }
+
+  void _onControllerChange() {
+    setState(() {
+      _currentLocale = _controller.locale;
+      _currentThemeMode = _controller.themeMode;
+    });
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChange);
     _controller.dispose();
     super.dispose();
   }
@@ -46,44 +57,36 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
     developer.log('🎨 MsaratWaselApp: building root widget tree', name: 'UI');
     return AppScope(
       controller: _controller,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final locale = _controller.locale;
-          final themeMode = _controller.themeMode;
-
-          return ScreenUtilInit(
-            designSize: const Size(375, 812),
-            minTextAdapt: true,
-            splitScreenMode: true,
-            builder: (context, child) {
-              return MaterialApp(
-                key: ValueKey(locale.languageCode),
-                navigatorKey: _controller.navigatorKey,
-                title: locale.languageCode == 'ar'
-                    ? 'مسارات واصل'
-                    : 'Msarat Wasel',
-                debugShowCheckedModeBanner: false,
-                theme: AppTheme.light,
-                darkTheme: AppTheme.dark,
-                themeMode: themeMode,
-                locale: locale,
-                supportedLocales: const [Locale('ar'), Locale('en')],
-                localizationsDelegates: const [
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                builder: (context, child) => GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                  child: OfflineBannerWrapper(
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
-                home: _buildHome(),
-              );
-            },
+      child: ScreenUtilInit(
+        designSize: const Size(375, 812),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (context, child) {
+          return MaterialApp(
+            key: ValueKey(_currentLocale.languageCode),
+            navigatorKey: _controller.navigatorKey,
+            title: _currentLocale.languageCode == 'ar'
+                ? 'مسارات واصل'
+                : 'Msarat Wasel',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: _currentThemeMode,
+            locale: _currentLocale,
+            supportedLocales: const [Locale('ar'), Locale('en')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            builder: (context, child) => GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: OfflineBannerWrapper(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+            home: _buildHome(),
           );
         },
       ),

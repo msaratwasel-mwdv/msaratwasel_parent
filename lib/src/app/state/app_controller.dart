@@ -133,6 +133,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Add Accept-Language header based on current locale
+          options.headers['Accept-Language'] = _locale.languageCode;
           if (_token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $_token';
           } else {
@@ -183,6 +185,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   int _navIndex = 0;
   final List<int> _navHistory = [0];
   int _selectedStudentIndex = 0;
+  String? _pendingStudentId;
+  String? get pendingStudentId => _pendingStudentId;
   bool _isAuthenticated = false;
   bool _bootCompleted = false;
   bool _shouldShowOnboarding = false;
@@ -355,6 +359,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void updateLocale(Locale newLocale) async {
     _locale = newLocale;
+    // Update Dio header for future requests
+    dio.options.headers['Accept-Language'] = newLocale.languageCode;
     notifyListeners();
     // Persist to storage
     final repo = LanguageRepositoryImpl(storageService: StorageService());
@@ -513,6 +519,19 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
         // Synchronize trip groups with the loaded students
         _syncTripGroupsWithStudents();
+
+        // If we have a pending student ID, select it now!
+        if (_pendingStudentId != null) {
+          final index = _students.indexWhere((s) => s.id == _pendingStudentId);
+          if (index != -1) {
+            _selectedStudentIndex = index;
+            if (_students[index].bus.id.isNotEmpty && _students[index].bus.id != '-') {
+              _selectedBusId = _students[index].bus.id;
+            }
+            developer.log('🔗 ROUTER: Deferred auto-selecting student index $index for student_id=$_pendingStudentId', name: 'ROUTER');
+          }
+          _pendingStudentId = null;
+        }
 
         // ✅ Security: Persist student IDs for background isolate checks
         final studentIds = _students.map((s) => s.id.toString()).toList();
@@ -766,10 +785,23 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       AppLogger.i('🚀 AppController: Starting optimized bootstrap...');
 
-      // 1. Core Config & Auth (Critical Path)
-      final prefs = await _storage.prefs;
+      AppLogger.i('📊 [BOOTSTRAP] Step 1: Getting prefs...');
+      final prefs = await _storage.prefs.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          AppLogger.w('⚠️ AppController: prefs load timed out');
+          throw Exception('SharedPreferences timeout');
+        },
+      );
+      AppLogger.i('📊 [BOOTSTRAP] Step 1: Prefs received successfully');
+
+      AppLogger.i('📊 [BOOTSTRAP] Step 2: Reading access token...');
       final savedToken = await _storage.readAccessToken();
+      AppLogger.i('📊 [BOOTSTRAP] Step 2: Access token read finished. Token: ${savedToken != null ? "FOUND" : "NULL"}');
+
+      AppLogger.i('📊 [BOOTSTRAP] Step 3: Reading user_name...');
       final savedName = prefs.getString('user_name') ?? '';
+      AppLogger.i('📊 [BOOTSTRAP] Step 3: user_name = "$savedName"');
 
       _shouldShowOnboarding = !(prefs.getBool('has_seen_onboarding') ?? false);
       _userId = prefs.getInt('user_id');
@@ -779,7 +811,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         _locale = Locale(savedLang);
       }
 
+      AppLogger.i('📊 [BOOTSTRAP] Step 4: Auth evaluation...');
       if (savedToken != null && savedName.isNotEmpty) {
+        AppLogger.i('📊 [BOOTSTRAP] User is authenticated. Loading background tasks...');
         _token = savedToken;
         _isAuthenticated = true;
         _userName = savedName;
@@ -789,10 +823,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         // 🔥 Non-blocking background initialization
         _backgroundInitialize(savedToken);
       } else {
+        AppLogger.i('📊 [BOOTSTRAP] User is NOT authenticated. Deleting saved token...');
         _isAuthenticated = false;
         await _storage.deleteAccessToken();
+        AppLogger.i('📊 [BOOTSTRAP] Saved token deletion complete');
       }
 
+      AppLogger.i('📊 [BOOTSTRAP] Step 5: Core boot complete. Setting bootCompleted = true');
       // Signal core boot completion so UI can render
       _bootCompleted = true;
       notifyListeners();
@@ -802,6 +839,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _bootCompleted = true;
       notifyListeners();
     } finally {
+      AppLogger.i('📊 [BOOTSTRAP] Finally block: Removing splash...');
       // Immediate splash removal
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
@@ -1306,6 +1344,17 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void setLocale(Locale locale) {
     updateLocale(locale);
+  }
+
+  void setPendingStudentId(String? studentId) {
+    _pendingStudentId = studentId;
+    if (studentId != null && _students.isNotEmpty) {
+      final index = _students.indexWhere((s) => s.id == studentId);
+      if (index != -1) {
+        selectStudent(index);
+        _pendingStudentId = null;
+      }
+    }
   }
 
   void selectStudent(int index) {
@@ -2070,6 +2119,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         (data['speed_kmh'] ?? data['speed'] as num?)?.toDouble() ?? 0.0;
     final heading = (data['heading'] as num?)?.toDouble() ?? 0.0;
 
+    final targetLat = double.tryParse(data['target_lat']?.toString() ?? '');
+    final targetLng = double.tryParse(data['target_lng']?.toString() ?? '');
+
     final etaMinutesRaw =
         (data['eta_minutes'] ?? data['eta'] as num?)?.toInt() ?? 0;
 
@@ -2185,7 +2237,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     final existingGroup = _tripGroups[busId];
 
     // 1. Quality Filters for Location (Pre-process)
-    final bool hasLocation = lat != null && lng != null;
+    // Reject lat=0.0, lng=0.0 as invalid (bus at the ocean, means no real data)
+    final bool hasLocation = lat != null && lng != null && !(lat == 0.0 && lng == 0.0);
     final bool isOverspeed = hasLocation && speed > 180.0;
 
     // 2. Initial/Update Logic
@@ -2205,6 +2258,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                 heading: heading,
                 lastUpdate: updatedAt,
                 etaMinutes: etaMinutes,
+                targetLatitude: targetLat,
+                targetLongitude: targetLng,
               )
             : null,
         students: busStudents,
@@ -2250,6 +2305,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                 etaMinutes: etaMinutes,
                 speed: speed,
                 heading: heading,
+                targetLatitude: targetLat ?? existingGroup.tracking!.targetLatitude,
+                targetLongitude: targetLng ?? existingGroup.tracking!.targetLongitude,
               ),
               tripStatus: tripStatus ?? existingGroup.tripStatus,
               startTime: startTime ?? existingGroup.startTime,
@@ -2272,6 +2329,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                 heading: heading,
                 lastUpdate: updatedAt,
                 etaMinutes: etaMinutes,
+                targetLatitude: targetLat,
+                targetLongitude: targetLng,
               ),
               tripStatus: tripStatus ?? existingGroup.tripStatus,
               busNumber: busNumber ?? existingGroup.busNumber,
@@ -2299,6 +2358,25 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         AppLogger.d(
           '🚌 _updateBusTracking: Updated status only for bus $busId to $tripStatus',
         );
+      } else if ((targetLat != null || targetLng != null) &&
+          existingGroup.tracking != null) {
+        // Target-only update: bus position not updated but target coordinates changed.
+        // This happens when TripAttendance broadcasts a target recalculation without a valid bus position.
+        final newTargetLat = targetLat ?? existingGroup.tracking!.targetLatitude;
+        final newTargetLng = targetLng ?? existingGroup.tracking!.targetLongitude;
+        if (newTargetLat != existingGroup.tracking!.targetLatitude ||
+            newTargetLng != existingGroup.tracking!.targetLongitude) {
+          _tripGroups[busId] = existingGroup.copyWith(
+            tracking: existingGroup.tracking!.copyWith(
+              targetLatitude: newTargetLat,
+              targetLongitude: newTargetLng,
+            ),
+            tripStatus: tripStatus ?? existingGroup.tripStatus,
+          );
+          AppLogger.d(
+            '🎯 _updateBusTracking: Target-only update for bus $busId → ($newTargetLat, $newTargetLng)',
+          );
+        }
       }
     }
 
@@ -2310,6 +2388,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     AppLogger.d(
       '📍 _updateBusTracking: Received data for bus $busId | status: $tripStatus | location: $hasLocation',
     );
+
+    if (tripStatus == 'finished' ||
+        tripStatus == 'idle' ||
+        tripStatus == 'in_progress' ||
+        tripStatus == 'started') {
+      loadChildrenFromApi();
+    }
+
     notifyListeners();
   }
 
@@ -2345,6 +2431,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           speed: 0,
           heading: 0,
           lastUpdate: DateTime.fromMillisecondsSinceEpoch(0),
+          targetLatitude: firstBus.targetLatitude,
+          targetLongitude: firstBus.targetLongitude,
         );
         AppLogger.d(
           '🚌 Initial location for bus $busId: ${firstBus.latitude}, ${firstBus.longitude}',
@@ -2380,9 +2468,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
               firstBus.totalStudents ?? existing.totalStudentsCount,
           totalStudentsOnBoard:
               firstBus.onBoardCount ?? existing.totalStudentsOnBoard,
-          // Fill tracking if missing from initial API data
+          // Fill or update tracking target coords if missing from initial API data
           tracking:
-              existing.tracking ??
+              existing.tracking?.copyWith(
+                targetLatitude: existing.tracking?.targetLatitude ?? firstBus.targetLatitude,
+                targetLongitude: existing.tracking?.targetLongitude ?? firstBus.targetLongitude,
+              ) ??
               initialTracking?.copyWith(
                 speed: firstBus.speed,
                 etaMinutes: firstBus.etaMinutes,
@@ -2418,6 +2509,14 @@ class AppScope extends InheritedNotifier<AppController> {
 
   static AppController of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
+    assert(scope != null, 'AppScope not found in context');
+    return scope!.notifier!;
+  }
+
+  /// Returns the controller WITHOUT registering for rebuilds.
+  /// Use this inside event handlers like onTap, or when you only need to call a method.
+  static AppController read(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<AppScope>();
     assert(scope != null, 'AppScope not found in context');
     return scope!.notifier!;
   }

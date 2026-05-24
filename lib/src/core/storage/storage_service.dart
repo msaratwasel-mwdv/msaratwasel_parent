@@ -4,19 +4,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'storage_keys.dart';
 
 class StorageService {
-  final _secureStorage = const FlutterSecureStorage();
+  final _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+  );
   Future<SharedPreferences> get prefs async => SharedPreferences.getInstance();
 
   Future<void> saveAccessToken(String token) async {
-    await _secureStorage.write(key: StorageKeys.accessToken, value: token);
+    try {
+      await _secureStorage.write(key: StorageKeys.accessToken, value: token).timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (e) {
+      print("SecureStorage saveAccessToken error: $e");
+    }
   }
 
   Future<String?> readAccessToken() async {
-    return await _secureStorage.read(key: StorageKeys.accessToken);
+    try {
+      return await _secureStorage.read(key: StorageKeys.accessToken).timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (e) {
+      print("SecureStorage readAccessToken error: $e");
+      return null;
+    }
   }
 
   Future<void> deleteAccessToken() async {
-    await _secureStorage.delete(key: StorageKeys.accessToken);
+    try {
+      await _secureStorage.delete(key: StorageKeys.accessToken).timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (e) {
+      print("SecureStorage deleteAccessToken error: $e");
+    }
   }
 
   Future<void> saveLocale(String code) async {

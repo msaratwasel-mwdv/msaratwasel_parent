@@ -37,6 +37,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
   // Road-following route state
   List<LatLng> _activeRoutePoints = [];
+  final Map<String, List<LatLng>> _cachedRoutesToTarget = {}; // Cache to prevent Google Maps API exhaustion and flickering
   String? _remainingDistance;
   String? _remainingTime;
   DateTime? _lastRouteFetchTime;
@@ -45,6 +46,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
   bool _followBus = true;
   LatLng? _lastBusPosition;
+  String? _lastActiveTargetStudentId;
+  String? _lastSelectedBusId;
+  bool? _wasActive;
 
   @override
   void initState() {
@@ -59,6 +63,40 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final selectedGroup = controller.selectedGroup;
     final authToken = controller.token;
 
+    final isActive = selectedGroup?.isActiveTrip ?? false;
+    if (_wasActive == true && !isActive) {
+      _wasActive = isActive;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                controller.locale.languageCode == 'ar'
+                    ? 'تم إنهاء الرحلة بنجاح.'
+                    : 'The trip has been completed successfully.',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+    _wasActive = isActive;
+
+    // Reset and clear route state instantly when switching buses
+    if (_lastSelectedBusId != selectedGroup?.busId) {
+      _lastSelectedBusId = selectedGroup?.busId;
+      _activeRoutePoints = [];
+      _remainingDistance = null;
+      _remainingTime = null;
+      _lastRouteFetchTime = null;
+      _lastFetchTarget = null;
+      _lastBusPosition = null;
+      _lastActiveTargetStudentId = null;
+    }
+
     // Detect student list changes and update markers
     if (_lastStudents != selectedGroup?.students) {
       _lastStudents = selectedGroup?.students;
@@ -70,6 +108,33 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final tracking = selectedGroup?.tracking;
     if (tracking != null) {
       _fetchRoadFollowingRoute();
+
+      // Auto-detect active target student and switch context when target changes
+      if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
+        final targetLatLng = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
+        Student? activeStudent;
+        int activeIndex = -1;
+        for (int i = 0; i < controller.students.length; i++) {
+          final s = controller.students[i];
+          if (_isStudentActiveTarget(s, targetLatLng)) {
+            activeStudent = s;
+            activeIndex = i;
+            break;
+          }
+        }
+        if (activeStudent != null) {
+          if (_lastActiveTargetStudentId != activeStudent.id) {
+            _lastActiveTargetStudentId = activeStudent.id;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              controller.selectStudent(activeIndex);
+            });
+          }
+        } else {
+          _lastActiveTargetStudentId = null;
+        }
+      } else {
+        _lastActiveTargetStudentId = null;
+      }
 
       final newPos = LatLng(tracking.latitude, tracking.longitude);
       if (_lastBusPosition != newPos) {
@@ -169,28 +234,52 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   }
 
   Future<void> _fetchRoadFollowingRoute() async {
-    if (_isFetchingRoute) return;
-
     final controller = AppScope.of(context);
     final group = controller.selectedGroup;
-    if (group == null || group.tracking == null) return;
+    if (group == null || group.tracking == null) {
+      if (_activeRoutePoints.isNotEmpty) {
+        setState(() {
+          _activeRoutePoints = [];
+          _remainingDistance = null;
+          _remainingTime = null;
+        });
+      }
+      return;
+    }
 
     final tracking = group.tracking!;
     final busPos = LatLng(tracking.latitude, tracking.longitude);
 
     // Determine target (final destination for this parent's perspective)
+    // STRICT BINDING: STRICTLY only follow the driver's active destination target. No static/fallback lines!
     LatLng? target;
-    if (group.tripType == 'to_school') {
-      target =
-          group.students.isNotEmpty
-              ? _parseLatLng(group.students.first.schoolLocation)
-              : null;
-    } else {
-      target =
-          group.students.isNotEmpty ? group.students.first.homeLocation : null;
+    if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
+      target = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
     }
 
-    if (target == null) return;
+    if (target == null) {
+      if (_activeRoutePoints.isNotEmpty) {
+        setState(() {
+          _activeRoutePoints = [];
+          _remainingDistance = null;
+          _remainingTime = null;
+        });
+      }
+      return;
+    }
+
+    if (_isFetchingRoute) return;
+
+    final cacheKey = "${target.latitude},${target.longitude}";
+
+    // Fast transition: If we have a cached route to this destination, show it immediately 
+    if (_activeRoutePoints.isEmpty && _cachedRoutesToTarget.containsKey(cacheKey)) {
+      if (mounted) {
+        setState(() {
+          _activeRoutePoints = _cachedRoutesToTarget[cacheKey]!;
+        });
+      }
+    }
 
     // Throttle: Don't fetch more than once every 15 seconds unless target changed
     final now = DateTime.now();
@@ -225,6 +314,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           setState(() {
             _activeRoutePoints =
                 points.map((p) => LatLng(p.latitude, p.longitude)).toList();
+            _cachedRoutesToTarget[cacheKey] = _activeRoutePoints; // Save to cache
             _remainingDistance = leg['distance']['text'];
             _remainingTime = leg['duration']['text'];
             _lastRouteFetchTime = now;
@@ -285,6 +375,85 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     });
   }
 
+  Widget _buildInactiveTripAlert(BuildContext context) {
+    final bool isArabic = AppScope.of(context).locale.languageCode == 'ar';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD), // Soft Amber background
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFEBAA), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(20),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFE8A1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFF856404), // Dark Amber
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic
+                      ? 'لا توجد رحلة نشطة حالياً لهذه الحافلة'
+                      : 'No active trip currently for this bus',
+                  style: const TextStyle(
+                    color: Color(0xFF856404),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isArabic
+                      ? 'الموقع المعروض هو آخر موقع تم تسجيله للحافلة.'
+                      : 'The displayed location is the last registered coordinate of the bus.',
+                  style: const TextStyle(
+                    color: Color(0xFF856404),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getNextStopName(BuildContext context, BusTrackingGroup group) {
+    final tracking = group.tracking;
+    final isArabic = AppScope.of(context).locale.languageCode == 'ar';
+    if (tracking == null) return isArabic ? 'المدرسة' : 'School';
+
+    if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
+      final targetLatLng = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
+      for (final s in group.students) {
+        if (_isStudentActiveTarget(s, targetLatLng)) {
+          return s.getLocalizedName(AppScope.of(context).locale.languageCode);
+        }
+      }
+    }
+    return isArabic ? 'المدرسة' : 'School';
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
@@ -316,9 +485,25 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                     selectedId: selectedGroup?.busId,
                     onSelect: (id) => controller.selectBus(id),
                   ),
+                  if (selectedGroup != null && !selectedGroup.isActiveTrip) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildInactiveTripAlert(context),
+                    ),
+                  ],
                 ],
               ),
             ),
+            if (selectedGroup != null && selectedGroup.isActiveTrip && _followBus && selectedGroup.tracking != null)
+              Align(
+                alignment: const Alignment(0, -0.22),
+                child: SpeechBubble(
+                  title: controller.locale.languageCode == 'ar' ? 'الوجهة القادمة' : 'Next Destination',
+                  description: _getNextStopName(context, selectedGroup),
+                  time: _remainingTime ?? (selectedGroup.tracking?.etaMinutes != null ? '${selectedGroup.tracking!.etaMinutes} ${context.t('minutesSuffix')}' : '--'),
+                ),
+              ),
             _buildMapControls(selectedGroup?.tracking),
             _DataDrivenPanel(
               group: selectedGroup,
@@ -434,32 +619,46 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           }
         }
       }
-
-      final List<LatLng> finalPoints =
-          _activeRoutePoints.isNotEmpty ? _activeRoutePoints : routePoints;
-
-      if (finalPoints.length > 1) {
-        polylines.add(
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: finalPoints,
-            color: const Color(0xFF1A73E8), // Vibrant blue
-            width: 6,
-            patterns:
-                _activeRoutePoints.isNotEmpty
-                    ? [] // Solid line for real roads
-                    : [PatternItem.dash(20), PatternItem.gap(10)], // Dashed for straight lines
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
-        );
-      }
-
-      // Add School Marker if available (using first student's school as reference)
       final firstStudent = group?.students.isNotEmpty == true
           ? group!.students.first
           : null;
+
+      LatLng? target;
+      if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
+        target = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
+      }
+      final fallbackDestination = target ?? firstStudent?.schoolCoords;
+
+      final bool isTripActive = group?.isActiveTrip ?? false;
+
+      if (isTripActive) {
+        if (_activeRoutePoints.isNotEmpty) {
+          polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: _activeRoutePoints,
+              color: const Color(0xFF1A73E8), // Vibrant blue
+              width: 6,
+              jointType: JointType.round,
+              startCap: Cap.roundCap,
+              endCap: Cap.roundCap,
+            ),
+          );
+        } else if (fallbackDestination != null) {
+          polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: [LatLng(tracking.latitude, tracking.longitude), fallbackDestination],
+              color: const Color(0xFF1A73E8), // Vibrant blue
+              width: 6,
+              jointType: JointType.round,
+              patterns: [PatternItem.dash(20), PatternItem.gap(10)], // Dotted straight line fallback
+            ),
+          );
+        }
+      }
+
+      // Add School Marker if available (using first student's school as reference)
       if (firstStudent != null && firstStudent.schoolCoords != null) {
         markers.add(
           Marker(
@@ -1130,8 +1329,24 @@ class _DataDrivenPanel extends StatelessWidget {
             ),
           )
         else
-          ...students.map(
-            (s) => _StudentCard(student: s, isCompact: isCompact),
+          ...students.asMap().entries.map(
+            (entry) {
+              final s = entry.value;
+              final controller = AppScope.of(context);
+              final isCurrent = controller.currentStudent?.id == s.id;
+              final tracking = group?.tracking;
+              final target = (tracking?.targetLatitude != null && tracking?.targetLongitude != null)
+                  ? LatLng(tracking!.targetLatitude!, tracking.targetLongitude!)
+                  : null;
+              final isActive = _isStudentActiveTarget(s, target);
+              
+              return _StudentCard(
+                student: s, 
+                isCompact: isCompact,
+                isActiveTarget: isActive,
+                isSelected: isCurrent,
+              );
+            }
           ),
       ],
     );
@@ -1307,7 +1522,15 @@ class _MetricItem extends StatelessWidget {
 class _StudentCard extends StatelessWidget {
   final Student student;
   final bool isCompact;
-  const _StudentCard({required this.student, this.isCompact = false});
+  final bool isActiveTarget;
+  final bool isSelected;
+
+  const _StudentCard({
+    required this.student,
+    this.isCompact = false,
+    this.isActiveTarget = false,
+    this.isSelected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1402,10 +1625,19 @@ class _StudentCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withAlpha(5) : Colors.white,
+        color: isActiveTarget
+            ? (isDark ? AppColors.primary.withAlpha(20) : AppColors.primary.withAlpha(8))
+            : isSelected
+                ? (isDark ? Colors.white.withAlpha(10) : Colors.grey.shade50)
+                : (isDark ? Colors.white.withAlpha(5) : Colors.white),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+          color: isActiveTarget
+              ? Colors.green
+              : isSelected
+                  ? AppColors.primary
+                  : (isDark ? Colors.white.withAlpha(10) : Colors.grey.shade100),
+          width: (isActiveTarget || isSelected) ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -1447,6 +1679,39 @@ class _StudentCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (isActiveTarget) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withAlpha(15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withAlpha(50)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.my_location_rounded,
+                        color: Colors.green,
+                        size: 11,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isArabic ? 'يتجه إليه الآن' : 'Heading here now',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -1706,3 +1971,135 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
     ),
   );
 }
+
+bool _isStudentActiveTarget(Student student, LatLng? target) {
+  if (target == null) return false;
+  
+  final home = student.homeLocation;
+  if (home != null) {
+    final latDiff = (home.latitude - target.latitude).abs();
+    final lngDiff = (home.longitude - target.longitude).abs();
+    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+      return true;
+    }
+  }
+
+  final school = student.schoolCoords;
+  if (school != null) {
+    final latDiff = (school.latitude - target.latitude).abs();
+    final lngDiff = (school.longitude - target.longitude).abs();
+    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+      return true;
+    }
+  }
+  
+  final schoolStr = student.schoolLocation;
+  if (schoolStr != null && schoolStr.isNotEmpty) {
+    try {
+      final parts = schoolStr.split(',');
+      if (parts.length == 2) {
+        final lat = double.tryParse(parts[0].trim());
+        final lng = double.tryParse(parts[1].trim());
+        if (lat != null && lng != null) {
+          final latDiff = (lat - target.latitude).abs();
+          final lngDiff = (lng - target.longitude).abs();
+          if (latDiff < 0.00015 && lngDiff < 0.00015) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  
+  return false;
+}
+
+class SpeechBubble extends StatelessWidget {
+  final String title;
+  final String description;
+  final String time;
+
+  const SpeechBubble({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.time,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF1A73E8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                time,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ClipPath(
+          clipper: TriangleClipper(),
+          child: Container(
+            color: Colors.white,
+            width: 16,
+            height: 8,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TriangleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
