@@ -48,10 +48,9 @@ Future<void> bootstrap() async {
     return true; // Prevent app from crashing
   };
 
-  // Watchdog timer: Force remove splash after 15 seconds if nothing else does
+  // Watchdog timer: Force remove splash after 15 seconds silently if nothing else does
   Future.delayed(const Duration(seconds: 15), () {
     try {
-      AppLogger.w('⏰ MsaratWasel: Startup Watchdog triggered (15s). Forcing splash removal.');
       FlutterNativeSplash.remove();
     } catch (_) {}
   });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
@@ -106,30 +107,30 @@ class _RootShellState extends State<RootShell> {
             SystemNavigator.pop();
           },
           child: Scaffold(
-            key: _scaffoldKey,
-            drawer: CustomDrawer(
-              controller: controller,
-              currentIndex: currentIndex,
-              onSelect: (index) {
-                controller.setNavIndex(index);
-                // Close drawer after selection
-                if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-                  Navigator.of(context).pop();
-                }
-              },
+              key: _scaffoldKey,
+              drawer: CustomDrawer(
+                controller: controller,
+                currentIndex: currentIndex,
+                onSelect: (index) {
+                  controller.setNavIndex(index);
+                  // Close drawer after selection
+                  if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              appBar: null,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              body: controller.hasMissingLocation
+                  ? MissingLocationView(
+                      students: controller.students
+                          .where((s) => !s.hasLocation)
+                          .toList(),
+                    )
+                  : currentIndex == 2
+                      ? page
+                      : SafeArea(top: true, bottom: false, child: page),
             ),
-            appBar: null,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: controller.hasMissingLocation
-                ? MissingLocationView(
-                    students: controller.students
-                        .where((s) => !s.hasLocation)
-                        .toList(),
-                  )
-                : currentIndex == 2
-                    ? page
-                    : SafeArea(top: true, bottom: false, child: page),
-          ),
         );
       },
     );

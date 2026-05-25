@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 
 class OfflineBannerWrapper extends StatefulWidget {
@@ -112,34 +111,34 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.w,
-                    vertical: 8.h,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.redAccent.shade700,
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
                         color: Colors.black26,
                         blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.wifi_off_rounded,
                         color: Colors.white,
-                        size: 20.sp,
+                        size: 20,
                       ),
-                      SizedBox(width: 8.w),
+                      const SizedBox(width: 8),
                       Text(
                         context.t('noInternetConnection'),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 14.sp,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'GoogleSans',
                         ),

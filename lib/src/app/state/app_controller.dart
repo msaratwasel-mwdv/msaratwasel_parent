@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:msaratwasel_user/src/core/responsive/api_language_interceptor.dart';
 
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
 import 'package:msaratwasel_user/src/core/utils/device_utils.dart';
@@ -129,6 +130,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         headers: {'Accept': 'application/json'},
       ),
     );
+
+    dio.interceptors.add(ApiLanguageInterceptor());
 
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -592,6 +595,16 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _isTrackingPolling = true;
 
     try {
+      // 🚀 إيقاف الجلب المتكرر (Polling) إذا كان اتصال الـ WebSocket (Reverb) نشطاً
+      if (_subscribedChannels.isNotEmpty) {
+        AppLogger.d('ℹ️ WebSocket is active. Skipping HTTP Polling.');
+        _pollCycleCount++;
+        if (_pollCycleCount % 6 == 0) {
+          await _refreshStudentStatuses();
+        }
+        return;
+      }
+
       await _fetchTrackingFromApi();
       _pollCycleCount++;
 
@@ -2283,9 +2296,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       // 3. Stale Data/Quality Checks for existing groups
       if (hasLocation && !isOverspeed) {
         if (existingGroup.tracking != null &&
-            updatedAt.isBefore(existingGroup.tracking!.lastUpdate)) {
+            !updatedAt.isAfter(existingGroup.tracking!.lastUpdate)) {
           AppLogger.d(
-            '📍 _updateBusTracking: Ignoring stale location update for bus $busId',
+            '📍 _updateBusTracking: Ignoring stale or duplicate location update for bus $busId',
           );
         } else {
           // Significant Change or Metadata Update

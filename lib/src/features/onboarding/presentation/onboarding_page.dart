@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_iconly/flutter_iconly.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
@@ -91,21 +90,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 ),
                 // Page Indicators
                 Padding(
-                  padding: EdgeInsets.only(bottom: 100.h), // Space for buttons
+                  padding: const EdgeInsets.only(bottom: 100), // Space for buttons
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
                       3,
                       (index) => AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        height: 8.h,
-                        width: _currentIndex == index ? 24.w : 8.w,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 8,
+                        width: _currentIndex == index ? 24 : 8,
                         decoration: BoxDecoration(
                           color: _currentIndex == index
                               ? Colors.white
                               : Colors.white.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4.r),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
@@ -122,7 +121,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: EdgeInsets.all(24.w),
+                padding: const EdgeInsets.all(24),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -147,12 +146,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white, // High contrast
                         foregroundColor: AppColors.primary,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 32.w,
-                          vertical: 16.h,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 4,
                         shadowColor: Colors.black.withValues(alpha: 0.2),
@@ -170,10 +169,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             ),
                           ),
                           if (_currentIndex < 2) ...[
-                            SizedBox(width: 8.w),
+                            const SizedBox(width: 8),
                             DirectionalIcon(
                               Icons.arrow_forward_rounded,
-                              size: 20.w,
+                              size: 20,
                               color: AppColors.primary,
                             ),
                           ],
@@ -219,17 +218,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
         : AppColors.primary.withValues(alpha: 0.1);
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Center(
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24.r),
+          borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 48.h),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
               decoration: BoxDecoration(
                 color: glassColor,
-                borderRadius: BorderRadius.circular(24.r),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: [
                   BoxShadow(
@@ -245,14 +244,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(24.w),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: iconBgColor,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 64.w, color: AppColors.primary),
+                    child: Icon(icon, size: 64, color: AppColors.primary),
                   ),
-                  SizedBox(height: 32.h),
+                  const SizedBox(height: 32),
                   Text(
                     title,
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -262,7 +261,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 16.h),
+                  const SizedBox(height: 16),
                   Text(
                     body,
                     style: theme.textTheme.bodyLarge?.copyWith(
