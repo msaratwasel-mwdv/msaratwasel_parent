@@ -38,7 +38,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   // Road-following route state
   List<LatLng> _activeRoutePoints = [];
   final Map<String, List<LatLng>> _cachedRoutesToTarget = {}; // Cache to prevent Google Maps API exhaustion and flickering
-  String? _remainingDistance;
+
   String? _remainingTime;
   DateTime? _lastRouteFetchTime;
   LatLng? _lastFetchTarget;
@@ -89,7 +89,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     if (_lastSelectedBusId != selectedGroup?.busId) {
       _lastSelectedBusId = selectedGroup?.busId;
       _activeRoutePoints = [];
-      _remainingDistance = null;
+
       _remainingTime = null;
       _lastRouteFetchTime = null;
       _lastFetchTarget = null;
@@ -240,7 +240,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       if (_activeRoutePoints.isNotEmpty) {
         setState(() {
           _activeRoutePoints = [];
-          _remainingDistance = null;
+
           _remainingTime = null;
         });
       }
@@ -261,7 +261,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       if (_activeRoutePoints.isNotEmpty) {
         setState(() {
           _activeRoutePoints = [];
-          _remainingDistance = null;
+
           _remainingTime = null;
         });
       }
@@ -315,7 +315,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
             _activeRoutePoints =
                 points.map((p) => LatLng(p.latitude, p.longitude)).toList();
             _cachedRoutesToTarget[cacheKey] = _activeRoutePoints; // Save to cache
-            _remainingDistance = leg['distance']['text'];
+
             _remainingTime = leg['duration']['text'];
             _lastRouteFetchTime = now;
             _lastFetchTarget = target;

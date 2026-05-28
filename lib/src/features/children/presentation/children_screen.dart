@@ -637,7 +637,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withOpacity(0.06) : AppColors.primary.withValues(alpha: 0.05),
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : AppColors.primary.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -664,7 +664,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.withValues(alpha: 0.1),
+                                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -697,7 +697,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                   icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withValues(alpha: 0.05),
+                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -802,9 +802,9 @@ class _ChildDetailsSheet extends StatelessWidget {
                                   Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.withOpacity(0.1),
+                                      color: Colors.amber.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                                     ),
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -940,8 +940,8 @@ class _ChildDetailsSheet extends StatelessWidget {
                                       ? (isDark ? Colors.white : AppColors.primary)
                                       : (isDark ? Colors.red[300] : AppColors.error),
                                   backgroundColor: student.hasLocation
-                                      ? (isDark ? Colors.white.withOpacity(0.08) : AppColors.primary.withValues(alpha: 0.05))
-                                      : (isDark ? Colors.red.withOpacity(0.1) : AppColors.error.withValues(alpha: 0.08)),
+                                      ? (isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.primary.withValues(alpha: 0.05))
+                                      : (isDark ? Colors.red.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.08)),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
                                     vertical: 6,
@@ -960,7 +960,7 @@ class _ChildDetailsSheet extends StatelessWidget {
                                   icon: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: isDark ? Colors.white.withOpacity(0.08) : AppColors.primary.withValues(alpha: 0.05),
+                                      color: isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.primary.withValues(alpha: 0.05),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(

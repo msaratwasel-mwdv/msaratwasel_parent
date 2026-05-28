@@ -710,6 +710,7 @@ class AppNotification {
       correlationId: data['correlation_id']?.toString() ?? 
                     data['notification_id']?.toString() ?? 
                     data['message_id']?.toString() ?? 
+                    data['id']?.toString() ??
                     message.messageId,
       title: titleAr,
       titleEn: titleEn,

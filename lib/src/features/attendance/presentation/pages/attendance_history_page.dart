@@ -52,7 +52,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
       final storage = StorageService();
       final apiClient = ApiClient(storage: storage);
       final response = await apiClient.client.get(
-        '/parent/children/${_selectedChild!.id}/attendance',
+        'parent/children/${_selectedChild!.id}/attendance',
         queryParameters: {'year': _focusedDay.year, 'month': _focusedDay.month},
       );
 

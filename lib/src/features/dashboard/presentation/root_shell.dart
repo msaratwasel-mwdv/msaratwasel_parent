@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:responsive_framework/responsive_framework.dart';
+
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/features/children/presentation/location_picker_screen.dart';
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
@@ -612,7 +612,7 @@ class MissingLocationView extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           Text(
-            context.t('mandatoryLocationTitle') ?? 'تحديد الموقع المنزل إلزامي',
+            context.t('mandatoryLocationTitle'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 24,
@@ -623,8 +623,7 @@ class MissingLocationView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            context.t('mandatoryLocationDesc') ??
-                'يرجى تحديد موقع المنزل لكل ابن لضمان وصول الحافلة بدقة.',
+            context.t('mandatoryLocationDesc'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
@@ -767,7 +766,7 @@ class MissingLocationView extends StatelessWidget {
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                         ),
-                        child: Text(context.t('setNow') ?? 'تحديد'),
+                        child: Text(context.t('setNow')),
                       ),
                     ],
                   ),
@@ -780,7 +779,7 @@ class MissingLocationView extends StatelessWidget {
           TextButton.icon(
             onPressed: () => controller.logout(),
             icon: const Icon(Icons.logout_rounded, size: 20),
-            label: Text(context.t('logout') ?? 'تسجيل الخروج'),
+            label: Text(context.t('logout')),
             style: TextButton.styleFrom(
               foregroundColor: Colors.redAccent,
             ),

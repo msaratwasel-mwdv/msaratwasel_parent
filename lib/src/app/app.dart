@@ -85,10 +85,6 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
                 final double currentWidth = MediaQuery.sizeOf(buildContext).width;
                 final double currentHeight = MediaQuery.sizeOf(buildContext).height;
                 
-                // جلب مسافة النظام وفرض حد أدنى بـ 24 بكسل حتماً لحماية أزرار التنقل
-                final double systemPadding = MediaQuery.viewPaddingOf(buildContext).bottom;
-                final double finalBottomPadding = systemPadding > 0 ? systemPadding : 24.0;
-                
                 final bool isHeightCompressed = currentHeight < 650;
                 final bool isExtremelySmallMobile = currentWidth < 360;
                 final bool needsForceScaling = isHeightCompressed || isExtremelySmallMobile;
@@ -102,7 +98,6 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
                         width: double.infinity,
                         height: double.infinity,
                         color: exactScreenColor,
-                    padding: EdgeInsets.only(bottom: finalBottomPadding), // حجز مركزي شامل للمشروع
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),

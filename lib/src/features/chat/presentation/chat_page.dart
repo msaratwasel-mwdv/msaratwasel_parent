@@ -71,7 +71,9 @@ class _ChatPageState extends State<ChatPage> {
 
       // Mark as read on open (API + central state)
       _repo.markAsRead(widget.conversationId);
-      app.markConversationAsRead(widget.conversationId);
+      Future.microtask(() {
+        if (mounted) app.markConversationAsRead(widget.conversationId);
+      });
       // Schedule polling for new messages (as fallback)
       _schedulePoll();
       _isInit = true;
@@ -134,11 +136,16 @@ class _ChatPageState extends State<ChatPage> {
     try {
       final messages = await _repo.getMessages(widget.conversationId);
       if (!mounted) return;
-      if (messages.length != _messages.length) {
-        setState(() => _messages = messages);
-        // Also mark as read on the server + central state
-        _repo.markAsRead(widget.conversationId);
-        AppScope.of(context).markConversationAsRead(widget.conversationId);
+      if (messages.isNotEmpty) {
+        bool isChanged = _messages.isEmpty || 
+                         messages.length != _messages.length || 
+                         messages.first.id != _messages.first.id;
+        if (isChanged) {
+          setState(() => _messages = messages);
+          // Also mark as read on the server + central state
+          _repo.markAsRead(widget.conversationId);
+          AppScope.of(context).markConversationAsRead(widget.conversationId);
+        }
       }
     } catch (_) {
       // Silently ignore poll errors

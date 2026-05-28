@@ -41,6 +41,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   final String? cid = data['correlation_id']?.toString() ?? 
                      data['notification_id']?.toString() ?? 
                      data['message_id']?.toString() ?? 
+                     data['id']?.toString() ??
                      message.messageId;
 
   // ── Persistent Deduplication ──────────────────────────────────────────
@@ -259,6 +260,9 @@ class NotificationService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
+      defaultPresentAlert: false,
+      defaultPresentSound: false,
+      defaultPresentBadge: false,
     );
     const initSettings = InitializationSettings(
       android: androidInit,

@@ -12,7 +12,7 @@ import 'package:msaratwasel_user/src/core/utils/logger.dart';
 Future<void> bootstrap() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-
+  
   // Hide system navigation buttons (Immersive Mode)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 

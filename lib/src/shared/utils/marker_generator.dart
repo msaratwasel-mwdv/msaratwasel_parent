@@ -17,7 +17,7 @@ class MarkerGenerator {
     final canvas = Canvas(pictureRecorder);
 
     // Use a higher resolution for the drawing
-    final double pixelRatio = 1.0;
+
     final double canvasSize = size * 1.5; // Extra space for shadow and tail
     final double radius = size / 2;
     final Offset center = Offset(canvasSize / 2, (canvasSize * 0.4));
@@ -192,7 +192,7 @@ class MarkerGenerator {
   }) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    final double pixelRatio = 1.0;
+
     final double canvasSize = size * 1.5;
     final double radius = size / 2;
     final center = Offset(canvasSize / 2, canvasSize * 0.4);

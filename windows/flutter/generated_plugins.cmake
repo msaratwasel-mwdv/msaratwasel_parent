@@ -12,7 +12,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   permission_handler_windows
   printing
   rive_native
-  sentry_flutter
   url_launcher_windows
 )
 

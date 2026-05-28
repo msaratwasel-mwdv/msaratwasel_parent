@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:msaratwasel_user/src/core/responsive/api_language_interceptor.dart';
 
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
@@ -239,7 +241,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   int get notificationsUnreadCount {
-    if (_serverUnreadCount != null) return _serverUnreadCount!;
     return _notifications.where((n) => !n.read).length;
   }
 
@@ -1116,8 +1117,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
       // استخراج بيانات المستخدم الكاملة من استجابة الـ API
       final userData = response.data['data']?['user'] ?? response.data['user'];
-      final name = userData?['name'] as String? ?? '';
-      final nameEn = userData?['name_en'] as String? ?? name;
+      final name = userData?['name_ar'] as String? ?? userData?['name'] as String? ?? '';
+      final nameEn = userData?['name_en'] as String? ?? userData?['name'] as String? ?? name;
       final phone = userData?['phone'] as String? ?? '';
       final email = userData?['email'] as String? ?? '';
       final nationalId = userData?['national_id'] as String? ?? '';
@@ -1210,7 +1211,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final deviceId = await DeviceUtils.getDeviceId();
 
       await dio.post(
-        '/auth/fcm-token',
+        'auth/fcm-token',
         data: {
           'fcm_token': fcmToken,
           'device_name': deviceName,
@@ -1304,8 +1305,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final response = await this.dio.get('parent/profile');
       if (response.statusCode == 200) {
         final data = response.data['data'] as Map<String, dynamic>;
-        _userName = data['name'] as String? ?? _userName;
-        _userNameEn = data['name_en'] as String? ?? _userNameEn;
+        _userName = data['name_ar'] as String? ?? data['name'] as String? ?? _userName;
+        _userNameEn = data['name_en'] as String? ?? data['name'] as String? ?? _userNameEn;
         _userPhone = data['phone'] as String? ?? _userPhone;
         _userEmail = data['email'] as String? ?? _userEmail;
         _userNationalId = data['national_id'] as String? ?? _userNationalId;
@@ -1385,26 +1386,25 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Marks specific notifications as read both locally and on the server.
   Future<void> markNotificationsRead([List<String>? ids]) async {
+    final targetIds = ids ?? _notifications.where((n) => !n.read).map((n) => n.id).toList();
+    if (targetIds.isEmpty) return;
+
     // 1. Update local state for immediate UI response
     for (final item in _notifications) {
-      if (ids == null || ids.contains(item.id)) {
+      if (targetIds.contains(item.id)) {
         item.read = true;
       }
     }
     
-    // Optimistically decrement server unread count if we are marking specific items as read
-    if (_serverUnreadCount != null && ids != null && ids.isNotEmpty) {
-      _serverUnreadCount = math.max(0, _serverUnreadCount! - ids.length);
-    } else if (ids == null) {
-      _serverUnreadCount = 0;
+    // Optimistically decrement server unread count
+    if (_serverUnreadCount != null) {
+      _serverUnreadCount = math.max(0, _serverUnreadCount! - targetIds.length);
     }
     
     notifyListeners();
     _updateAppIconBadge();
 
     // 2. Sync with server
-    if (ids == null || ids.isEmpty) return;
-
     try {
       final token = await _storage.readAccessToken();
       if (token != null) {
@@ -1415,8 +1415,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           ),
         );
 
-        for (final id in ids) {
-          await dio.post('/api/guardian/notifications/$id/read');
+        for (final id in targetIds) {
+          try {
+            await dio.post('guardian/notifications/$id/read');
+          } catch (e) {
+            developer.log('Failed to mark $id as read: $e');
+          }
         }
       }
     } catch (e) {
@@ -1598,8 +1602,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           channelName = 'حالة الطلاب';
         }
 
+        String displayTitle = notification.getDisplayTitle(isEn);
+        if (isChatMessage) {
+          final convIdStr = notification.data['conversation_id']?.toString();
+          if (convIdStr != null) {
+            final convId = int.tryParse(convIdStr);
+            if (convId != null) {
+              final conv = _conversations.firstWhereOrNull((c) => c.id == convId);
+              if (conv != null) {
+                final other = conv.otherParticipant(userId ?? 0);
+                if (other != null && other.name.isNotEmpty) {
+                  displayTitle = isEn 
+                      ? 'New message from ${other.name}' 
+                      : 'رسالة جديدة من ${other.name}';
+                }
+              }
+            }
+          }
+        }
+
         NotificationService.showLocalNotification(
-          title: notification.getDisplayTitle(isEn),
+          title: displayTitle,
           body: notification.getDisplayBody(isEn),
           id: notification.id.hashCode,
           payload: jsonEncode(notification.toJson()),
@@ -1680,6 +1703,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (notification.type == NotificationType.chat ||
         notification.type == NotificationType.supervisorMessage) {
       _hasNewMessages = true;
+      _messageStreamController.add(notification.data);
+      loadConversationsFromApi();
     }
 
     // 5. Handle Navigation and Async Backend Sync on Tap
