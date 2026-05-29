@@ -96,12 +96,7 @@ class BusTrackingGroup {
       }
     }
 
-    final activeResult = isExplicitlyActive || hasStudentsOnBus;
-
-    // Debug print to console to see exactly why it resolves to active or inactive
-    print('🚌 [isActiveTrip Check] busId: $busId | tripStatus: $tripStatus | isExplicitlyActive: $isExplicitlyActive | hasStudentsOnBus: $hasStudentsOnBus | final: $activeResult');
-
-    return activeResult;
+    return isExplicitlyActive || hasStudentsOnBus;
   }
 
   DateTime? get resolvedStartTime {
