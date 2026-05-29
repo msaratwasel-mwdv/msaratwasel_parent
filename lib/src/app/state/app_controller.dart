@@ -49,6 +49,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     AppLogger.i('🏗️ AppController: Instance created');
     _initDio();
     WidgetsBinding.instance.addObserver(this);
+    _initConnectivityListener();
   }
 
   @override
@@ -175,6 +176,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     // Add logger if needed (already handled by Interceptor check in task.md)
   }
 
+  void _initConnectivityListener() {
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      final List<ConnectivityResult> resultsList = results;
+
+      final hasConnection = resultsList.any((result) => result != ConnectivityResult.none);
+
+      if (hasConnection) {
+        developer.log('📶 Internet connection restored. Reloading data...', name: 'CONNECTIVITY');
+        if (_isAuthenticated) {
+          loadChildrenFromApi();
+          loadNotificationsFromApi();
+          loadConversationsFromApi();
+          loadAbsenceRequestsFromApi();
+          loadLocationRequestsFromApi();
+          startTrackingPoll();
+        }
+      }
+    });
+  }
+
   Locale _locale = () {
     try {
       final platformDispatcher = WidgetsBinding.instance.platformDispatcher;
@@ -280,6 +302,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       List.unmodifiable(_locationRequests);
   bool get isLocationRequestsLoading => _isLocationRequestsLoading;
   ReverbService? _reverbService;
+  StreamSubscription? _connectivitySubscription;
   String _token = '';
 
   /// Synchronous memory set for immediate deduplication of incoming notification CIDs.
@@ -570,8 +593,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _scheduleTrackingPoll({bool immediate = false}) {
     _trackingTimer?.cancel();
+    
+    // If there are active trips, poll every 10 seconds. Otherwise, if the app is waiting for a trip to start, poll every 30 seconds to save battery and server resources!
+    final interval = immediate 
+        ? 0 
+        : (activeTripGroups.isNotEmpty ? 10 : 30);
+        
     _trackingTimer = Timer(
-      Duration(seconds: immediate ? 0 : 10),
+      Duration(seconds: interval),
       _runTrackingPollCycle,
     );
   }
@@ -2147,6 +2176,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       );
       return;
     }
+    final existingGroup = _tripGroups[busId];
     final lat = double.tryParse(
       data['latitude']?.toString() ?? data['lat']?.toString() ?? '',
     );
@@ -2196,7 +2226,24 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           data['last_location_update']?.toString() ??
           '',
         ) ?? DateTime.now();
-    final tripStatus = (data['trip_status'] ?? data['status'])?.toString();
+    final rawTripStatus = (data['trip_status'] ?? data['status'])?.toString();
+    String? tripStatus = rawTripStatus;
+    if (rawTripStatus == 'idle' && existingGroup != null) {
+      const activeStatuses = {
+        'to_school',
+        'to_home',
+        'started',
+        'en_route',
+        'active',
+        'in_progress',
+        'awaiting_confirmation',
+        'awaiting_video',
+        'on_route',
+      };
+      if (existingGroup.tripStatus != null && activeStatuses.contains(existingGroup.tripStatus)) {
+        tripStatus = existingGroup.tripStatus;
+      }
+    }
     final busNumber = data['bus_number']?.toString();
     final busPlate = data['plate_number']?.toString();
 
@@ -2219,6 +2266,25 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           data['trip_start_time']?.toString() ??
           '',
     );
+
+    DateTime? resolvedStartTimeVal = startTime;
+    if (resolvedStartTimeVal == null) {
+      final bool isExplicitlyActiveStatus = tripStatus != null && const {
+        'to_school',
+        'to_home',
+        'started',
+        'en_route',
+        'active',
+        'in_progress',
+        'awaiting_confirmation',
+        'awaiting_video',
+        'on_route',
+      }.contains(tripStatus);
+      final isCurrentlyActive = isExplicitlyActiveStatus || (existingGroup?.isActiveTrip ?? false);
+      if (isCurrentlyActive) {
+        resolvedStartTimeVal = existingGroup?.startTime ?? DateTime.now();
+      }
+    }
 
     // Extract Staff Info
     final driverJson = data['driver'];
@@ -2272,7 +2338,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    final existingGroup = _tripGroups[busId];
+
 
     // 1. Quality Filters for Location (Pre-process)
     // Reject lat=0.0, lng=0.0 as invalid (bus at the ocean, means no real data)
@@ -2312,7 +2378,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
             (busStudents.isNotEmpty ? busStudents.first.bus.supervisor : null),
         busPlate: busPlate,
         tripType: tripTypeStr,
-        startTime: startTime,
+        startTime: resolvedStartTimeVal,
       );
       AppLogger.d(
         '🚌 _updateBusTracking: Created new group for bus $busId (hasLocation: $hasLocation)',
@@ -2347,7 +2413,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                 targetLongitude: targetLng ?? existingGroup.tracking!.targetLongitude,
               ),
               tripStatus: tripStatus ?? existingGroup.tripStatus,
-              startTime: startTime ?? existingGroup.startTime,
+              startTime: resolvedStartTimeVal ?? existingGroup.startTime,
               totalStudentsCount:
                   totalStudents ?? existingGroup.totalStudentsCount,
               totalStudentsOnBoard:
@@ -2380,7 +2446,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
               driver: driver ?? existingGroup.driver,
               supervisor: supervisor ?? existingGroup.supervisor,
               tripType: tripTypeStr ?? existingGroup.tripType,
-              startTime: startTime ?? existingGroup.startTime,
+              startTime: resolvedStartTimeVal ?? existingGroup.startTime,
             );
           }
         }
@@ -2388,7 +2454,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         // Status-only update
         _tripGroups[busId] = existingGroup.copyWith(
           tripStatus: tripStatus,
-          startTime: startTime ?? existingGroup.startTime,
+          startTime: resolvedStartTimeVal ?? existingGroup.startTime,
           totalStudentsCount: totalStudents ?? existingGroup.totalStudentsCount,
           driver: driver ?? existingGroup.driver,
           supervisor: supervisor ?? existingGroup.supervisor,
@@ -2532,6 +2598,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _connectivitySubscription?.cancel();
     _reverbService?.dispose();
     _messageStreamController.close();
     super.dispose();

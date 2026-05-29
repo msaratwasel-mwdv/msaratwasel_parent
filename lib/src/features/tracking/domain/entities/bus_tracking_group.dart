@@ -83,10 +83,50 @@ class BusTrackingGroup {
       'on_route',
     };
 
-    // A trip is active IF the status is in the active list.
-    // tracking != null is no longer enough to consider it active if status is finished.
-    return tripStatus != null && activeStatuses.contains(tripStatus);
+    final isExplicitlyActive = tripStatus != null && activeStatuses.contains(tripStatus);
+
+    // Fallback: If any student in this group is currently on the bus
+    bool hasStudentsOnBus = false;
+    for (final student in students) {
+      if (student.status == StudentStatus.onBus ||
+          student.status == StudentStatus.onBusToSchool ||
+          student.status == StudentStatus.onBusToHome) {
+        hasStudentsOnBus = true;
+        break;
+      }
+    }
+
+    final activeResult = isExplicitlyActive || hasStudentsOnBus;
+
+    // Debug print to console to see exactly why it resolves to active or inactive
+    print('🚌 [isActiveTrip Check] busId: $busId | tripStatus: $tripStatus | isExplicitlyActive: $isExplicitlyActive | hasStudentsOnBus: $hasStudentsOnBus | final: $activeResult');
+
+    return activeResult;
   }
+
+  DateTime? get resolvedStartTime {
+    if (startTime != null) return startTime;
+
+    DateTime? earliest;
+    for (final student in students) {
+      final times = [
+        student.waitingAtHomeTime,
+        student.onBusToSchoolTime,
+        student.onBusToHomeTime,
+        student.atSchoolTime,
+        student.arrivedHomeTime,
+      ];
+      for (final t in times) {
+        if (t != null) {
+          if (earliest == null || t.isBefore(earliest)) {
+            earliest = t;
+          }
+        }
+      }
+    }
+    return earliest;
+  }
+
 
   BusState get busState {
     switch (tripStatus) {

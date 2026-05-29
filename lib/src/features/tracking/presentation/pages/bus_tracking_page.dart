@@ -116,7 +116,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         int activeIndex = -1;
         for (int i = 0; i < controller.students.length; i++) {
           final s = controller.students[i];
-          if (_isStudentActiveTarget(s, targetLatLng)) {
+          if (_isStudentActiveTarget(s, targetLatLng, tripType: selectedGroup?.tripType)) {
             activeStudent = s;
             activeIndex = i;
             break;
@@ -195,25 +195,31 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   ) async {
     if (!mounted) return;
     final languageCode = AppScope.of(context).locale.languageCode;
+    
+    final List<Future<void>> futures = [];
     for (final student in students) {
       if (!_studentIcons.containsKey(student.id)) {
         final studentName = student.getLocalizedName(languageCode);
-        try {
-          // Create marker for student using our generator
-          final icon = await MarkerGenerator.createStudentMarker(
-            name: studentName,
-            imageUrl: student.avatarUrl,
-            authToken: authToken,
-            color: AppColors.accent,
-            size: 22.0,
-          );
-
-          _studentIcons[student.id] = icon;
-          if (mounted) setState(() {});
-        } catch (e) {
-          debugPrint('Error creating marker for $studentName: $e');
-        }
+        futures.add(() async {
+          try {
+            final icon = await MarkerGenerator.createStudentMarker(
+              name: studentName,
+              imageUrl: student.avatarUrl,
+              authToken: authToken,
+              color: AppColors.accent,
+              size: 22.0,
+            );
+            _studentIcons[student.id] = icon;
+          } catch (e) {
+            debugPrint('Error creating marker for $studentName: $e');
+          }
+        }());
       }
+    }
+    
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
+      if (mounted) setState(() {});
     }
   }
 
@@ -337,8 +343,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     points.add(LatLng(group.tracking!.latitude, group.tracking!.longitude));
 
     for (final student in group.students) {
-      if (student.hasLocation) {
-        points.add(student.homeLocation!);
+      final pos = _getStudentActiveLocation(student, group.tripType);
+      if (pos != null && pos.latitude != 0.0 && pos.longitude != 0.0) {
+        points.add(pos);
       }
       final schoolPos = _parseLatLng(student.schoolLocation);
       if (schoolPos != null) {
@@ -375,65 +382,115 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     });
   }
 
-  Widget _buildInactiveTripAlert(BuildContext context) {
-    final bool isArabic = AppScope.of(context).locale.languageCode == 'ar';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3CD), // Soft Amber background
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFEBAA), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(20),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFE8A1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.warning_amber_rounded,
-              color: Color(0xFF856404), // Dark Amber
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isArabic
-                      ? 'لا توجد رحلة نشطة حالياً لهذه الحافلة'
-                      : 'No active trip currently for this bus',
-                  style: const TextStyle(
-                    color: Color(0xFF856404),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
+  Widget _buildNoActiveTripBlocker(BuildContext context, BusTrackingGroup? group) {
+    final isArabic = AppScope.of(context).locale.languageCode == 'ar';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? AppColors.dark : AppColors.light;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: colors.scaffold.withAlpha(isDark ? 150 : 200),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: isDark ? Colors.white.withAlpha(20) : colors.text.withAlpha(15),
+                  width: 1.5,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  isArabic
-                      ? 'الموقع المعروض هو آخر موقع تم تسجيله للحافلة.'
-                      : 'The displayed location is the last registered coordinate of the bus.',
-                  style: const TextStyle(
-                    color: Color(0xFF856404),
-                    fontSize: 11,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(isDark ? 80 : 20),
+                    blurRadius: 30,
+                    offset: const Offset(0, 15),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.location_off_rounded,
+                        size: 38,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    isArabic ? 'لا توجد رحلة نشطة حالياً' : 'No Active Trip Currently',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: colors.text,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isArabic
+                        ? 'هذه الحافلة ليست في رحلة الآن. ستتمكن من تتبع مسار الحافلة وموقع أبنائك مباشرة فور بدء الرحلة من قبل السائق.'
+                        : 'This bus is not on a live trip right now. You will be able to track the bus and your children as soon as the driver starts the trip.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: colors.text70,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.primary.withAlpha(40),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          isArabic ? 'يتم التحديث تلقائياً...' : 'Updating automatically...',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -446,7 +503,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
       final targetLatLng = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
       for (final s in group.students) {
-        if (_isStudentActiveTarget(s, targetLatLng)) {
+        if (_isStudentActiveTarget(s, targetLatLng, tripType: group.tripType)) {
           return s.getLocalizedName(AppScope.of(context).locale.languageCode);
         }
       }
@@ -459,16 +516,41 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final controller = AppScope.of(context);
     final selectedGroup = controller.selectedGroup;
     final allGroups = controller.allTripGroups;
+    final isArabic = controller.locale.languageCode == 'ar';
+    final hasActiveTrip = selectedGroup != null && selectedGroup.isActiveTrip;
 
     return Directionality(
-      textDirection: controller.locale.languageCode == 'ar'
-          ? TextDirection.rtl
-          : TextDirection.ltr,
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Stack(
           children: [
-            _buildMap(selectedGroup),
+            if (hasActiveTrip) ...[
+              _buildMap(selectedGroup),
+              if (_followBus && selectedGroup.tracking != null)
+                Align(
+                  alignment: const Alignment(0, -0.22),
+                  child: SpeechBubble(
+                    title: isArabic ? 'الوجهة القادمة' : 'Next Destination',
+                    description: _getNextStopName(context, selectedGroup),
+                    time: _remainingTime ??
+                        (selectedGroup.tracking?.etaMinutes != null
+                            ? '${selectedGroup.tracking!.etaMinutes} ${context.t('minutesSuffix')}'
+                            : '--'),
+                  ),
+                ),
+              _buildMapControls(selectedGroup.tracking),
+              _DataDrivenPanel(
+                group: selectedGroup,
+                isExpanded: _isPanelExpanded,
+                onToggle: () =>
+                    setState(() => _isPanelExpanded = !_isPanelExpanded),
+                parentStudents: controller.students,
+                remainingTime: _remainingTime,
+              ),
+            ] else ...[
+              _buildNoActiveTripBlocker(context, selectedGroup),
+            ],
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
               left: 0,
@@ -485,33 +567,8 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                     selectedId: selectedGroup?.busId,
                     onSelect: (id) => controller.selectBus(id),
                   ),
-                  if (selectedGroup != null && !selectedGroup.isActiveTrip) ...[
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildInactiveTripAlert(context),
-                    ),
-                  ],
                 ],
               ),
-            ),
-            if (selectedGroup != null && selectedGroup.isActiveTrip && _followBus && selectedGroup.tracking != null)
-              Align(
-                alignment: const Alignment(0, -0.22),
-                child: SpeechBubble(
-                  title: controller.locale.languageCode == 'ar' ? 'الوجهة القادمة' : 'Next Destination',
-                  description: _getNextStopName(context, selectedGroup),
-                  time: _remainingTime ?? (selectedGroup.tracking?.etaMinutes != null ? '${selectedGroup.tracking!.etaMinutes} ${context.t('minutesSuffix')}' : '--'),
-                ),
-              ),
-            _buildMapControls(selectedGroup?.tracking),
-            _DataDrivenPanel(
-              group: selectedGroup,
-              isExpanded: _isPanelExpanded,
-              onToggle: () =>
-                  setState(() => _isPanelExpanded = !_isPanelExpanded),
-              parentStudents: controller.students,
-              remainingTime: _remainingTime,
             ),
           ],
         ),
@@ -556,6 +613,10 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
   Widget _buildMap(BusTrackingGroup? group) {
     final tracking = group?.tracking;
+    LatLng? target;
+    if (tracking != null && tracking.targetLatitude != null && tracking.targetLongitude != null) {
+      target = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
+    }
     final Set<Marker> markers = {};
     final Set<Polyline> polylines = {};
 
@@ -576,22 +637,28 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
         LatLng(tracking.latitude, tracking.longitude),
       ];
       for (var student in group?.students ?? []) {
-        if (student.hasLocation) {
-          final pos = student.homeLocation!;
+        final pos = _getStudentActiveLocation(student, group?.tripType);
+        if (pos != null && pos.latitude != 0.0 && pos.longitude != 0.0) {
+          final isActiveTarget = _isStudentActiveTarget(student, target, tripType: group?.tripType);
+          final studentName = student.getLocalizedName(AppScope.of(context).locale.languageCode);
+
           markers.add(
             Marker(
               markerId: MarkerId('student_${student.id}'),
               position: pos,
-              icon:
-                  _studentIcons[student.id] ??
-                  _homeIcon ??
-                  BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueOrange,
-                  ),
+              icon: isActiveTarget
+                  ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed) // Red for active target stop
+                  : (_studentIcons[student.id] ??
+                      _homeIcon ??
+                      BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueOrange,
+                      )),
               anchor: const Offset(0.5, 0.9), // Anchor at the tip of the pin
               infoWindow: InfoWindow(
-                title: student.getLocalizedName(AppScope.of(context).locale.languageCode),
-                snippet: context.t('homeLocation'),
+                title: isActiveTarget ? '🎯 $studentName' : studentName,
+                snippet: isActiveTarget 
+                    ? (AppScope.of(context).locale.languageCode == 'ar' ? '🎯 الوجهة الحالية للحافلة' : '🎯 Current Destination')
+                    : context.t('homeLocation'),
               ),
             ),
           );
@@ -623,10 +690,6 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           ? group!.students.first
           : null;
 
-      LatLng? target;
-      if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
-        target = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
-      }
       final fallbackDestination = target ?? firstStudent?.schoolCoords;
 
       final bool isTripActive = group?.isActiveTrip ?? false;
@@ -1252,10 +1315,10 @@ class _DataDrivenPanel extends StatelessWidget {
           _MetricItem(
             icon: Icons.schedule,
             label: context.t('startedAt'),
-            value: group?.startTime != null
+            value: group?.resolvedStartTime != null
                 ? (() {
-                    final hour = group!.startTime!.hour;
-                    final minute = group!.startTime!.minute.toString().padLeft(
+                    final hour = group!.resolvedStartTime!.hour;
+                    final minute = group!.resolvedStartTime!.minute.toString().padLeft(
                       2,
                       "0",
                     );
@@ -1338,7 +1401,7 @@ class _DataDrivenPanel extends StatelessWidget {
               final target = (tracking?.targetLatitude != null && tracking?.targetLongitude != null)
                   ? LatLng(tracking!.targetLatitude!, tracking.targetLongitude!)
                   : null;
-              final isActive = _isStudentActiveTarget(s, target);
+              final isActive = _isStudentActiveTarget(s, target, tripType: group?.tripType);
               
               return _StudentCard(
                 student: s, 
@@ -1972,13 +2035,62 @@ void _showQuickCall(BuildContext context, BusTrackingGroup? group) {
   );
 }
 
-bool _isStudentActiveTarget(Student student, LatLng? target) {
+LatLng? _getStudentActiveLocation(Student student, String? tripType) {
+  final bool isMorning;
+  if (tripType == null || tripType.isEmpty) {
+    // Fallback: Check local time - before 12:00 PM is considered morning (forth) trip
+    isMorning = DateTime.now().hour < 12;
+  } else {
+    isMorning = tripType == 'forth' ||
+        tripType == 'to_school' ||
+        tripType == 'morning' ||
+        tripType == 'morning_trip';
+  }
+
+  final specific = isMorning ? student.forthLocation : student.backLocation;
+  if (specific != null && specific.latitude != 0.0 && specific.longitude != 0.0) {
+    return specific;
+  }
+  return student.homeLocation;
+}
+
+bool _isStudentActiveTarget(Student student, LatLng? target, {String? tripType}) {
   if (target == null) return false;
   
+  final activeLoc = _getStudentActiveLocation(student, tripType);
+  if (activeLoc != null) {
+    final latDiff = (activeLoc.latitude - target.latitude).abs();
+    final lngDiff = (activeLoc.longitude - target.longitude).abs();
+    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+      return true;
+    }
+  }
+
+  // Fallback to general homeLocation
   final home = student.homeLocation;
-  if (home != null) {
+  if (home != null && home != activeLoc) {
     final latDiff = (home.latitude - target.latitude).abs();
     final lngDiff = (home.longitude - target.longitude).abs();
+    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+      return true;
+    }
+  }
+
+  // Fallback to forthLocation
+  final forth = student.forthLocation;
+  if (forth != null && forth != activeLoc) {
+    final latDiff = (forth.latitude - target.latitude).abs();
+    final lngDiff = (forth.longitude - target.longitude).abs();
+    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+      return true;
+    }
+  }
+
+  // Fallback to backLocation
+  final back = student.backLocation;
+  if (back != null && back != activeLoc) {
+    final latDiff = (back.latitude - target.latitude).abs();
+    final lngDiff = (back.longitude - target.longitude).abs();
     if (latDiff < 0.00015 && lngDiff < 0.00015) {
       return true;
     }

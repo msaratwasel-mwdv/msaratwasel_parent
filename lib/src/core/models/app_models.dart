@@ -261,6 +261,8 @@ class Student {
     this.tripCount = 0,
     this.attendancePercentage = 0,
     this.homeLocation,
+    this.forthLocation,
+    this.backLocation,
     this.locationNote,
     this.schoolName,
     this.schoolLocation,
@@ -290,6 +292,8 @@ class Student {
   final int tripCount; // trip_count from API
   final int attendancePercentage; // attendance_percentage from API
   final LatLng? homeLocation;
+  final LatLng? forthLocation;
+  final LatLng? backLocation;
   final String? locationNote;
   final String? schoolName;
   final String? schoolLocation;
@@ -363,6 +367,18 @@ class Student {
           ? LatLng(
               double.tryParse(json['home_lat'].toString()) ?? 0.0,
               double.tryParse(json['home_lng'].toString()) ?? 0.0,
+            )
+          : null,
+      forthLocation: (json['forth_lat'] != null && json['forth_lng'] != null)
+          ? LatLng(
+              double.tryParse(json['forth_lat'].toString()) ?? 0.0,
+              double.tryParse(json['forth_lng'].toString()) ?? 0.0,
+            )
+          : null,
+      backLocation: (json['back_lat'] != null && json['back_lng'] != null)
+          ? LatLng(
+              double.tryParse(json['back_lat'].toString()) ?? 0.0,
+              double.tryParse(json['back_lng'].toString()) ?? 0.0,
             )
           : null,
       locationNote: json['location_note'] as String?,
@@ -458,6 +474,8 @@ class Student {
     int? tripCount,
     int? attendancePercentage,
     LatLng? homeLocation,
+    LatLng? forthLocation,
+    LatLng? backLocation,
     String? locationNote,
     String? schoolName,
     String? schoolLocation,
@@ -486,6 +504,8 @@ class Student {
       tripCount: tripCount ?? this.tripCount,
       attendancePercentage: attendancePercentage ?? this.attendancePercentage,
       homeLocation: homeLocation ?? this.homeLocation,
+      forthLocation: forthLocation ?? this.forthLocation,
+      backLocation: backLocation ?? this.backLocation,
       locationNote: locationNote ?? this.locationNote,
       schoolName: schoolName ?? this.schoolName,
       schoolLocation: schoolLocation ?? this.schoolLocation,

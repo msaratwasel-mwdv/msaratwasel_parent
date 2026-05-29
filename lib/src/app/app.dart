@@ -10,7 +10,6 @@ import 'package:msaratwasel_user/src/features/dashboard/presentation/root_shell.
 import 'package:msaratwasel_user/src/features/onboarding/presentation/onboarding_page.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_theme.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
-import 'package:msaratwasel_user/src/shared/widgets/offline_banner.dart';
 
 class MsaratWaselApp extends StatefulWidget {
   const MsaratWaselApp({super.key, this.controller});
@@ -101,9 +100,7 @@ class _MsaratWaselAppState extends State<MsaratWaselApp> {
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                      child: OfflineBannerWrapper(
-                        child: child ?? const SizedBox.shrink(),
-                      ),
+                      child: child ?? const SizedBox.shrink(),
                     ),
                   ),
                 );

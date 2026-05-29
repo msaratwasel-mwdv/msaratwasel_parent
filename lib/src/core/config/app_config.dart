@@ -1,7 +1,6 @@
 class AppConfig {
   const AppConfig._();
 
-  // هذا هو المتغير الوحيد الذي ستغيره للربط بين المحلي والاستضافة
   static const bool isLocal = false;
 
   // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
@@ -25,7 +24,7 @@ class AppConfig {
 
   // ─── Timeouts ────────────────────────────────────────────────────────────
   static const Duration defaultTimeout = Duration(seconds: 30);
-  static const Duration markerImageTimeout = Duration(seconds: 10);
+  static const Duration markerImageTimeout = Duration(seconds: 2);
 
   // ─── Image Normalization ──────────────────────────────────────────────────
   static String? normalizeImageUrl(String? url) {
