@@ -65,12 +65,12 @@ class ReverbService {
         _handleMessage,
         onDone: () {
           developer.log('🔌 WebSocket disconnected', name: 'REVERB');
-          _isConnected = false;
+          _handleDisconnect();
           _scheduleReconnect();
         },
         onError: (error) {
           developer.log('❌ WebSocket error: $error', name: 'REVERB');
-          _isConnected = false;
+          _handleDisconnect();
           _scheduleReconnect();
         },
       );
@@ -131,14 +131,17 @@ class ReverbService {
           break;
 
         case 'driver.location.updated':
+        case 'DriverLocationUpdated':
+        case 'App\\Events\\DriverLocationUpdated':
         case 'bus.location.updated':
         case 'BusLocationUpdated':
         case 'App\\Events\\BusLocationUpdated':
         case 'trip.status.updated':
         case 'TripStatusUpdated':
         case 'App\\Events\\TripStatusUpdated':
-          developer.log('📍 Event: ${event}', name: 'REVERB');
           final data = _parseData(message['data']);
+          print('📍 [REVERB] Event: $event | Lat: ${data['latitude'] ?? data['lat']}, Lng: ${data['longitude'] ?? data['lng']} | Channel: ${message['channel']}');
+          developer.log('📍 Event: $event | Lat: ${data['latitude'] ?? data['lat']}, Lng: ${data['longitude'] ?? data['lng']} | Channel: ${message['channel']}', name: 'REVERB');
           if (_onBusLocationUpdated != null) {
             _onBusLocationUpdated(data);
           }
@@ -155,6 +158,10 @@ class ReverbService {
           break;
 
         case 'pusher_internal:subscription_succeeded':
+          final channel = message['channel'] as String?;
+          if (channel != null) {
+            _subscribedChannels.add(channel);
+          }
           developer.log('✅ Subscription succeeded for: ${message["channel"]}', name: 'REVERB');
           break;
 
@@ -218,7 +225,6 @@ class ReverbService {
           'data': {'channel': channelName},
         });
       }
-      _subscribedChannels.add(channelName);
       developer.log('📡 Subscribed to: $channelName', name: 'REVERB');
     } catch (e, stack) {
       developer.log('❌ Subscription failed for $channelName: $e', name: 'REVERB', stackTrace: stack);
@@ -286,7 +292,28 @@ class ReverbService {
     _pingTimer?.cancel();
     _channel?.sink.close();
     _channel = null;
-    _isConnected = false;
+    _handleDisconnect();
     developer.log('🔌 ReverbService disposed', name: 'REVERB');
+  }
+
+  /// Whether the WebSocket is currently connected
+  bool get isConnected => _isConnected;
+
+  /// Check if a specific channel is successfully subscribed and connected
+  bool isChannelSubscribed(String channelName) {
+    return _isConnected && _subscribedChannels.contains(channelName);
+  }
+
+  void _handleDisconnect() {
+    _isConnected = false;
+    for (final channel in _subscribedChannels) {
+      if (channel != 'private-guardian.$_userId' &&
+          channel != 'private-App.Models.User.$_userId') {
+        if (!_pendingSubscriptions.contains(channel)) {
+          _pendingSubscriptions.add(channel);
+        }
+      }
+    }
+    _subscribedChannels.clear();
   }
 }

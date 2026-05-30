@@ -62,7 +62,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   late final Dio dio;
   final StorageService _storage = StorageService();
-  final Set<String> _subscribedChannels = {};
 
   // ── Global Navigator Key ──────────────────────────────────────────────
   /// Used by NotificationRouter to push ChatPage directly without going
@@ -537,10 +536,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         for (var student in _students) {
           if (student.bus.id.isNotEmpty && student.bus.id != '-') {
             final channel = 'private-bus.${student.bus.id}';
-            if (!_subscribedChannels.contains(channel)) {
-              _reverbService?.subscribe(channel);
-              _subscribedChannels.add(channel);
-            }
+            _reverbService?.subscribe(channel);
           }
         }
 
@@ -625,8 +621,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _isTrackingPolling = true;
 
     try {
-      // 🚀 إيقاف الجلب المتكرر (Polling) إذا كان اتصال الـ WebSocket (Reverb) نشطاً
-      if (_subscribedChannels.isNotEmpty) {
+      // 🚀 إيقاف الجلب المتكرر (Polling) فقط إذا كان اتصال الـ WebSocket (Reverb) نشطاً والقنوات مسجلة بنجاح
+      bool isReverbActive = false;
+      if (_reverbService != null && _reverbService!.isConnected) {
+        final activeBuses = _students
+            .map((s) => s.bus.id)
+            .where((id) => id.isNotEmpty && id != '-')
+            .toSet();
+
+        if (activeBuses.isNotEmpty) {
+          bool allSubscribed = true;
+          for (final busId in activeBuses) {
+            if (!_reverbService!.isChannelSubscribed('private-bus.$busId')) {
+              allSubscribed = false;
+              break;
+            }
+          }
+          isReverbActive = allSubscribed;
+        }
+      }
+
+      if (isReverbActive) {
         AppLogger.d('ℹ️ WebSocket is active. Skipping HTTP Polling.');
         _pollCycleCount++;
         if (_pollCycleCount % 6 == 0) {
@@ -929,6 +944,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       if (_userId != null && _userId! > 0) {
         _initReverb(token);
       }
+      startTrackingPoll();
 
       // Sync local language setting with backend for correct background FCM payloads
       try {
@@ -969,7 +985,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   // ═════════════════════════════════════════════════════════════
   void _initReverb(String token) {
     _reverbService?.dispose();
-    _subscribedChannels.clear();
     _reverbService = ReverbService(
       token: token,
       userId: _userId!,
@@ -985,10 +1000,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     for (var student in _students) {
       if (student.bus.id.isNotEmpty && student.bus.id != '-') {
         final channel = 'private-bus.${student.bus.id}';
-        if (!_subscribedChannels.contains(channel)) {
-          _reverbService!.subscribe(channel);
-          _subscribedChannels.add(channel);
-        }
+        _reverbService!.subscribe(channel);
       }
     }
 
@@ -1006,8 +1018,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     // We use the current request version to allow the update if it's the latest
     _updateBusTracking(busId, data, _trackingRequestVersion);
 
+    print('📍 [PARENT MAP UPDATE] Real-time location update for bus $busId | Lat: ${data['latitude'] ?? data['lat']}, Lng: ${data['longitude'] ?? data['lng']}');
     developer.log(
-      '📍 Real-time location update for bus $busId',
+      '📍 Real-time location update for bus $busId | Lat: ${data['latitude'] ?? data['lat']}, Lng: ${data['longitude'] ?? data['lng']}',
       name: 'REVERB',
     );
   }
@@ -1207,6 +1220,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       if (_userId != null) {
         _initReverb(token);
       }
+      startTrackingPoll();
 
       notifyListeners();
       return true;
@@ -1355,6 +1369,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         await prefs.setString('user_email', _userEmail);
         await prefs.setString('user_national_id', _userNationalId);
         await prefs.setString('user_avatar_url', _userAvatarUrl);
+        if (_userId != null) {
+          await prefs.setInt('user_id', _userId!);
+          if (_reverbService == null && _token.isNotEmpty) {
+            developer.log('🔌 ReverbService was not initialized on boot. Initializing now with retrieved userId: $_userId', name: 'REVERB');
+            _initReverb(_token);
+          }
+        }
 
         notifyListeners();
         AppLogger.d('✅ Profile loaded from API');
@@ -2389,7 +2410,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         if (existingGroup.tracking != null &&
             !updatedAt.isAfter(existingGroup.tracking!.lastUpdate)) {
           AppLogger.d(
-            '📍 _updateBusTracking: Ignoring stale or duplicate location update for bus $busId',
+            '📍 _updateBusTracking: Ignoring stale or duplicate location update for bus $busId. updatedAt=$updatedAt (${updatedAt.isUtc ? "UTC" : "Local"}), lastUpdate=${existingGroup.tracking!.lastUpdate} (${existingGroup.tracking!.lastUpdate.isUtc ? "UTC" : "Local"})',
           );
         } else {
           // Significant Change or Metadata Update
@@ -2405,6 +2426,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           if (distance < 0.002 && existingGroup.tracking != null) {
             _tripGroups[busId] = existingGroup.copyWith(
               tracking: existingGroup.tracking!.copyWith(
+                latitude: lat,
+                longitude: lng,
                 lastUpdate: updatedAt,
                 etaMinutes: etaMinutes,
                 speed: speed,

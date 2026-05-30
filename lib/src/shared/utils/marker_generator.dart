@@ -290,4 +290,44 @@ class MarkerGenerator {
     if (byteData == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
+
+  /// Simple version for a Point/Dot Marker (blue dot)
+  static Future<BitmapDescriptor> createPointMarker({
+    required Color color,
+    required double size,
+  }) async {
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    final double pixelRatio =
+        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final double canvasSize = size * pixelRatio;
+    final center = Offset(canvasSize / 2, canvasSize / 2);
+    final radius = canvasSize / 2;
+
+    // Draw shadow / glow
+    final shadowPaint = Paint()
+      ..color = color.withAlpha(50)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius, shadowPaint);
+
+    // Draw outer white circle
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius * 0.75, whitePaint);
+
+    // Draw inner colored circle
+    final colorPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius * 0.55, colorPaint);
+
+    final picture = pictureRecorder.endRecording();
+    final img = await picture.toImage(canvasSize.toInt(), canvasSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+
+    if (byteData == null) return BitmapDescriptor.defaultMarker;
+    return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
+  }
 }
+

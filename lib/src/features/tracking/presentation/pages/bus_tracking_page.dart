@@ -28,6 +28,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   GoogleMapController? _mapController;
   bool _isPanelExpanded = true;
   MapType _currentMapType = MapType.normal;
+  bool _showBusSelector = true;
 
   BitmapDescriptor? _busIcon;
   BitmapDescriptor? _homeIcon;
@@ -150,10 +151,10 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
   Future<void> _loadCustomMarkers() async {
     try {
-      // Generate a nice bus marker using our generator
-      _busIcon = await MarkerGenerator.createBusMarker(
-        color: AppColors.primary,
-        size: 30.0,
+      // Generate a nice point (blue dot) marker using our generator
+      _busIcon = await MarkerGenerator.createPointMarker(
+        color: const Color(0xFF1A73E8), // Beautiful Google Maps blue
+        size: 12.0,
       );
 
       _homeIcon = await MarkerGenerator.createHomeMarker(
@@ -506,6 +507,13 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final isArabic = controller.locale.languageCode == 'ar';
     final hasActiveTrip = selectedGroup != null && selectedGroup.isActiveTrip;
 
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool isSplitScreen = screenHeight < 550;
+
+    final double collapsedHeight = isSplitScreen ? 120.0 : 235.0;
+    final double expandedHeight = isSplitScreen ? screenHeight * 0.55 : screenHeight * 0.75;
+    final double panelHeight = _isPanelExpanded ? expandedHeight : collapsedHeight;
+
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Container(
@@ -526,7 +534,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                             : '--'),
                   ),
                 ),
-              _buildMapControls(selectedGroup.tracking),
+              _buildMapControls(selectedGroup.tracking, panelHeight),
               _DataDrivenPanel(
                 group: selectedGroup,
                 isExpanded: _isPanelExpanded,
@@ -534,6 +542,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                     setState(() => _isPanelExpanded = !_isPanelExpanded),
                 parentStudents: controller.students,
                 remainingTime: _remainingTime,
+                height: panelHeight,
               ),
             ] else ...[
               _buildNoActiveTripBlocker(context, selectedGroup),
@@ -548,12 +557,14 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _buildTopNavBar(context),
                   ),
-                  const SizedBox(height: 10),
-                  _DynamicBusSelector(
-                    groups: allGroups,
-                    selectedId: selectedGroup?.busId,
-                    onSelect: (id) => controller.selectBus(id),
-                  ),
+                  if (_showBusSelector) ...[
+                    const SizedBox(height: 10),
+                    _DynamicBusSelector(
+                      groups: allGroups,
+                      selectedId: selectedGroup?.busId,
+                      onSelect: (id) => controller.selectBus(id),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -590,7 +601,14 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
                   color: colors.text,
                 ),
               ),
-              const SizedBox(width: 44), // Placeholder to keep title centered
+              _CircleHeaderButton(
+                icon: _showBusSelector ? Icons.directions_bus : Icons.directions_bus_outlined,
+                onPressed: () {
+                  setState(() {
+                    _showBusSelector = !_showBusSelector;
+                  });
+                },
+              ),
             ],
           ),
         ),
@@ -615,8 +633,8 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
           icon:
               _busIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          anchor: const Offset(0.5, 0.9), // Anchor at the tip of the "nail"
-          rotation: 0, // Keep pin upright for clarity
+          anchor: const Offset(0.5, 0.5), // Center of the circular dot
+          rotation: 0,
         ),
       );
 
@@ -761,9 +779,9 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     );
   }
 
-  Widget _buildMapControls(BusTracking? tracking) {
+  Widget _buildMapControls(BusTracking? tracking, double panelHeight) {
     return Positioned(
-      bottom: _isPanelExpanded ? 600 : 200,
+      bottom: panelHeight + 16.0,
       left: 16,
       right: 16,
       child: Row(
@@ -976,7 +994,7 @@ class _DynamicBusSelector extends StatelessWidget {
                           const SizedBox(height: 1),
                         ],
                         Text(
-                          '${context.t('updated')}: ${group.tracking != null ? "${group.tracking!.lastUpdate.hour}:${group.tracking!.lastUpdate.minute.toString().padLeft(2, "0")}" : "---"}',
+                          '${context.t('updated')}: ${group.tracking != null ? "${group.tracking!.lastUpdate.toLocal().hour}:${group.tracking!.lastUpdate.toLocal().minute.toString().padLeft(2, "0")}" : "---"}',
                           style: TextStyle(
                             color: isSelected
                                 ? (isDark ? AppColors.textSecondary : Colors.white.withAlpha(180))
@@ -1038,12 +1056,14 @@ class _DataDrivenPanel extends StatelessWidget {
   final VoidCallback onToggle;
   final List<Student> parentStudents;
   final String? remainingTime;
+  final double height;
 
   const _DataDrivenPanel({
     required this.group,
     required this.isExpanded,
     required this.onToggle,
     required this.parentStudents,
+    required this.height,
     this.remainingTime,
   });
 
@@ -1056,7 +1076,7 @@ class _DataDrivenPanel extends StatelessWidget {
       bottom: 0,
       left: 0,
       right: 0,
-      height: isExpanded ? MediaQuery.of(context).size.height * 0.75 : 235,
+      height: height,
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -1162,7 +1182,7 @@ class _DataDrivenPanel extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${context.t('updated')}: ${tracking != null ? "${tracking.lastUpdate.hour > 12 ? tracking.lastUpdate.hour - 12 : tracking.lastUpdate.hour}:${tracking.lastUpdate.minute.toString().padLeft(2, "0")} ${tracking.lastUpdate.hour >= 12 ? context.t('pm') : context.t('am')}" : "---"}',
+                    '${context.t('updated')}: ${tracking != null ? "${tracking.lastUpdate.toLocal().hour > 12 ? tracking.lastUpdate.toLocal().hour - 12 : (tracking.lastUpdate.toLocal().hour == 0 ? 12 : tracking.lastUpdate.toLocal().hour)}:${tracking.lastUpdate.toLocal().minute.toString().padLeft(2, "0")} ${tracking.lastUpdate.toLocal().hour >= 12 ? context.t('pm') : context.t('am')}" : "---"}',
                     style: TextStyle(
                       color:
                           (Theme.of(context).brightness == Brightness.dark

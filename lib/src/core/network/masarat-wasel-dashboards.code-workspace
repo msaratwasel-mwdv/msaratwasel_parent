@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../../../laragon/www/masarat-wasel-dashboards"
+		},
+		{
+			"path": "../../../.."
+		},
+		{
+			"path": "../../../../../msaratwasel-services"
+		}
+	],
+	"settings": {}
+}
