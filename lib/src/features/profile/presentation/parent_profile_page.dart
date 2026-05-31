@@ -1,11 +1,9 @@
 import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
@@ -13,6 +11,7 @@ import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
 import 'package:msaratwasel_user/src/shared/widgets/user_avatar.dart';
 import 'package:msaratwasel_user/src/shared/widgets/directional_icon.dart';
+
 class ParentProfilePage extends StatefulWidget {
   const ParentProfilePage({super.key});
 
@@ -287,8 +286,12 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   (student) => Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: _ChildQuickCard(
-                      name: student.getLocalizedName(AppScope.of(context).locale.languageCode),
-                      grade: student.getLocalizedGrade(AppScope.of(context).locale.languageCode),
+                      name: student.getLocalizedName(
+                        AppScope.of(context).locale.languageCode,
+                      ),
+                      grade: student.getLocalizedGrade(
+                        AppScope.of(context).locale.languageCode,
+                      ),
                       avatarUrl: student.avatarUrl,
                       isDark: isDark,
                     ),
@@ -358,7 +361,6 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
         ),
       ],
     );
-
   }
 }
 
@@ -754,9 +756,9 @@ class _ProfileActionButton extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-        ),
-      ),
-    );
-  }
-}
+               ),
+             ),
+           ),
+         );
+       }
+     }

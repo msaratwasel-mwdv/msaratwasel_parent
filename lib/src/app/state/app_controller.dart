@@ -1889,16 +1889,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          connectTimeout: AppConfig.defaultTimeout,
-          receiveTimeout: AppConfig.defaultTimeout,
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      final repo = NotificationRepositoryImpl(dio: dio);
+      final repo = NotificationRepositoryImpl(dio: this.dio);
       final result = await repo.fetchNotifications();
       final fetched = result.notifications;
 
@@ -1939,14 +1930,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final token = await _storage.readAccessToken();
       if (token == null) return;
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      final repo = AbsenceRepositoryImpl(dio: dio);
+      final repo = AbsenceRepositoryImpl(dio: this.dio);
       _absenceRequests = await repo.fetchHistory();
       notifyListeners();
       developer.log(

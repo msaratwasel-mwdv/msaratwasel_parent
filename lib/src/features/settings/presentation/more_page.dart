@@ -5,7 +5,7 @@ import 'package:msaratwasel_user/src/app/state/app_controller.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_spacing.dart';
 import 'package:msaratwasel_user/src/shared/presentation/widgets/app_sliver_header.dart';
-import 'package:msaratwasel_user/src/features/profile/presentation/change_password_page.dart';
+
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/privacy_policy_page.dart';
 import 'package:msaratwasel_user/src/features/settings/presentation/contact_us_page.dart';
@@ -71,18 +71,7 @@ class _MorePageState extends State<MorePage> {
                         onTap: () =>
                             controller.setNavIndex(8), // Parent Profile
                       ),
-                      _Divider(),
-                      _SettingsTile(
-                        icon: PhosphorIcons.lockKey(PhosphorIconsStyle.duotone),
-                        title: context.t('changePassword'),
-                        subtitle: '********',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePasswordPage(),
-                          ),
-                        ),
-                      ),
+
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),

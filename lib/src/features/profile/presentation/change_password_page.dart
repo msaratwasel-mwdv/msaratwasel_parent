@@ -58,8 +58,22 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       final msg = response.data['message'] ?? context.t('passwordUpdatedSuccess');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(msg, style: GoogleFonts.cairo(color: Colors.white)),
-          backgroundColor: Colors.green,
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  msg,
+                  style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
         ),
       );
       Navigator.pop(context);
@@ -82,10 +96,28 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         }
       }
 
+      if (errorMsg.contains('uppercase') && errorMsg.contains('lowercase')) {
+        errorMsg = context.t('passwordRequiresMixedCase');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMsg, style: GoogleFonts.cairo(color: Colors.white)),
-          backgroundColor: Colors.red,
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  errorMsg,
+                  style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
         ),
       );
     }

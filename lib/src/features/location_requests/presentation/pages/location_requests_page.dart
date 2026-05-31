@@ -196,13 +196,15 @@ class _LocationRequestsPageState extends State<LocationRequestsPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: isDark 
+                      ? Colors.white.withValues(alpha: 0.1) 
+                      : AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.location_on,
                   size: 16,
-                  color: AppColors.primary,
+                  color: isDark ? Colors.white : AppColors.primary,
                 ),
               ),
               const SizedBox(width: 12),
