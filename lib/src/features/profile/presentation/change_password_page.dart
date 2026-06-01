@@ -96,8 +96,22 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         }
       }
 
-      if (errorMsg.contains('uppercase') && errorMsg.contains('lowercase')) {
+      final lowerError = errorMsg.toLowerCase();
+      if ((lowerError.contains('uppercase') && lowerError.contains('lowercase')) ||
+          (lowerError.contains('كبير') && lowerError.contains('صغير')) ||
+          lowerError.contains('mixed case') ||
+          lowerError.contains('mixedcase')) {
         errorMsg = context.t('passwordRequiresMixedCase');
+      } else if (lowerError.contains('number') || 
+                 lowerError.contains('digit') || 
+                 lowerError.contains('رقم') || 
+                 lowerError.contains('أرقام')) {
+        errorMsg = context.t('passwordRequiresNumber');
+      } else if (lowerError.contains('8 characters') || 
+                 lowerError.contains('8 أحرف') || 
+                 lowerError.contains('8 خانات') ||
+                 lowerError.contains('at least 8')) {
+        errorMsg = context.t('passwordMinLength');
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
