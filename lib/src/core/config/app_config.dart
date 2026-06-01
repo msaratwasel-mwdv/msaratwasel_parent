@@ -1,7 +1,7 @@
 class AppConfig {
   const AppConfig._();
 
-  static const bool isLocal = true;
+  static const bool isLocal = false;
 
   // رابط المحاكي (ويجب أن يكون IP جهازك إذا كنت تستخدم هاتفاً حقيقياً)
   static const String _localUrl = 'http://192.168.8.188:8001/api/';

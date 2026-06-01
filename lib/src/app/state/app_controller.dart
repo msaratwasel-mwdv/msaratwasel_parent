@@ -15,6 +15,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 // FCM token registration — see _registerFcmToken below
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:msaratwasel_user/src/core/config/app_config.dart';
 import 'package:msaratwasel_user/src/core/routing/notification_router.dart';
 import 'package:msaratwasel_user/src/features/chat/presentation/chat_page.dart';
@@ -1243,6 +1244,46 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<({bool success, String message})> forgotPassword({
+    required String civilId,
+  }) async {
+    try {
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          connectTimeout: AppConfig.defaultTimeout,
+          receiveTimeout: AppConfig.defaultTimeout,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      final resetData = {
+        'national_id': civilId.trim(),
+      };
+
+      final response = await dio.post(
+        'auth/forgot-password',
+        data: resetData,
+      );
+
+      if (response.statusCode == 200) {
+        final message = response.data['message'] as String? ?? 'تمت إعادة تعيين كلمة المرور بنجاح';
+        return (success: true, message: message);
+      }
+      return (success: false, message: 'فشل إعادة تعيين كلمة المرور');
+    } on DioException catch (e) {
+      final message = e.response?.data?['message']
+          ?? e.response?.data?['errors']?['national_id']?.first
+          ?? 'فشل إعادة تعيين كلمة المرور';
+      return (success: false, message: message.toString());
+    } catch (e) {
+      return (success: false, message: e.toString());
+    }
+  }
+
   /// يرسل FCM Token للـ backend بعد تسجيل الدخول.
   Future<void> _registerFcmToken({
     required Dio dio,
@@ -1272,6 +1313,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> logout() async {
+    try {
+      // Delete the FCM token from Firebase completely to stop notifications
+      await FirebaseMessaging.instance.deleteToken();
+      developer.log('✅ FCM token deleted from Firebase Messaging on logout', name: 'AUTH');
+    } catch (e) {
+      developer.log('⚠️ Failed to delete FCM token on logout: $e', name: 'AUTH');
+    }
+
     try {
       final token = await _storage.readAccessToken();
       final fcmToken = await _storage.prefs.then(
@@ -1513,6 +1562,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
   /// Called by [NotificationService] whenever an FCM push arrives.
   Future<void> addNotification(AppNotification notification, {bool isTap = false}) async {
+    if (!_isAuthenticated) {
+      developer.log('🔇 Suppressing notification - user is not authenticated.', name: 'NOTIFICATION');
+      return;
+    }
+
     developer.log('🧪 DEBUG: Incoming notification ${notification.id} | isTap: $isTap', name: 'NOTIF_DEBUG');
     developer.log('🧪 DEBUG: List length before: ${_notifications.length}', name: 'NOTIF_DEBUG');
 

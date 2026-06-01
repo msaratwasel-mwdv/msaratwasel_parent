@@ -24,6 +24,13 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 
   final SharedPreferences prefs = await SharedPreferences.getInstance();
 
+  // Guard: Verify there is an active parent session in this device
+  final int userId = prefs.getInt('user_id') ?? 0;
+  if (userId <= 0) {
+    developer.log('🚫 [BG] No active user session (user_id is null/zero). Skipping notification.', name: 'FCM');
+    return;
+  }
+
   final data = message.data;
 
   // ── Sync Badge in Background / Terminated State ───────────────────────

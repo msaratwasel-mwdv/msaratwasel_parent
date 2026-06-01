@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:msaratwasel_user/src/app/state/app_controller.dart';
-import 'package:msaratwasel_user/src/features/auth/presentation/otp_verification_screen.dart';
 import 'package:msaratwasel_user/src/shared/localization/app_strings.dart';
 import 'package:msaratwasel_user/src/shared/theme/app_colors.dart';
 import 'package:msaratwasel_user/src/shared/widgets/custom_text_field.dart';
@@ -23,12 +22,12 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _civilIdController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _civilIdController.dispose();
     super.dispose();
   }
 
@@ -38,21 +37,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 1500));
+    final res = await widget.controller.forgotPassword(
+      civilId: _civilIdController.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OtpVerificationScreen(
-          controller: widget.controller,
-          phoneNumber: _phoneController.text,
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 5),
         ),
-      ),
-    );
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -77,7 +85,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         body: Stack(
           children: [
-            // 1. Background
             // 1. Background
             AuthBackground(isDark: isDark),
 
@@ -140,19 +147,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                               const SizedBox(height: 32),
 
                               CustomTextField(
-                                    controller: _phoneController,
-                                    label: context.t('phoneNumber'),
-                                    icon: Icons.phone_android_rounded,
-                                    keyboardType: TextInputType.phone,
+                                    controller: _civilIdController,
+                                    label: context.t('civilId'),
+                                    icon: Icons.credit_card_rounded,
+                                    keyboardType: TextInputType.number,
                                     validator: (v) {
                                       if (v == null || v.isEmpty) {
-                                        return context.t('enterValidPhone');
+                                        return context.t('civilIdError');
                                       }
                                       return null;
                                     },
                                   )
                                   .animate()
-                                  .fadeIn(delay: 200.ms)
+                                  .fadeIn(delay: 150.ms)
                                   .slideY(begin: 0.2),
 
                               const SizedBox(height: 24),
@@ -161,26 +168,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     onTap: _handleReset,
                                     text: context.t('sendResetLink'),
                                     isLoading: _isLoading,
-                                    icon: Icons.send_rounded,
+                                    icon: Icons.lock_reset_rounded,
                                   )
                                   .animate()
-                                  .fadeIn(delay: 300.ms)
+                                  .fadeIn(delay: 250.ms)
                                   .slideY(begin: 0.2),
 
                               const SizedBox(height: 16),
 
                               TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: Text(
-                                  context.t('backToLogin'),
-                                  style: GoogleFonts.cairo(
-                                    color: isDark
-                                        ? Colors.white70
-                                        : AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(
+                                    context.t('backToLogin'),
+                                    style: GoogleFonts.cairo(
+                                      color: isDark
+                                          ? Colors.white70
+                                          : AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
