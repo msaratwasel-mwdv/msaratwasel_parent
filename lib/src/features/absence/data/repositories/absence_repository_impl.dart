@@ -37,6 +37,7 @@ class AbsenceRepositoryImpl implements AbsenceRepository {
           id: json['id'].toString(),
           studentIds: [json['student_id'].toString()],
           studentName: json['student_name'] ?? json['student']?['name'],
+          studentNameEn: json['student_name_en'] ?? json['student']?['name_en'] ?? json['student']?['nameEn'],
           type: _parseType(json['type']),
           date: DateTime.tryParse(json['date']) ?? DateTime.now(),
           note: json['reason'],

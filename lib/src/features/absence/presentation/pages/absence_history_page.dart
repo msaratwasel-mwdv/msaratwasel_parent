@@ -115,7 +115,9 @@ class _AbsenceHistoryPageState extends State<AbsenceHistoryPage> {
             children: [
               Expanded(
                 child: Text(
-                  req.studentName ?? context.t('student'),
+                  req.getLocalizedStudentName(AppScope.of(context).locale.languageCode).isEmpty
+                      ? context.t('student')
+                      : req.getLocalizedStudentName(AppScope.of(context).locale.languageCode),
                   style: GoogleFonts.cairo(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
