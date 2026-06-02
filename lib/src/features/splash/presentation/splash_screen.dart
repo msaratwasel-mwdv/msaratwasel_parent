@@ -36,10 +36,10 @@ class _SplashScreenState extends State<SplashScreen> {
     // Return a sleek centered logo with navy blue background
     return Scaffold(
       backgroundColor: const Color(0xFF062A5A),
-      body: SizedBox.expand(
+      body: Center(
         child: Image.asset(
           'assets/images/splashscreen.png',
-          fit: BoxFit.cover,
+          width: 250, // Added width to match typical native splash logo sizes
         ),
       ),
     );
