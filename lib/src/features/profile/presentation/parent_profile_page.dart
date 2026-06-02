@@ -166,9 +166,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.camera_alt_rounded,
-                    color: AppColors.primary,
+                    color: isDark ? Colors.white : AppColors.primary,
                   ),
                   onPressed: _showPhotoOptions,
                 ),
@@ -304,7 +304,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               _ProfileActionButton(
                 icon: Icons.lock_reset_rounded,
                 label: context.t('changePassword'),
-                color: AppColors.primary,
+                color: isDark ? Colors.white : AppColors.primary,
                 isDark: isDark,
                 isHorizontal: true,
                 onTap: () {
