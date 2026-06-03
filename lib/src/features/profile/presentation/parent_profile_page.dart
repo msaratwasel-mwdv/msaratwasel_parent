@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
@@ -35,15 +36,43 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final file = await _picker.pickImage(
-      source: source,
-      maxWidth: 1400,
-      imageQuality: 85,
-    );
+    XFile? file;
+    try {
+      file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1400,
+        imageQuality: 85,
+      );
+    } on PlatformException catch (e) {
+      debugPrint('⚠️ Image picking failed: $e');
+      if (mounted) {
+        final String message;
+        if (e.code == 'camera_access_denied') {
+          message = context.t('cameraPermissionDenied');
+        } else if (e.code == 'photo_access_denied') {
+          message = context.t('photoPermissionDenied');
+        } else {
+          message = context.t('errorOccurred');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    } catch (e) {
+      debugPrint('⚠️ Image picking failed: $e');
+      return;
+    }
+    
     if (file == null) return;
+    
+    final String filePath = file.path;
 
     setState(() {
-      _avatarFile = File(file.path);
+      _avatarFile = File(filePath);
       _isUploadingAvatar = true;
     });
 
@@ -51,7 +80,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
       final app = AppScope.of(context);
       final formData = FormData.fromMap({
         'avatar': await MultipartFile.fromFile(
-          file.path,
+          filePath,
           filename: 'avatar.jpg',
         ),
       });

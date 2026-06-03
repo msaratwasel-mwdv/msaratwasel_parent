@@ -88,8 +88,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                   _ContactCard(
                     icon: PhosphorIcons.phoneCall(PhosphorIconsStyle.duotone),
                     title: context.t('phoneNumber'),
-                    value: '920000000', // Example number
-                    onTap: () => _makePhoneCall('920000000'),
+                    value: '+96879967769',
+                    onTap: () => _makePhoneCall('+96879967769'),
                     isDark: isDark,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -100,8 +100,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                       PhosphorIconsStyle.duotone,
                     ),
                     title: context.t('email'),
-                    value: 'info@msarat.sa', // Example email
-                    onTap: () => _sendEmail('info@msarat.sa'),
+                    value: 'msaratwasel@gmail.com',
+                    onTap: () => _sendEmail('msaratwasel@gmail.com'),
                     isDark: isDark,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -110,8 +110,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                   _ContactCard(
                     icon: PhosphorIcons.globe(PhosphorIconsStyle.duotone),
                     title: context.t('website'),
-                    value: 'www.msarat.sa', // Example website
-                    onTap: () => _launchUrl('https://www.msarat.sa'),
+                    value: 'masaratwasal.com',
+                    onTap: () => _launchUrl('https://masaratwasal.com/'),
                     isDark: isDark,
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -123,12 +123,12 @@ class _ContactUsPageState extends State<ContactUsPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _SocialButton(
-                        icon: PhosphorIcons.twitterLogo(
+                        icon: PhosphorIcons.linkedinLogo(
                           PhosphorIconsStyle.fill,
                         ),
-                        label: 'Twitter',
-                        color: const Color(0xFF1DA1F2),
-                        onTap: () => _launchUrl('https://twitter.com/msarat'),
+                        label: 'LinkedIn',
+                        color: const Color(0xFF0A66C2),
+                        onTap: () => _launchUrl('https://www.linkedin.com/in/msarat-wasel-company-4a244b3b2'),
                         isDark: isDark,
                       ),
                       _SocialButton(
@@ -137,7 +137,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
                         ),
                         label: 'Instagram',
                         color: const Color(0xFFE1306C),
-                        onTap: () => _launchUrl('https://instagram.com/msarat'),
+                        onTap: () => _launchUrl('https://www.instagram.com/wasel_company'),
                         isDark: isDark,
                       ),
 
@@ -147,7 +147,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
                         ),
                         label: 'Facebook',
                         color: const Color(0xFF4267B2),
-                        onTap: () => _launchUrl('https://facebook.com/msarat'),
+                        onTap: () => _launchUrl('https://www.facebook.com/fthy.alhjry.924385'),
                         isDark: isDark,
                       ),
                       _SocialButton(
@@ -156,7 +156,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
                         ),
                         label: 'WhatsApp',
                         color: const Color(0xFF25D366),
-                        onTap: () => _launchUrl('https://wa.me/966500000000'),
+                        onTap: () => _launchUrl('https://wa.me/96879967769'),
                         isDark: isDark,
                       ),
                     ],

@@ -11,16 +11,20 @@ import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/core/services/notification_badge_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:msaratwasel_user/firebase_options.dart';
+
 /// Background message handler — must be a top-level function.
 @pragma('vm:entry-point')
-Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   developer.log(
     '📬 FCM [BG]: ${message.notification?.title} | data: ${message.data}',
     name: 'FCM',
   );
 
   // Initialize Firebase for the background isolate
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final SharedPreferences prefs = await SharedPreferences.getInstance();
 
@@ -334,8 +338,8 @@ class NotificationService {
     }
 
     // ── 4. Background Message Handler ──────────────────────────────────────
-    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
-
+    // The background handler is now registered early in main.dart
+    
     // ── 5. Foreground Message Handler (REGISTERED ONCE) ───────────────────
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       developer.log('📥 FCM RAW DATA: ${jsonEncode(message.data)}', name: 'FCM_RAW');

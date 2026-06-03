@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen>
       _isLoading = true;
       _errorMessage = null;
     });
-    await Future.delayed(const Duration(milliseconds: 1200));
+
     try {
       final ok = await widget.controller.login(
         civilId: _civilIdController.text.trim(),

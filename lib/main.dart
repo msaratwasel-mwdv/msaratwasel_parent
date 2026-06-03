@@ -8,6 +8,8 @@ import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:msaratwasel_user/src/core/utils/logger.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:msaratwasel_user/src/core/services/notification_service.dart';
 
 Future<void> bootstrap() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,7 @@ Future<void> bootstrap() async {
         return Firebase.app();
       },
     );
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
     AppLogger.i('🔥 MsaratWasel: Firebase initialized successfully');
   } catch (e, stack) {
     AppLogger.e('❌ MsaratWasel: Firebase initialization failed: $e', error: e, stackTrace: stack);
