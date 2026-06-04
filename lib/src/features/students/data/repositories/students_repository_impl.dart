@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:msaratwasel_user/src/features/students/domain/entities/student.dart';
+import '../../../../core/config/app_config.dart';
 import './students_repository.dart';
 
 class StudentsRepositoryImpl implements StudentsRepository {
@@ -32,9 +33,7 @@ class StudentsRepositoryImpl implements StudentsRepository {
 
   Student _mapToStudent(Map<String, dynamic> json) {
     String? avatarUrl = json['image_url'];
-    if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-      avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
-    }
+    avatarUrl = AppConfig.normalizeImageUrl(avatarUrl);
 
     return Student(
       id: json['id'].toString(),

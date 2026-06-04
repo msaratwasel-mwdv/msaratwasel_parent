@@ -43,7 +43,7 @@
     <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" />
 
     <application
-        android:label="msaratwaselParent"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:enableOnBackInvokedCallback="true">

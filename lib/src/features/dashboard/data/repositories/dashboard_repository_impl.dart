@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:msaratwasel_user/src/features/dashboard/domain/entities/child_summary.dart';
+import '../../../../core/config/app_config.dart';
 import './dashboard_repository.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
@@ -13,9 +14,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
     final List<dynamic> data = response.data['data'];
     return data.map((json) {
       String? avatarUrl = json['image_url'];
-      if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-        avatarUrl = 'http://10.60.17.139:8001/storage/$avatarUrl';
-      }
+      avatarUrl = AppConfig.normalizeImageUrl(avatarUrl);
 
       return ChildSummary(
         id: json['id'].toString(),
