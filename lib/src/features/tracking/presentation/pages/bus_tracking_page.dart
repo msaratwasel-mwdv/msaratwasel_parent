@@ -65,7 +65,11 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final authToken = controller.token;
 
     final isActive = selectedGroup?.isActiveTrip ?? false;
-    if (_wasActive == true && !isActive) {
+    final busChanged = _lastSelectedBusId != null &&
+        selectedGroup != null &&
+        _lastSelectedBusId != selectedGroup.busId;
+
+    if (_wasActive == true && !isActive && !busChanged) {
       _wasActive = isActive;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
