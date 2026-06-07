@@ -17,7 +17,7 @@ enum StudentStatus {
   late,
 }
 
-enum BusState { enRoute, atSchool, atHome }
+enum BusState { pending, enRoute, atSchool, atHome }
 
 enum AttendanceDirection { outbound, inbound, fullDay }
 

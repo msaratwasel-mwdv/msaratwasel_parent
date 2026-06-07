@@ -578,8 +578,8 @@ class _StudentCard extends StatelessWidget {
     final theme = Theme.of(context);
     final tracking = group?.tracking;
     final canTrack =
+        (group?.busState == BusState.enRoute || group?.busState == BusState.pending) &&
         tracking != null &&
-        group?.busState == BusState.enRoute &&
         (tracking.etaMinutes ?? 0) > 0;
     final etaText = canTrack
         ? '${tracking.etaMinutes} ${context.t('minutesSuffix')}'

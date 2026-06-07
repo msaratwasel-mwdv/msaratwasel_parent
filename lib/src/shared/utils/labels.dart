@@ -28,6 +28,8 @@ class Labels {
 
   static String busState(BuildContext context, BusState state) {
     switch (state) {
+      case BusState.pending:
+        return context.t('tripPending');
       case BusState.enRoute:
         return context.t('enRoute');
       case BusState.atSchool:

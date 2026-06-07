@@ -70,8 +70,11 @@ class BusTrackingGroup {
   int get myStudentsCount => students.length;
 
   bool get isActiveTrip {
-    // Explicit active statuses from API
+    // Explicit active statuses from API (includes pending = trip created but not started yet)
     const activeStatuses = {
+      'pending',
+      'pending_to_school',
+      'pending_to_home',
       'to_school',
       'to_home',
       'started',
@@ -123,8 +126,20 @@ class BusTrackingGroup {
   }
 
 
+  /// Whether the trip is in pending state (created but not started by driver yet)
+  bool get isPendingTrip {
+    return tripStatus == 'pending' ||
+        tripStatus == 'pending_to_school' ||
+        tripStatus == 'pending_to_home';
+  }
+
   BusState get busState {
     switch (tripStatus) {
+      // رحلة تم إنشاؤها وتنتظر بدء السائق
+      case 'pending':
+      case 'pending_to_school':
+      case 'pending_to_home':
+        return BusState.pending;
       case 'to_school':
       case 'to_home':
       case 'started':

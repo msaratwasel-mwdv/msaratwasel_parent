@@ -868,6 +868,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final savedLang = prefs.getString('app_locale');
       if (savedLang != null && savedLang.isNotEmpty) {
         _locale = Locale(savedLang);
+        // ✅ FIX: Set Accept-Language header immediately so ALL API calls use correct locale
+        // (previously this was only set after login, causing Arabic names to return in English)
+        dio.options.headers['Accept-Language'] = savedLang;
+        AppLogger.i('🌐 [BOOTSTRAP] Accept-Language header set to "$savedLang" early.');
       }
 
       AppLogger.i('📊 [BOOTSTRAP] Step 4: Auth evaluation...');
@@ -1765,6 +1769,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
             newStatus = StudentStatus.waitingAtHome;
             _fetchTrackingFromApi();
             break;
+          // ✅ FIX: When a trip starts/is created, reload children IMMEDIATELY without
+          // requiring the user to tap the notification. This removes the delay where
+          // the parent had to manually open the app to see the trip.
+          case NotificationType.tripStarted:
+            AppLogger.d('🚌 tripStarted notification received → reloading children instantly');
+            loadChildrenFromApi();
+            break;
           case NotificationType.absenceApproved:
           case NotificationType.absenceRejected:
             loadAbsenceRequestsFromApi();
@@ -2287,8 +2298,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         ) ?? DateTime.now();
     final rawTripStatus = (data['trip_status'] ?? data['status'])?.toString();
     String? tripStatus = rawTripStatus;
-    if (rawTripStatus == 'idle' && existingGroup != null) {
+    final tripTypeStr = data['trip_type']?.toString(); // to_school / to_home (used below too)
+    // ✅ FIX: Sticky Status Bug - only keep old active status if backend also reports an active
+    // trip_type. If trip_type is null it means the backend has truly cleared the trip.
+    if (rawTripStatus == 'idle' && existingGroup != null && tripTypeStr != null) {
       const activeStatuses = {
+        'pending',
+        'pending_to_school',
+        'pending_to_home',
         'to_school',
         'to_home',
         'started',
@@ -2317,7 +2334,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         data['on_board_count'] ?? data['on_board'] ?? data['on_bus_count'];
     final totalOnBoard = int.tryParse(rawOnBoard?.toString() ?? '');
 
-    final tripTypeStr = data['trip_type']?.toString(); // to_school / to_home
+    // tripTypeStr already declared above (moved up for sticky-status fix)
     final startTime = DateTime.tryParse(
       data['departure_time']?.toString() ??
           data['started_at']?.toString() ??
@@ -2554,10 +2571,19 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       '📍 _updateBusTracking: Received data for bus $busId | status: $tripStatus | location: $hasLocation',
     );
 
-    if (tripStatus == 'finished' ||
+    // ✅ FIX: Call loadChildrenFromApi ONLY when the trip status has CHANGED, not on every
+    // GPS coordinate update. Previously this fired on every location broadcast (every 5s),
+    // flooding the server with heavy DB queries and causing severe app lag/freeze.
+    final prevStatus = existingGroup?.tripStatus;
+    final statusChanged = prevStatus != tripStatus;
+    final isSignificantStatus = tripStatus == 'finished' ||
         tripStatus == 'idle' ||
-        tripStatus == 'in_progress' ||
-        tripStatus == 'started') {
+        tripStatus == 'started' ||
+        tripStatus == 'pending' ||
+        tripStatus == 'pending_to_school' ||
+        tripStatus == 'pending_to_home';
+    if (statusChanged && isSignificantStatus) {
+      AppLogger.d('🔄 Trip status changed ($prevStatus → $tripStatus): triggering loadChildrenFromApi()');
       loadChildrenFromApi();
     }
 
