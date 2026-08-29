@@ -26,10 +26,17 @@ void main() {
 
     // Default mock behavior
     when(
-      () => mockPlaces.getPredictions(any(), any()),
+      () => mockPlaces.getPredictions(
+        any(),
+        any(),
+        cancelToken: any(named: 'cancelToken'),
+      ),
     ).thenAnswer((_) async => []);
     when(
-      () => mockGeocoding.reverseGeocode(any()),
+      () => mockGeocoding.reverseGeocode(
+        any(),
+        cancelToken: any(named: 'cancelToken'),
+      ),
     ).thenAnswer((_) async => 'Test Address');
 
     controller = LocationPickerController(
@@ -53,9 +60,19 @@ void main() {
       // Simulate slow first request
       Completer<List<PlacePrediction>> slowRequest = Completer();
       when(
-        () => mockPlaces.getPredictions('A', any()),
+        () => mockPlaces.getPredictions(
+          'A',
+          any(),
+          cancelToken: any(named: 'cancelToken'),
+        ),
       ).thenAnswer((_) => slowRequest.future);
-      when(() => mockPlaces.getPredictions('AB', any())).thenAnswer(
+      when(
+        () => mockPlaces.getPredictions(
+          'AB',
+          any(),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
         (_) async => [
           PlacePrediction(
             placeId: '2',
@@ -93,7 +110,12 @@ void main() {
       expect(controller.isGeocoding, isTrue);
 
       await Future.delayed(Duration.zero);
-      verify(() => mockGeocoding.reverseGeocode(location)).called(1);
+      verify(
+        () => mockGeocoding.reverseGeocode(
+          location,
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
     });
 
     test(
@@ -108,7 +130,12 @@ void main() {
         controller.onLongPress(location2);
         await Future.delayed(Duration.zero);
 
-        verify(() => mockGeocoding.reverseGeocode(any())).called(1);
+        verify(
+          () => mockGeocoding.reverseGeocode(
+            any(),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).called(1);
       },
     );
   });

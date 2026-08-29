@@ -25,6 +25,8 @@ void main() {
           () => mockDio.get(
             any(),
             queryParameters: any(named: 'queryParameters'),
+            cancelToken: any(named: 'cancelToken'),
+            options: any(named: 'options'),
           ),
         ).thenAnswer(
           (_) async => Response(
@@ -61,6 +63,8 @@ void main() {
           () => mockDio.get(
             any(),
             queryParameters: any(named: 'queryParameters'),
+            cancelToken: any(named: 'cancelToken'),
+            options: any(named: 'options'),
           ),
         ).thenAnswer(
           (_) async => Response(
@@ -82,8 +86,12 @@ void main() {
 
     test('returns Unknown Location on failure', () async {
       when(
-        () =>
-            mockDio.get(any(), queryParameters: any(named: 'queryParameters')),
+        () => mockDio.get(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+          cancelToken: any(named: 'cancelToken'),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(DioException(requestOptions: RequestOptions(path: '')));
 
       final result = await geocodingService.reverseGeocode(testLocation);
