@@ -374,7 +374,7 @@ class _ChildCard extends StatelessWidget {
                       color: AppColors.accent,
                       isDark: isDark,
                       onTap: () {
-                        final index = controller.students.indexOf(student);
+                        final index = controller.students.indexWhere((s) => s.id == student.id);
                         if (index != -1) {
                           controller.selectStudent(index);
                           controller.setNavIndex(2);
@@ -450,12 +450,15 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
@@ -478,8 +481,9 @@ class _ActionButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─── StatBox ─────────────────────────────────────────────────────────────────

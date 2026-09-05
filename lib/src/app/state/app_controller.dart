@@ -61,6 +61,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
   late final Dio dio;
   final StorageService _storage = StorageService();
 
@@ -579,16 +588,19 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   int _pollCycleCount = 0;
   bool _isTrackingPolling = false;
   bool _isTrackingInitialFetchDone = false;
+  bool _isTrackingPollStopped = false;
 
   bool get isTrackingDataReady => _isTrackingInitialFetchDone;
 
   void startTrackingPoll() {
+    _isTrackingPollStopped = false;
     _trackingTimer?.cancel();
     _pollCycleCount = 0;
     _scheduleTrackingPoll(immediate: true);
   }
 
   void _scheduleTrackingPoll({bool immediate = false}) {
+    if (_isTrackingPollStopped) return;
     _trackingTimer?.cancel();
     
     // If there are active trips, poll every 10 seconds. Otherwise, if the app is waiting for a trip to start, poll every 30 seconds to save battery and server resources!
@@ -673,15 +685,18 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       // Schedule next poll automatically if we haven't been stopped
-      if (_trackingTimer != null) {
+      if (_trackingTimer != null && !_isTrackingPollStopped) {
         _scheduleTrackingPoll();
       }
     }
   }
 
   void stopTrackingPoll() {
+    _isTrackingPollStopped = true;
     _trackingTimer?.cancel();
     _trackingTimer = null;
+    _reverbService?.dispose();
+    _reverbService = null;
   }
 
   Future<void> _fetchTrackingFromApi() async {
@@ -946,10 +961,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       ]).timeout(AppConfig.defaultTimeout, onTimeout: () => []);
 
       // Restore WebSocket
-      if (_userId != null && _userId! > 0) {
+      if (_userId != null && _userId! > 0 && !_isTrackingPollStopped) {
         _initReverb(token);
       }
-      startTrackingPoll();
+      if (!_isTrackingPollStopped) {
+        startTrackingPoll();
+      }
 
       // Sync local language setting with backend for correct background FCM payloads
       try {
@@ -1279,10 +1296,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       }
       return (success: false, message: 'فشل إعادة تعيين كلمة المرور');
     } on DioException catch (e) {
-      final message = e.response?.data?['message']
-          ?? e.response?.data?['errors']?['national_id']?.first
-          ?? 'فشل إعادة تعيين كلمة المرور';
-      return (success: false, message: message.toString());
+      String? message;
+      final data = e.response?.data;
+      if (data is Map) {
+        message = data['message']?.toString()
+            ?? data['errors']?['national_id']?.first?.toString();
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
+      }
+      return (success: false, message: message ?? 'فشل إعادة تعيين كلمة المرور');
     } catch (e) {
       return (success: false, message: e.toString());
     }
@@ -1424,7 +1446,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         await prefs.setString('user_avatar_url', _userAvatarUrl);
         if (_userId != null) {
           await prefs.setInt('user_id', _userId!);
-          if (_reverbService == null && _token.isNotEmpty) {
+          if (_reverbService == null && _token.isNotEmpty && !_isTrackingPollStopped) {
             developer.log('🔌 ReverbService was not initialized on boot. Initializing now with retrieved userId: $_userId', name: 'REVERB');
             _initReverb(_token);
           }
@@ -2684,8 +2706,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _isDisposed = true;
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
     _connectivitySubscription?.cancel();
+    stopTrackingPoll();
     _reverbService?.dispose();
     _messageStreamController.close();
     super.dispose();

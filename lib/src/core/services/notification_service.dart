@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:msaratwasel_user/src/core/models/app_models.dart';
 import 'package:msaratwasel_user/src/core/services/notification_badge_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:msaratwasel_user/firebase_options.dart';
 
@@ -21,10 +22,12 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
     name: 'FCM',
   );
 
-  // Initialize Firebase for the background isolate
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Initialize Firebase for the background isolate if not already initialized
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   final SharedPreferences prefs = await SharedPreferences.getInstance();
 
@@ -491,5 +494,20 @@ class NotificationService {
         developer.log('❌ Error parsing notification tap payload: $e', name: 'FCM', stackTrace: st);
       }
     }
+  }
+
+  @visibleForTesting
+  static void handleNotificationTapForTesting(NotificationResponse response) {
+    _handleNotificationTap(response);
+  }
+
+  @visibleForTesting
+  static void setOnReceivedForTesting(OnNotificationReceived? callback) {
+    _onReceived = callback;
+  }
+
+  @visibleForTesting
+  static void resetInitializedForTesting() {
+    _initialized = false;
   }
 }

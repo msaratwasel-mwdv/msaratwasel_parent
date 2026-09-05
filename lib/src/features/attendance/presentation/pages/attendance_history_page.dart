@@ -20,6 +20,7 @@ class AttendanceHistoryPage extends StatefulWidget {
 }
 
 class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
+  final ScrollController _scrollController = ScrollController();
   Student? _selectedChild;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -28,6 +29,12 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   final Map<DateTime, Map<String, dynamic>> _attendanceEvents = {};
   int _presentCount = 0;
   int _absentCount = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -44,6 +51,8 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   Future<void> _fetchAttendanceData() async {
     if (_selectedChild == null) return;
 
+    final childId = _selectedChild!.id;
+
     setState(() {
       _isLoading = true;
     });
@@ -52,33 +61,61 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
       final storage = StorageService();
       final apiClient = ApiClient(storage: storage);
       final response = await apiClient.client.get(
-        'parent/children/${_selectedChild!.id}/attendance',
+        'parent/children/$childId/attendance',
         queryParameters: {'year': _focusedDay.year, 'month': _focusedDay.month},
       );
 
+      if (!mounted || _selectedChild?.id != childId) return;
+
       final data = response.data['data'];
-      final logs = data['logs'] as Map<String, dynamic>;
-      final summary = data['summary'] as Map<String, dynamic>;
+      final Map<DateTime, Map<String, dynamic>> newEvents = {};
+      int present = 0;
+      int absent = 0;
 
-      _attendanceEvents.clear();
-      logs.forEach((dateStr, val) {
-        final parts = dateStr.split('-');
-        if (parts.length == 3) {
-          final date = DateTime(
-            int.parse(parts[0]),
-            int.parse(parts[1]),
-            int.parse(parts[2]),
-          );
-          _attendanceEvents[date] = val as Map<String, dynamic>;
+      if (data is Map<String, dynamic>) {
+        final rawLogs = data['logs'];
+        if (rawLogs is Map) {
+          rawLogs.forEach((dateStr, val) {
+            final parts = dateStr.toString().split('-');
+            if (parts.length == 3) {
+              final date = DateTime(
+                int.parse(parts[0]),
+                int.parse(parts[1]),
+                int.parse(parts[2]),
+              );
+              if (val is Map<String, dynamic>) {
+                newEvents[date] = val;
+              } else if (val is Map) {
+                newEvents[date] = Map<String, dynamic>.from(val);
+              }
+            }
+          });
         }
-      });
 
-      _presentCount = summary['present_days'] ?? 0;
-      _absentCount = summary['absent_days'] ?? 0;
-    } catch (e) {
-      // Ignored for UI
+        final rawSummary = data['summary'];
+        if (rawSummary is Map) {
+          present = (rawSummary['present_days'] as num?)?.toInt() ?? 0;
+          absent = (rawSummary['absent_days'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      setState(() {
+        _attendanceEvents.clear();
+        _attendanceEvents.addAll(newEvents);
+        _presentCount = present;
+        _absentCount = absent;
+      });
+    } catch (e, st) {
+      debugPrint('Error fetching attendance data for child $childId: $e\n$st');
+      if (mounted && _selectedChild?.id == childId) {
+        setState(() {
+          _attendanceEvents.clear();
+          _presentCount = 0;
+          _absentCount = 0;
+        });
+      }
     } finally {
-      if (mounted) {
+      if (mounted && _selectedChild?.id == childId) {
         setState(() {
           _isLoading = false;
         });
@@ -87,11 +124,29 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   }
 
   void _onChildSelected(Student child) {
-    if (_selectedChild?.id == child.id) return;
-    setState(() {
-      _selectedChild = child;
+    final isDifferent = _selectedChild?.id != child.id;
+    if (isDifferent) {
+      setState(() {
+        _selectedChild = child;
+      });
+      _fetchAttendanceData();
+    }
+
+    _scrollToCalendarBottom();
+  }
+
+  void _scrollToCalendarBottom() {
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (!mounted || !_scrollController.hasClients) return;
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (_scrollController.offset < maxExtent) {
+        _scrollController.animateTo(
+          maxExtent,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+        );
+      }
     });
-    _fetchAttendanceData();
   }
 
   @override
@@ -107,6 +162,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
           ? Theme.of(context).scaffoldBackgroundColor
           : const Color(0xFFF8F9FD),
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           AppSliverHeader(
             title: context.t('attendanceHistory'),
@@ -172,6 +228,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
 
                   // Calendar View
                   Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -261,115 +318,130 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                                 child: SizedBox(
                                   // Force width to show 5 days
                                   width: constraints.maxWidth * (7 / 5),
-                                  child: _isLoading
-                                      ? const Center(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(32.0),
-                                            child: CircularProgressIndicator(),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      TableCalendar(
+                                        firstDay: DateTime.utc(2020, 1, 1),
+                                        lastDay: DateTime.utc(2030, 12, 31),
+                                        focusedDay: _focusedDay,
+                                        locale: locale.languageCode,
+                                        startingDayOfWeek:
+                                            StartingDayOfWeek.sunday,
+                                        weekendDays: const [
+                                          DateTime.friday,
+                                          DateTime.saturday,
+                                        ],
+                                        calendarFormat: CalendarFormat.month,
+                                        availableCalendarFormats: {
+                                          CalendarFormat.month: isArabic
+                                              ? 'شهر'
+                                              : 'Month',
+                                        },
+                                        headerVisible:
+                                            false, // Use custom header
+                                        daysOfWeekHeight: 40,
+                                        daysOfWeekStyle: DaysOfWeekStyle(
+                                          weekdayStyle: GoogleFonts.cairo(
+                                            color: const Color(0xFF64748B),
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                        )
-                                      : TableCalendar(
-                                          firstDay: DateTime.utc(2020, 1, 1),
-                                          lastDay: DateTime.utc(2030, 12, 31),
-                                          focusedDay: _focusedDay,
-                                          locale: locale.languageCode,
-                                          startingDayOfWeek:
-                                              StartingDayOfWeek.sunday,
-                                          weekendDays: const [
-                                            DateTime.friday,
-                                            DateTime.saturday,
-                                          ],
-                                          calendarFormat: CalendarFormat.month,
-                                          availableCalendarFormats: {
-                                            CalendarFormat.month: isArabic
-                                                ? 'شهر'
-                                                : 'Month',
-                                          },
-                                          headerVisible:
-                                              false, // Use custom header
-                                          daysOfWeekHeight: 40,
-                                          daysOfWeekStyle: DaysOfWeekStyle(
-                                            weekdayStyle: GoogleFonts.cairo(
-                                              color: const Color(0xFF64748B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            weekendStyle: GoogleFonts.cairo(
-                                              color: const Color(0xFFEF5350),
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                          weekendStyle: GoogleFonts.cairo(
+                                            color: const Color(0xFFEF5350),
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                          // Adjusted rowHeight to be standard and square-like
-                                          rowHeight: 54,
-                                          calendarBuilders: CalendarBuilders(
-                                            // We don't need to hide weekends manually anymore since they are clipped off-screen
-                                            defaultBuilder:
-                                                (context, day, focusedDay) {
-                                                  if (day.weekday ==
-                                                          DateTime.friday ||
-                                                      day.weekday ==
-                                                          DateTime.saturday) {
-                                                    return _buildDateCell(
-                                                      day,
-                                                      isDark: isDark,
-                                                    );
-                                                  }
-                                                  return _buildDateCell(
-                                                    day,
-                                                    isDark: isDark,
-                                                  );
-                                                },
-                                            todayBuilder:
-                                                (context, day, focusedDay) {
-                                                  return _buildDateCell(
-                                                    day,
-                                                    isDark: isDark,
-                                                    isToday: true,
-                                                  );
-                                                },
-                                            selectedBuilder:
-                                                (context, day, focusedDay) {
-                                                  return _buildDateCell(
-                                                    day,
-                                                    isDark: isDark,
-                                                    isSelected: true,
-                                                  );
-                                                },
-                                            prioritizedBuilder:
-                                                (context, day, focusedDay) {
-                                                  final normalizedDay =
-                                                      DateTime(
-                                                        day.year,
-                                                        day.month,
-                                                        day.day,
-                                                      );
-                                                  final event =
-                                                      _attendanceEvents[normalizedDay];
-                                                  if (event != null) {
-                                                    return _buildEventCell(
-                                                      day,
-                                                      event,
-                                                      isDark,
-                                                    );
-                                                  }
-                                                  return null;
-                                                },
-                                          ),
-                                          onDaySelected:
-                                              (selectedDay, focusedDay) {
-                                                setState(() {
-                                                  _selectedDay = selectedDay;
-                                                  _focusedDay = focusedDay;
-                                                });
-                                              },
-                                          onPageChanged: (focusedDay) {
-                                            setState(() {
-                                              _focusedDay = focusedDay;
-                                            });
-                                            _fetchAttendanceData();
-                                          },
-                                          selectedDayPredicate: (day) =>
-                                              isSameDay(_selectedDay, day),
                                         ),
+                                        // Adjusted rowHeight to be standard and fit all rows
+                                        rowHeight: 46,
+                                        calendarBuilders: CalendarBuilders(
+                                          // We don't need to hide weekends manually anymore since they are clipped off-screen
+                                          defaultBuilder:
+                                              (context, day, focusedDay) {
+                                                if (day.weekday ==
+                                                        DateTime.friday ||
+                                                    day.weekday ==
+                                                        DateTime.saturday) {
+                                                  return _buildDateCell(
+                                                    day,
+                                                    isDark: isDark,
+                                                  );
+                                                }
+                                                return _buildDateCell(
+                                                  day,
+                                                  isDark: isDark,
+                                                );
+                                              },
+                                          todayBuilder:
+                                              (context, day, focusedDay) {
+                                                return _buildDateCell(
+                                                  day,
+                                                  isDark: isDark,
+                                                  isToday: true,
+                                                );
+                                              },
+                                          selectedBuilder:
+                                              (context, day, focusedDay) {
+                                                return _buildDateCell(
+                                                  day,
+                                                  isDark: isDark,
+                                                  isSelected: true,
+                                                );
+                                              },
+                                          prioritizedBuilder:
+                                              (context, day, focusedDay) {
+                                                final normalizedDay =
+                                                    DateTime(
+                                                      day.year,
+                                                      day.month,
+                                                      day.day,
+                                                    );
+                                                final event =
+                                                    _attendanceEvents[normalizedDay];
+                                                if (event != null) {
+                                                  return _buildEventCell(
+                                                    day,
+                                                    event,
+                                                    isDark,
+                                                  );
+                                                }
+                                                return null;
+                                              },
+                                        ),
+                                        onDaySelected:
+                                            (selectedDay, focusedDay) {
+                                              setState(() {
+                                                _selectedDay = selectedDay;
+                                                _focusedDay = focusedDay;
+                                              });
+                                            },
+                                        onPageChanged: (focusedDay) {
+                                          setState(() {
+                                            _focusedDay = focusedDay;
+                                          });
+                                          _fetchAttendanceData();
+                                        },
+                                        selectedDayPredicate: (day) =>
+                                            isSameDay(_selectedDay, day),
+                                      ),
+                                      if (_isLoading)
+                                        Positioned.fill(
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: (isDark
+                                                      ? const Color(0xFF1E293B)
+                                                      : Colors.white)
+                                                  .withValues(alpha: 0.65),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: const Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
@@ -378,7 +450,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: 80),
                 ],
               ),
             ),

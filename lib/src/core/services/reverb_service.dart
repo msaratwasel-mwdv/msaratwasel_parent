@@ -34,6 +34,8 @@ class ReverbService {
   final Set<String> _subscribedChannels = {};
   final List<String> _pendingSubscriptions = [];
 
+  final WebSocketChannel Function(Uri uri)? _channelFactory;
+
   ReverbService({
     required String token,
     required int userId,
@@ -42,12 +44,14 @@ class ReverbService {
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
     void Function(Map<String, dynamic> data)? onNotificationReceived,
     void Function(Map<String, dynamic> data)? onMessageReceived,
+    WebSocketChannel Function(Uri uri)? channelFactory,
   }) : _userId = userId,
        _dio = dio,
        _onStudentStatusUpdated = onStudentStatusUpdated,
        _onBusLocationUpdated = onBusLocationUpdated,
        _onNotificationReceived = onNotificationReceived,
-       _onMessageReceived = onMessageReceived;
+       _onMessageReceived = onMessageReceived,
+       _channelFactory = channelFactory;
 
   /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
@@ -59,7 +63,9 @@ class ReverbService {
       final wsUrl = '$protocol://$_reverbHost:$_reverbPort/app/$_reverbKey';
       developer.log('🔌 Connecting to Reverb: $wsUrl', name: 'REVERB');
 
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _channel = _channelFactory != null
+          ? _channelFactory(Uri.parse(wsUrl))
+          : WebSocketChannel.connect(Uri.parse(wsUrl));
 
       _channel!.stream.listen(
         _handleMessage,
