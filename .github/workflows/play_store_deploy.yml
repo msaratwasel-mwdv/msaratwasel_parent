@@ -44,10 +44,13 @@ jobs:
         run: flutter pub get
 
       - name: Setup Signing Keystore
-        if: env.KEYSTORE_BASE64 != ''
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set or empty!"
+            exit 1
+          fi
           echo "$KEYSTORE_BASE64" | base64 --decode > android/msarat_parent_key.jks
           cat << 'EOF' > android/key.properties
           storePassword=aqs123#@A1223
