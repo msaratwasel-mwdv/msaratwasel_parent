@@ -9,11 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       target_track:
-        description: 'Choose deployment track (internal or production)'
+        description: 'Choose deployment track'
         required: true
-        default: 'internal'
+        default: 'alpha'
         type: choice
         options:
+          - alpha
           - internal
           - production
 
@@ -63,7 +64,7 @@ jobs:
           elif [ "${{ github.ref }}" = "refs/heads/production" ]; then
             echo "selected_track=production" >> $GITHUB_OUTPUT
           else
-            echo "selected_track=internal" >> $GITHUB_OUTPUT
+            echo "selected_track=alpha" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Android App Bundle (AAB)
