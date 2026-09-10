@@ -56,8 +56,18 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      developer.log('🔄 App resumed: synchronizing notification badge...', name: 'LIFECYCLE');
+      developer.log('🔄 App resumed: synchronizing notification badge & live tracking...', name: 'LIFECYCLE');
       _updateAppIconBadge();
+      if (_isAuthenticated) {
+        if (_reverbService == null && _token.isNotEmpty) {
+          _initReverb(_token);
+        } else if (_reverbService != null && !_reverbService!.isConnected) {
+          _reverbService!.reconnect();
+        }
+        if (activeTripGroups.isNotEmpty && !_isTrackingPollStopped) {
+          _scheduleTrackingPoll(immediate: true);
+        }
+      }
     }
   }
 
@@ -193,14 +203,21 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final hasConnection = resultsList.any((result) => result != ConnectivityResult.none);
 
       if (hasConnection) {
-        developer.log('📶 Internet connection restored. Reloading data...', name: 'CONNECTIVITY');
+        developer.log('📶 Internet connection restored. Reconnecting Reverb & syncing data...', name: 'CONNECTIVITY');
         if (_isAuthenticated) {
+          if (_reverbService != null) {
+            _reverbService!.reconnect();
+          } else if (_token.isNotEmpty) {
+            _initReverb(_token);
+          }
           loadChildrenFromApi();
           loadNotificationsFromApi();
           loadConversationsFromApi();
           loadAbsenceRequestsFromApi();
           loadLocationRequestsFromApi();
-          startTrackingPoll();
+          if (!_isTrackingPollStopped) {
+            startTrackingPoll();
+          }
         }
       }
     });
@@ -589,6 +606,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool _isTrackingPolling = false;
   bool _isTrackingInitialFetchDone = false;
   bool _isTrackingPollStopped = false;
+  DateTime? _lastLocationReceivedTime;
 
   bool get isTrackingDataReady => _isTrackingInitialFetchDone;
 
@@ -603,10 +621,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (_isTrackingPollStopped) return;
     _trackingTimer?.cancel();
     
-    // If there are active trips, poll every 10 seconds. Otherwise, if the app is waiting for a trip to start, poll every 30 seconds to save battery and server resources!
+    // Watchdog check interval: 15s during active trips to monitor WebSocket health, 30s when idle
     final interval = immediate 
         ? 0 
-        : (activeTripGroups.isNotEmpty ? 10 : 30);
+        : (activeTripGroups.isNotEmpty ? 15 : 30);
         
     _trackingTimer = Timer(
       Duration(seconds: interval),
@@ -634,40 +652,50 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _isTrackingPolling = true;
 
     try {
-      // 🚀 إيقاف الجلب المتكرر (Polling) فقط إذا كان اتصال الـ WebSocket (Reverb) نشطاً والقنوات مسجلة بنجاح
-      bool isReverbActive = false;
-      if (_reverbService != null && _reverbService!.isConnected) {
-        final activeBuses = _students
-            .map((s) => s.bus.id)
-            .where((id) => id.isNotEmpty && id != '-')
-            .toSet();
+      // 🚀 Reverb / WebSocket is the PRIMARY tracking channel.
+      // Polling is ONLY a fallback when WebSocket is disconnected or silent > 30s during active trips.
+      final bool isWsConnected = _reverbService != null && _reverbService!.isConnected;
+      final bool hasRecentLocation = _lastLocationReceivedTime != null &&
+          DateTime.now().difference(_lastLocationReceivedTime!).inSeconds < 30;
 
-        if (activeBuses.isNotEmpty) {
-          bool allSubscribed = true;
-          for (final busId in activeBuses) {
-            if (!_reverbService!.isChannelSubscribed('private-bus.$busId')) {
-              allSubscribed = false;
-              break;
-            }
+      final activeBuses = _students
+          .map((s) => s.bus.id)
+          .where((id) => id.isNotEmpty && id != '-')
+          .toSet();
+
+      bool allBusesSubscribed = isWsConnected && activeBuses.isNotEmpty;
+      if (allBusesSubscribed) {
+        for (final busId in activeBuses) {
+          if (!_reverbService!.isChannelSubscribed('private-bus.$busId')) {
+            allBusesSubscribed = false;
+            _reverbService!.subscribe('private-bus.$busId');
           }
-          isReverbActive = allSubscribed;
         }
       }
 
-      if (isReverbActive) {
-        AppLogger.d('ℹ️ WebSocket is active. Skipping HTTP Polling.');
+      final bool isReverbHealthy = isWsConnected && allBusesSubscribed && hasRecentLocation;
+
+      if (isReverbHealthy) {
+        AppLogger.d('ℹ️ Reverb WebSocket is healthy with live updates. Skipping HTTP Polling.');
         _pollCycleCount++;
-        if (_pollCycleCount % 6 == 0) {
+        if (_pollCycleCount % 4 == 0) {
           await _refreshStudentStatuses();
         }
         return;
       }
 
+      // If WebSocket disconnected or silent > 30s during active trips:
+      if (!isWsConnected && _isAuthenticated && !_isTrackingPollStopped) {
+        developer.log('🔄 Reverb disconnected during tracking. Triggering reconnect...', name: 'REVERB');
+        _reverbService?.reconnect();
+      }
+
+      developer.log('⚠️ Reverb silent or inactive. Falling back to HTTP tracking fetch.', name: 'TRACKING_FALLBACK');
       await _fetchTrackingFromApi();
       _pollCycleCount++;
 
       // Polling as fallback only (every 60s) — primary updates via WebSocket
-      if (_pollCycleCount % 6 == 0) {
+      if (_pollCycleCount % 4 == 0) {
         await _refreshStudentStatuses();
       }
     } catch (e) {
@@ -1015,6 +1043,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       onBusLocationUpdated: _handleRealtimeLocationUpdate,
       onNotificationReceived: _handleRealtimeNotification,
       onMessageReceived: _handleIncomingMessage,
+      onConnectionStateChanged: _handleReverbConnectionStateChanged,
     );
     _reverbService!.connect();
 
@@ -1032,8 +1061,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
+  void _handleReverbConnectionStateChanged(bool isConnected) {
+    developer.log('⚡ Reverb connection state changed: isConnected=$isConnected', name: 'REVERB');
+    if (!isConnected) {
+      // If WebSocket drops during active trips, trigger fallback poll cycle immediately
+      if (activeTripGroups.isNotEmpty && !_isTrackingPollStopped) {
+        _scheduleTrackingPoll(immediate: true);
+      }
+    } else {
+      // Reconnected: re-subscribe all current bus channels immediately
+      for (var student in _students) {
+        if (student.bus.id.isNotEmpty && student.bus.id != '-') {
+          _reverbService?.subscribe('private-bus.${student.bus.id}');
+        }
+      }
+    }
+    notifyListeners();
+  }
+
   /// معالجة تحديث الموقع الفوري للحافلة
   void _handleRealtimeLocationUpdate(Map<String, dynamic> data) {
+    _lastLocationReceivedTime = DateTime.now();
     final busId = data['bus_id']?.toString();
     if (busId == null) return;
 
@@ -1719,17 +1767,29 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         String? channelName;
 
         if (isChatMessage) {
-          channelId = 'chat_messages_v3';
+          channelId = 'chat_messages_v4';
           channelName = 'رسائل المحادثات';
         } else if (notification.type == NotificationType.adminAnnouncement ||
             notification.type == NotificationType.schoolAlert) {
-          channelId = 'school_announcements';
+          channelId = 'school_announcements_v2';
           channelName = 'إعلانات المدرسة';
         } else if (notification.type == NotificationType.checkIn ||
             notification.type == NotificationType.checkOut ||
-            notification.type == NotificationType.arrival) {
-          channelId = 'student_status';
+            notification.type == NotificationType.arrival ||
+            notification.type == NotificationType.approach ||
+            notification.type == NotificationType.absence ||
+            notification.type == NotificationType.absenceApproved ||
+            notification.type == NotificationType.absenceRejected ||
+            notification.type == NotificationType.lateBoarding ||
+            notification.type == NotificationType.schoolAttendance ||
+            notification.type == NotificationType.locationRequest ||
+            notification.type == NotificationType.locationApproved ||
+            notification.type == NotificationType.locationRejected) {
+          channelId = 'student_status_v2';
           channelName = 'حالة الطلاب';
+        } else {
+          channelId = 'msarat_wasel_high_importance_v5';
+          channelName = 'إشعارات مسارات واصل الهامة';
         }
 
         String displayTitle = notification.getDisplayTitle(isEn);

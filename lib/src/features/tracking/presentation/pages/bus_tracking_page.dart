@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -24,7 +25,7 @@ class BusTrackingPage extends StatefulWidget {
   State<BusTrackingPage> createState() => _BusTrackingPageState();
 }
 
-class _BusTrackingPageState extends State<BusTrackingPage> {
+class _BusTrackingPageState extends State<BusTrackingPage> with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   bool _isPanelExpanded = true;
   MapType _currentMapType = MapType.normal;
@@ -51,10 +52,73 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
   String? _lastSelectedBusId;
   bool? _wasActive;
 
+  // Smooth bus animation state
+  AnimationController? _busAnimController;
+  LatLng? _animStartPos;
+  LatLng? _animTargetPos;
+  LatLng? _animatedBusPosition;
+  double _busBearing = 0.0;
+
   @override
   void initState() {
     super.initState();
     _loadCustomMarkers();
+    _busAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..addListener(() {
+        if (_animStartPos != null && _animTargetPos != null) {
+          final double t = CurvedAnimation(
+            parent: _busAnimController!,
+            curve: Curves.easeOutCubic,
+          ).value;
+
+          final double lat = ui.lerpDouble(
+                  _animStartPos!.latitude, _animTargetPos!.latitude, t) ??
+              _animTargetPos!.latitude;
+          final double lng = ui.lerpDouble(
+                  _animStartPos!.longitude, _animTargetPos!.longitude, t) ??
+              _animTargetPos!.longitude;
+
+          if (mounted) {
+            setState(() {
+              _animatedBusPosition = LatLng(lat, lng);
+            });
+          }
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _busAnimController?.dispose();
+    super.dispose();
+  }
+
+  double _calculateDistanceInMeters(LatLng p1, LatLng p2) {
+    const double p = 0.017453292519943295; // Math.PI / 180
+    final double a = 0.5 -
+        math.cos((p2.latitude - p1.latitude) * p) / 2 +
+        math.cos(p1.latitude * p) *
+            math.cos(p2.latitude * p) *
+            (1 - math.cos((p2.longitude - p1.longitude) * p)) /
+            2;
+    return 12742000 * math.asin(math.sqrt(a));
+  }
+
+  double _calculateBearing(LatLng start, LatLng end) {
+    final double startLat = start.latitude * (math.pi / 180.0);
+    final double startLng = start.longitude * (math.pi / 180.0);
+    final double endLat = end.latitude * (math.pi / 180.0);
+    final double endLng = end.longitude * (math.pi / 180.0);
+
+    final double dLng = endLng - startLng;
+    final double y = math.sin(dLng) * math.cos(endLat);
+    final double x = math.cos(startLat) * math.sin(endLat) -
+        math.sin(startLat) * math.cos(endLat) * math.cos(dLng);
+
+    final double bearing = math.atan2(y, x) * (180.0 / math.pi);
+    return (bearing + 360.0) % 360.0;
   }
 
   @override
@@ -100,6 +164,10 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       _lastFetchTarget = null;
       _lastBusPosition = null;
       _lastActiveTargetStudentId = null;
+      _animatedBusPosition = null;
+      _animStartPos = null;
+      _animTargetPos = null;
+      _busAnimController?.stop();
     }
 
     // Detect student list changes and update markers
@@ -143,11 +211,32 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
       final newPos = LatLng(tracking.latitude, tracking.longitude);
       if (_lastBusPosition != newPos) {
+        if (_lastBusPosition != null) {
+          final dist = _calculateDistanceInMeters(_lastBusPosition!, newPos);
+          if (dist > 1.0) {
+            if (tracking.heading != null && tracking.heading! > 0) {
+              _busBearing = tracking.heading!.toDouble();
+            } else {
+              _busBearing = _calculateBearing(_lastBusPosition!, newPos);
+            }
+            _animStartPos = _animatedBusPosition ?? _lastBusPosition;
+            _animTargetPos = newPos;
+            _busAnimController?.forward(from: 0.0);
+          }
+        } else {
+          _animatedBusPosition = newPos;
+          _animStartPos = newPos;
+          _animTargetPos = newPos;
+          if (tracking.heading != null && tracking.heading! > 0) {
+            _busBearing = tracking.heading!.toDouble();
+          }
+        }
         _lastBusPosition = newPos;
+
         if (_followBus && _mapController != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _centerOnBus(tracking);
-          });
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLng(newPos),
+          );
         }
       }
     }
@@ -281,7 +370,8 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
 
     if (_isFetchingRoute) return;
 
-    final cacheKey = "${target.latitude},${target.longitude}";
+    final LatLng finalTarget = target;
+    final cacheKey = "${group.busId}_${finalTarget.latitude.toStringAsFixed(5)},${finalTarget.longitude.toStringAsFixed(5)}";
 
     // Fast transition: If we have a cached route to this destination, show it immediately 
     if (_activeRoutePoints.isEmpty && _cachedRoutesToTarget.containsKey(cacheKey)) {
@@ -292,11 +382,39 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
       }
     }
 
-    // Throttle: Don't fetch more than once every 15 seconds unless target changed
     final now = DateTime.now();
-    if (_lastRouteFetchTime != null &&
-        now.difference(_lastRouteFetchTime!).inSeconds < 15 &&
-        _lastFetchTarget == target) {
+    final bool targetChanged = _lastFetchTarget == null ||
+        _lastFetchTarget!.latitude != finalTarget.latitude ||
+        _lastFetchTarget!.longitude != finalTarget.longitude;
+
+    // Architectural Google API Cost Protection:
+    // If the target has not changed and the road polyline is already rendered, NEVER hit Google Directions API.
+    // Calculate local ETA/remaining time dynamically based on real distance to target.
+    if (!targetChanged && _activeRoutePoints.isNotEmpty) {
+      final distToTargetKm = _calculateDistanceInMeters(busPos, finalTarget) / 1000.0;
+      final estimatedMin = (distToTargetKm / 25.0 * 60).ceil().clamp(1, 120);
+      if (_remainingTime == null || now.difference(_lastRouteFetchTime ?? now).inSeconds >= 15) {
+        if (mounted) {
+          setState(() {
+            _remainingTime = '$estimatedMin ${context.t('minutesSuffix')}';
+          });
+        }
+      }
+      return;
+    }
+
+    // If target changed or points empty, but route is already in cache:
+    if (_cachedRoutesToTarget.containsKey(cacheKey)) {
+      if (mounted) {
+        setState(() {
+          _activeRoutePoints = _cachedRoutesToTarget[cacheKey]!;
+          _lastFetchTarget = finalTarget;
+          _lastRouteFetchTime = now;
+          final distToTargetKm = _calculateDistanceInMeters(busPos, finalTarget) / 1000.0;
+          final estimatedMin = (distToTargetKm / 25.0 * 60).ceil().clamp(1, 120);
+          _remainingTime = '$estimatedMin ${context.t('minutesSuffix')}';
+        });
+      }
       return;
     }
 
@@ -629,16 +747,20 @@ class _BusTrackingPageState extends State<BusTrackingPage> {
     final Set<Marker> markers = {};
     final Set<Polyline> polylines = {};
 
-    if (tracking != null) {
+    final busDisplayPos = _animatedBusPosition ??
+        (tracking != null ? LatLng(tracking.latitude, tracking.longitude) : null);
+
+    if (tracking != null && busDisplayPos != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('bus'),
-          position: LatLng(tracking.latitude, tracking.longitude),
+          position: busDisplayPos,
           icon:
               _busIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           anchor: const Offset(0.5, 0.5), // Center of the circular dot
-          rotation: 0,
+          rotation: _busBearing,
+          flat: true,
         ),
       );
 

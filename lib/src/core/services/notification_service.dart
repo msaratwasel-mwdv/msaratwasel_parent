@@ -129,17 +129,20 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   final String displayBody = isEnglish ? bodyEn : bodyAr;
 
   if (displayTitle.isNotEmpty || displayBody.isNotEmpty) {
-    String channelId = 'msarat_wasel_high_importance_v4';
+    String channelId = 'msarat_wasel_high_importance_v5';
     String channelName = 'إشعارات مسارات واصل الهامة';
     
     final type = data['type']?.toString();
     bool isChat = (type == 'chat_message' || type == 'chat' || type == 'new_message' || type == 'supervisor_message');
     if (isChat) {
-      channelId = 'chat_messages_v3';
+      channelId = 'chat_messages_v4';
       channelName = 'رسائل المحادثات';
-    } else if (type == 'admin_announcement') {
-      channelId = 'school_announcements';
+    } else if (type == 'admin_announcement' || type == 'school_alert') {
+      channelId = 'school_announcements_v2';
       channelName = 'إعلانات المدرسة';
+    } else if (type != null && (type.contains('student') || type.contains('boarding') || type.contains('alight') || type.contains('bus_') || type.contains('check_') || type.contains('absence') || type.contains('approach') || type.contains('attendance') || type.contains('location'))) {
+      channelId = 'student_status_v2';
+      channelName = 'حالة الطلاب';
     }
 
     await localNotifications.show(
@@ -150,6 +153,7 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
         android: AndroidNotificationDetails(
           channelId,
           channelName,
+          channelDescription: 'إشعارات مسارات واصل الفورية غير الصامتة',
           importance: Importance.max,
           priority: Priority.high,
           ticker: 'ticker',
@@ -161,6 +165,7 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          sound: 'default',
         ),
       ),
       payload: jsonEncode(message.data),
@@ -191,10 +196,10 @@ class NotificationService {
 
   static OnNotificationReceived? get onReceived => _onReceived;
 
-  // Notification Channel Constants
-  static const String _channelId = 'msarat_wasel_high_importance_v4';
+  // Notification Channel Constants (Bumped to v5/v4/v2 to purge any persisted silent channels in Android OS)
+  static const String _channelId = 'msarat_wasel_high_importance_v5';
   static const String _channelName = 'إشعارات مسارات واصل الهامة';
-  static const String _channelDesc = 'هذه القناة مخصصة لإشعارات الحافلات والرسائل الهامة';
+  static const String _channelDesc = 'هذه القناة مخصصة لإشعارات الحافلات والرسائل الهامة مع الصوت والاهتزاز';
 
   /// Initialise FCM. Call once from [main] after Firebase.initializeApp().
   ///
@@ -248,7 +253,7 @@ class NotificationService {
     // intelligent deduplication and suppression (e.g. when already on chat screen).
     await FirebaseMessaging.instance
         .setForegroundNotificationPresentationOptions(
-          alert: false, // 🚫 No OS banner in foreground
+          alert: false, // 🚫 No OS banner in foreground (handled via showLocalNotification)
           badge: true,
           sound: true,
         );
@@ -274,9 +279,9 @@ class NotificationService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
-      defaultPresentAlert: false,
-      defaultPresentSound: false,
-      defaultPresentBadge: false,
+      defaultPresentAlert: true,
+      defaultPresentSound: true,
+      defaultPresentBadge: true,
     );
     const initSettings = InitializationSettings(
       android: androidInit,
@@ -294,7 +299,7 @@ class NotificationService {
         >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
-    // ── 3. Setup Android Notification Channel ──────────────────────────────
+    // ── 3. Setup Android Notification Channels ─────────────────────────────
     const androidChannel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -305,7 +310,7 @@ class NotificationService {
       showBadge: true,
     );
     const chatChannel = AndroidNotificationChannel(
-      'chat_messages_v3',
+      'chat_messages_v4',
       'رسائل المحادثات',
       description: 'إشعارات الرسائل الجديدة في المحادثات',
       importance: Importance.max,
@@ -314,7 +319,7 @@ class NotificationService {
       showBadge: true,
     );
     const schoolChannel = AndroidNotificationChannel(
-      'school_announcements',
+      'school_announcements_v2',
       'إعلانات المدرسة',
       description: 'إشعارات وتنبيهات هامة من إدارة المدرسة',
       importance: Importance.max,
@@ -323,9 +328,9 @@ class NotificationService {
       showBadge: true,
     );
     const statusChannel = AndroidNotificationChannel(
-      'student_status',
+      'student_status_v2',
       'حالة الطلاب',
-      description: 'إشعارات ركوب ونزول الطلاب',
+      description: 'إشعارات ركوب ونزول واقتراب وغياب الطلاب',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
@@ -334,6 +339,7 @@ class NotificationService {
     
     final plugin = _localNotif.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (plugin != null) {
+      // Register the new versioned non-silent channels (Importance.max, default sound, vibration)
       await plugin.createNotificationChannel(androidChannel);
       await plugin.createNotificationChannel(chatChannel);
       await plugin.createNotificationChannel(schoolChannel);

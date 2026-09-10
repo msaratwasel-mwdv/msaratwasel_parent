@@ -23,6 +23,7 @@ class ReverbService {
   final void Function(Map<String, dynamic> data)? _onBusLocationUpdated;
   final void Function(Map<String, dynamic> data)? _onNotificationReceived;
   final void Function(Map<String, dynamic> data)? _onMessageReceived;
+  final void Function(bool isConnected)? onConnectionStateChanged;
 
   // إعدادات Reverb المستمدة من AppConfig
   static const String _reverbKey = AppConfig.reverbKey;
@@ -32,6 +33,7 @@ class ReverbService {
 
   // قائمة القنوات المشترك بها حالياً
   final Set<String> _subscribedChannels = {};
+  final Set<String> _subscribingChannels = {};
   final List<String> _pendingSubscriptions = [];
 
   final WebSocketChannel Function(Uri uri)? _channelFactory;
@@ -44,6 +46,7 @@ class ReverbService {
     void Function(Map<String, dynamic> data)? onBusLocationUpdated,
     void Function(Map<String, dynamic> data)? onNotificationReceived,
     void Function(Map<String, dynamic> data)? onMessageReceived,
+    this.onConnectionStateChanged,
     WebSocketChannel Function(Uri uri)? channelFactory,
   }) : _userId = userId,
        _dio = dio,
@@ -56,7 +59,19 @@ class ReverbService {
   /// الاتصال بـ Reverb والاشتراك في القنوات المطلوبة
   Future<void> connect() async {
     if (_isDisposed) return;
+    if (_isConnected && _channel != null) {
+      developer.log('🔌 Reverb already connected, skipping duplicate connect', name: 'REVERB');
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+
     _subscribedChannels.clear();
+    _subscribingChannels.clear();
 
     try {
       final protocol = _isSecure ? 'wss' : 'ws';
@@ -89,6 +104,7 @@ class ReverbService {
       });
     } catch (e, stack) {
       developer.log('❌ Failed to connect to Reverb: $e', name: 'REVERB', stackTrace: stack);
+      _handleDisconnect();
       _scheduleReconnect();
     }
   }
@@ -106,6 +122,7 @@ class ReverbService {
           final socketId = data['socket_id'] as String;
           _lastSocketId = socketId;
           developer.log('✅ Connected! Socket ID: $socketId', name: 'REVERB');
+          onConnectionStateChanged?.call(true);
 
           // 1. الاشتراك في القنوات الخاصة بولي الأمر تلقائياً
           subscribe('private-guardian.$_userId', socketId);
@@ -166,6 +183,7 @@ class ReverbService {
         case 'pusher_internal:subscription_succeeded':
           final channel = message['channel'] as String?;
           if (channel != null) {
+            _subscribingChannels.remove(channel);
             _subscribedChannels.add(channel);
           }
           developer.log('✅ Subscription succeeded for: ${message["channel"]}', name: 'REVERB');
@@ -195,7 +213,7 @@ class ReverbService {
 
   /// تنفيذ الاشتراك في قناة معينة (خاص أو عام)
   Future<void> subscribe(String channelName, [String? socketId]) async {
-    if (_subscribedChannels.contains(channelName)) return;
+    if (_subscribedChannels.contains(channelName) || _subscribingChannels.contains(channelName)) return;
 
     if (!_isConnected || _channel == null) {
       if (!_pendingSubscriptions.contains(channelName)) {
@@ -206,11 +224,13 @@ class ReverbService {
     }
 
     final effectiveSocketId = socketId ?? _lastSocketId;
+    _subscribingChannels.add(channelName);
 
     try {
       // إذا كانت قناة خاصة، نحتاج لمصادقة
       if (channelName.startsWith('private-')) {
         if (effectiveSocketId == null) {
+          _subscribingChannels.remove(channelName);
           developer.log(
             '⚠️ Cannot subscribe to private channel $channelName without socketId',
             name: 'REVERB',
@@ -233,12 +253,15 @@ class ReverbService {
       }
       developer.log('📡 Subscribed to: $channelName', name: 'REVERB');
     } catch (e, stack) {
+      _subscribingChannels.remove(channelName);
       developer.log('❌ Subscription failed for $channelName: $e', name: 'REVERB', stackTrace: stack);
     }
   }
 
   /// إلغاء الاشتراك من قناة معينة
   void unsubscribe(String channelName) {
+    _pendingSubscriptions.remove(channelName);
+    _subscribingChannels.remove(channelName);
     if (!_subscribedChannels.contains(channelName)) return;
     try {
       _send({
@@ -305,13 +328,27 @@ class ReverbService {
   /// Whether the WebSocket is currently connected
   bool get isConnected => _isConnected;
 
+  /// Forces a complete fresh reconnection, e.g. on network switch or app resume
+  Future<void> reconnect() async {
+    if (_isDisposed) return;
+    developer.log('🔄 Reconnect requested for Reverb...', name: 'REVERB');
+    _handleDisconnect();
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+    await connect();
+  }
+
   /// Check if a specific channel is successfully subscribed and connected
   bool isChannelSubscribed(String channelName) {
     return _isConnected && _subscribedChannels.contains(channelName);
   }
 
   void _handleDisconnect() {
+    final bool wasConnected = _isConnected;
     _isConnected = false;
+    _subscribingChannels.clear();
     for (final channel in _subscribedChannels) {
       if (channel != 'private-guardian.$_userId' &&
           channel != 'private-App.Models.User.$_userId') {
@@ -321,5 +358,8 @@ class ReverbService {
       }
     }
     _subscribedChannels.clear();
+    if (wasConnected) {
+      onConnectionStateChanged?.call(false);
+    }
   }
 }
