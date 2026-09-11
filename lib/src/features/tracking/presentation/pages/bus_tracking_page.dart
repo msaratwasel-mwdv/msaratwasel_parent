@@ -435,9 +435,18 @@ class _BusTrackingPageState extends State<BusTrackingPage> with TickerProviderSt
       if (response.statusCode == 200 && response.data['status'] == 'OK') {
         final route = response.data['routes'][0];
         final leg = route['legs'][0];
-        final points = PolylinePoints.decodePolyline(
-          route['overview_polyline']['points'],
-        );
+
+        List<PointLatLng> points = [];
+        if (leg['steps'] != null && leg['steps'] is List) {
+          for (final step in leg['steps']) {
+            if (step['polyline'] != null && step['polyline']['points'] != null) {
+              points.addAll(PolylinePoints.decodePolyline(step['polyline']['points']));
+            }
+          }
+        }
+        if (points.isEmpty && route['overview_polyline'] != null && route['overview_polyline']['points'] != null) {
+          points = PolylinePoints.decodePolyline(route['overview_polyline']['points']);
+        }
 
         if (mounted) {
           setState(() {
@@ -608,17 +617,36 @@ class _BusTrackingPageState extends State<BusTrackingPage> with TickerProviderSt
   String _getNextStopName(BuildContext context, BusTrackingGroup group) {
     final tracking = group.tracking;
     final isArabic = AppScope.of(context).locale.languageCode == 'ar';
-    if (tracking == null) return isArabic ? 'المدرسة' : 'School';
+    final firstStudent = group.students.isNotEmpty ? group.students.first : null;
+    final realSchoolName = (firstStudent?.schoolName != null && firstStudent!.schoolName!.trim().isNotEmpty)
+        ? firstStudent.schoolName!.trim()
+        : (isArabic ? 'المدرسة' : 'School');
+
+    if (tracking == null) return realSchoolName;
 
     if (tracking.targetLatitude != null && tracking.targetLongitude != null) {
       final targetLatLng = LatLng(tracking.targetLatitude!, tracking.targetLongitude!);
+
+      // 1. Check if the target is the school
+      if (_isSchoolActiveTarget(firstStudent, targetLatLng)) {
+        return realSchoolName;
+      }
+
+      // 2. Check if the target is one of the parent's children
       for (final s in group.students) {
         if (_isStudentActiveTarget(s, targetLatLng, tripType: group.tripType)) {
           return s.getLocalizedName(AppScope.of(context).locale.languageCode);
         }
       }
+
+      // 3. Target is another student stop (privacy-aware label)
+      return isArabic ? 'محطة قادمة' : 'Upcoming Stop';
     }
-    return isArabic ? 'المدرسة' : 'School';
+
+    if (group.tripType == 'forth') {
+      return isArabic ? 'في الطريق' : 'On the route';
+    }
+    return realSchoolName;
   }
 
   @override
@@ -746,6 +774,7 @@ class _BusTrackingPageState extends State<BusTrackingPage> with TickerProviderSt
     }
     final Set<Marker> markers = {};
     final Set<Polyline> polylines = {};
+    final isArabic = AppScope.of(context).locale.languageCode == 'ar';
 
     final busDisplayPos = _animatedBusPosition ??
         (tracking != null ? LatLng(tracking.latitude, tracking.longitude) : null);
@@ -861,7 +890,14 @@ class _BusTrackingPageState extends State<BusTrackingPage> with TickerProviderSt
             icon: BitmapDescriptor.defaultMarkerWithHue(
               BitmapDescriptor.hueRed,
             ),
-            infoWindow: InfoWindow(title: firstStudent.schoolName ?? 'School'),
+            infoWindow: InfoWindow(
+              title: (firstStudent.schoolName != null && firstStudent.schoolName!.trim().isNotEmpty)
+                  ? firstStudent.schoolName!.trim()
+                  : (isArabic ? 'المدرسة' : 'School'),
+              snippet: (target != null && _isSchoolActiveTarget(firstStudent, target))
+                  ? (isArabic ? '🎯 الوجهة الحالية للحافلة' : '🎯 Current Destination')
+                  : (isArabic ? 'المدرسة' : 'School'),
+            ),
           ),
         );
       }
@@ -2229,15 +2265,21 @@ bool _isStudentActiveTarget(Student student, LatLng? target, {String? tripType})
     }
   }
 
+  return false;
+}
+
+bool _isSchoolActiveTarget(Student? student, LatLng? target) {
+  if (student == null || target == null) return false;
+
   final school = student.schoolCoords;
   if (school != null) {
     final latDiff = (school.latitude - target.latitude).abs();
     final lngDiff = (school.longitude - target.longitude).abs();
-    if (latDiff < 0.00015 && lngDiff < 0.00015) {
+    if (latDiff < 0.0003 && lngDiff < 0.0003) {
       return true;
     }
   }
-  
+
   final schoolStr = student.schoolLocation;
   if (schoolStr != null && schoolStr.isNotEmpty) {
     try {
@@ -2248,14 +2290,14 @@ bool _isStudentActiveTarget(Student student, LatLng? target, {String? tripType})
         if (lat != null && lng != null) {
           final latDiff = (lat - target.latitude).abs();
           final lngDiff = (lng - target.longitude).abs();
-          if (latDiff < 0.00015 && lngDiff < 0.00015) {
+          if (latDiff < 0.0003 && lngDiff < 0.0003) {
             return true;
           }
         }
       }
     } catch (_) {}
   }
-  
+
   return false;
 }
 
