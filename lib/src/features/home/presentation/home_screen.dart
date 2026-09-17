@@ -103,19 +103,34 @@ class _HomeScreenState extends State<HomeScreen> {
                           controller.students.where((s) => !s.hasLocation).toList();
 
                       String? lastMessage;
+                      final navigator = Navigator.of(context, rootNavigator: true);
 
-                      if (missingLocStudents.isEmpty) {
-                        lastMessage = await controller.updateHomeLocationApi(
-                          location,
-                          address: address,
-                        );
-                      } else {
-                        for (final student in missingLocStudents) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+
+                      try {
+                        if (missingLocStudents.isEmpty) {
                           lastMessage = await controller.updateHomeLocationApi(
                             location,
-                            studentId: student.id,
                             address: address,
                           );
+                        } else {
+                          for (final student in missingLocStudents) {
+                            lastMessage = await controller.updateHomeLocationApi(
+                              location,
+                              studentId: student.id,
+                              address: address,
+                            );
+                          }
+                        }
+                      } finally {
+                        if (navigator.canPop()) {
+                          navigator.pop();
                         }
                       }
 

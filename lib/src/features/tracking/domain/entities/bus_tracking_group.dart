@@ -15,6 +15,10 @@ class BusTrackingGroup {
   final int? totalStudentsCount;
   final BusStaffInfo? driver;
   final BusStaffInfo? supervisor;
+  final int? childSequence;
+  final int? totalStops;
+  final int? stopsRemaining;
+  final String? childStatus;
 
   BusTrackingGroup({
     required this.busId,
@@ -29,6 +33,10 @@ class BusTrackingGroup {
     this.supervisor,
     this.tripType,
     this.startTime,
+    this.childSequence,
+    this.totalStops,
+    this.stopsRemaining,
+    this.childStatus,
   });
 
   BusTrackingGroup copyWith({
@@ -44,6 +52,10 @@ class BusTrackingGroup {
     int? totalStudentsCount,
     BusStaffInfo? driver,
     BusStaffInfo? supervisor,
+    int? childSequence,
+    int? totalStops,
+    int? stopsRemaining,
+    String? childStatus,
   }) {
     return BusTrackingGroup(
       busId: busId ?? this.busId,
@@ -58,6 +70,10 @@ class BusTrackingGroup {
       supervisor: supervisor ?? this.supervisor,
       tripType: tripType ?? this.tripType,
       startTime: startTime ?? this.startTime,
+      childSequence: childSequence ?? this.childSequence,
+      totalStops: totalStops ?? this.totalStops,
+      stopsRemaining: stopsRemaining ?? this.stopsRemaining,
+      childStatus: childStatus ?? this.childStatus,
     );
   }
 

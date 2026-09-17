@@ -1277,6 +1277,7 @@ class _DataDrivenPanel extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Column(
                   children: [
+                    _buildStopSequenceBanner(context),
                     _buildMetricsRow(context),
                     if (isExpanded) ...[
                       const SizedBox(height: 16),
@@ -1454,6 +1455,73 @@ class _DataDrivenPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStopSequenceBanner(BuildContext context) {
+    if (group?.childSequence == null) return const SizedBox.shrink();
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final childSeq = group!.childSequence!;
+    final totalStops = group!.totalStops ?? childSeq;
+    final stopsRem = group!.stopsRemaining ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.pin_drop_rounded,
+              color: Color(0xFF2563EB),
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isArabic
+                  ? 'ترتيب محطة ابنك: $childSeq من $totalStops'
+                  : 'Child Stop: #$childSeq of $totalStops',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12.5,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: stopsRem == 0
+                  ? Colors.green.withValues(alpha: 0.15)
+                  : Colors.orange.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              stopsRem == 0
+                  ? (isArabic ? 'المحطة الحالية!' : 'Current Stop!')
+                  : (isArabic ? 'متبقي $stopsRem محطات' : '$stopsRem stops left'),
+              style: TextStyle(
+                color: stopsRem == 0 ? Colors.green[800] : Colors.orange[900],
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

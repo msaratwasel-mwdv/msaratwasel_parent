@@ -704,15 +704,6 @@ class MissingLocationView extends StatelessWidget {
                       ),
                       ElevatedButton(
                         onPressed: () async {
-                          // Show loading
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -721,8 +712,6 @@ class MissingLocationView extends StatelessWidget {
                               ),
                             ),
                           );
-
-                          if (context.mounted) Navigator.pop(context); // close loading
 
                           if (result != null && context.mounted) {
                             LatLng? location;
@@ -737,7 +726,9 @@ class MissingLocationView extends StatelessWidget {
                               note = result['note'] as String?;
                             }
 
-                            if (location != null) {
+                            if (location != null && context.mounted) {
+                              final navigator = Navigator.of(context, rootNavigator: true);
+
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
@@ -746,14 +737,18 @@ class MissingLocationView extends StatelessWidget {
                                 ),
                               );
 
-                              await controller.updateHomeLocationApi(
-                                location,
-                                studentId: student.id,
-                                address: label,
-                                note: note,
-                              );
-
-                              if (context.mounted) Navigator.pop(context);
+                              try {
+                                await controller.updateHomeLocationApi(
+                                  location,
+                                  studentId: student.id,
+                                  address: label,
+                                  note: note,
+                                );
+                              } finally {
+                                if (navigator.canPop()) {
+                                  navigator.pop();
+                                }
+                              }
                             }
                           }
                         },

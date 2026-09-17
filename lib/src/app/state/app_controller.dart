@@ -796,6 +796,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
                 }
               }
             }
+
+            // Fetch authoritative sequence and stops remaining for children on this bus
+            final busChildren = _students.where((s) => s.bus.id == busId).toList();
+            for (final child in busChildren) {
+              fetchChildTripStatus(child.id);
+            }
           }
         } catch (e) {
           AppLogger.d(
@@ -1107,13 +1113,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     final idx = _students.indexWhere((s) => s.id == studentId);
     if (idx == -1) return;
 
-    // تحويل حالة Reverb (boarding/alight) إلى حالات الـ 5-states المتعارف عليها في التطبيق
+    // تحويل حالة Reverb إلى حالات الـ 5-states المتعارف عليها في التطبيق
     StudentStatus newStatus;
-    if (newStatusStr == 'boarding') {
+    if (newStatusStr == 'boarding' || newStatusStr == 'boarded' || newStatusStr == 'picked_up') {
       newStatus = (direction == 'to_school')
           ? StudentStatus.onBusToSchool
           : StudentStatus.onBusToHome;
-    } else if (newStatusStr == 'alight') {
+    } else if (newStatusStr == 'alight' || newStatusStr == 'dropped' || newStatusStr == 'completed') {
       newStatus = (direction == 'to_school')
           ? StudentStatus.atSchool
           : StudentStatus.arrivedHome;
@@ -1121,7 +1127,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       newStatus = (direction == 'to_school')
           ? StudentStatus.waitingAtHome
           : StudentStatus.onBusToHome;
-    } else if (newStatusStr == 'absent') {
+    } else if (newStatusStr == 'absent' || newStatusStr == 'skipped') {
       newStatus = StudentStatus.atHome;
     } else {
       // Fallback for direct enum name matching if backend sends onBus/atHome etc.
@@ -1157,6 +1163,42 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         name: 'REVERB',
       );
       notifyListeners();
+
+      // Refresh authoritative sequence & stops remaining count
+      fetchChildTripStatus(studentId);
+    }
+  }
+
+  /// جلب تسلسل الطالب في الرحلة وعدد المحطات المتبقية وفق ترتيب السيرفر المعتمد
+  Future<void> fetchChildTripStatus(String studentId) async {
+    try {
+      final response = await dio.get('parent/child/$studentId/trip-status');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['has_active_trip'] == true) {
+          final childSeq = data['child_sequence'] as int?;
+          final totalStops = data['total_stops'] as int?;
+          final stopsRem = data['stops_remaining'] as int?;
+          final childStat = data['child_status'] as String?;
+
+          final sIdx = _students.indexWhere((s) => s.id == studentId);
+          if (sIdx != -1) {
+            final busId = _students[sIdx].bus.id;
+            if (busId.isNotEmpty && _tripGroups.containsKey(busId)) {
+              final group = _tripGroups[busId]!;
+              _tripGroups[busId] = group.copyWith(
+                childSequence: childSeq,
+                totalStops: totalStops,
+                stopsRemaining: stopsRem,
+                childStatus: childStat,
+              );
+              notifyListeners();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.d('fetchChildTripStatus failed for student $studentId: $e');
     }
   }
 

@@ -892,8 +892,9 @@ class _ChildDetailsSheet extends StatelessWidget {
                                       note = result['note'] as String?;
                                     }
 
-                                    if (location != null) {
+                                    if (location != null && context.mounted) {
                                       // Show loading indicator
+                                      final navigator = Navigator.of(context, rootNavigator: true);
                                       showDialog(
                                         context: context,
                                         barrierDismissible: false,
@@ -902,16 +903,19 @@ class _ChildDetailsSheet extends StatelessWidget {
                                         ),
                                       );
 
-                                      final message = await AppScope.of(context)
-                                          .updateHomeLocationApi(
-                                            location,
-                                            studentId: student.id,
-                                            address: label,
-                                            note: note,
-                                          );
-
-                                      if (context.mounted) {
-                                        Navigator.pop(context); // Remove loading
+                                      String? message;
+                                      try {
+                                        message = await AppScope.of(context)
+                                            .updateHomeLocationApi(
+                                              location,
+                                              studentId: student.id,
+                                              address: label,
+                                              note: note,
+                                            );
+                                      } finally {
+                                        if (navigator.canPop()) {
+                                          navigator.pop(); // Remove loading
+                                        }
                                       }
 
                                       if (message != null && context.mounted) {
